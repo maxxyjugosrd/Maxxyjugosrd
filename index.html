@@ -380,50 +380,45 @@
       try {
         await db.collection("pedidos").add(orderData);
 
-        if (email) {
-          const templateParams = {
-            to_name: name,
-            to_email: email,
-            phone: phone,
-            address: address,
-            delivery_date: date,
-            order_summary: itemsSummary,
-            total_price: `RD$ ${totalAmount.toFixed(2)}`
-          };
+        if (email && email.trim() !== "") {
+            // SI TIENE CORREO: Envía la factura y termina en la web (NO abre WhatsApp)
+            const templateParams = {
+                to_name: name,
+                to_email: email,
+                phone: phone,
+                address: address,
+                delivery_date: date,
+                order_summary: itemsSummary,
+                total_price: `RD$ ${totalAmount.toFixed(2)}`
+            };
 
-          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+            await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
 
-          alert('¡Muchas gracias por tu orden! Te hemos enviado un correo con la confirmación.');
+            alert('¡Muchas gracias por tu orden! Hemos registrado tu pedido y te enviamos la factura por correo.');
+
         } else {
-          let msg = `*¡Hola Maxxy Jugos! Quisiera realizar la siguiente orden:*\n\n`;
-          msg += `*Cliente:* ${name}\n`;
-          msg += `*Teléfono:* ${phone}\n`;
-          msg += `*Dirección:* ${address}\n`;
-          msg += `*Fecha de Entrega:* ${date}\n\n`;
-          msg += `*Detalle del Pedido:*\n${itemsSummary}\n\n`;
-          msg += `*Total a Pagar:* RD$ ${totalAmount.toFixed(2)}\n\n`;
-          msg += `_Adjunto por aquí mi comprobante de pago del Banco Popular._`;
+            // SI NO PUSO CORREO: Registra la orden y lo envía a WhatsApp
+            let msg = `*¡Hola Maxxy Jugos! Quisiera realizar la siguiente orden:*\n\n`;
+            msg += `*Cliente:* ${name}\n`;
+            msg += `*Teléfono:* ${phone}\n`;
+            msg += `*Dirección:* ${address}\n`;
+            msg += `*Fecha de Entrega:* ${date}\n`;
+            msg += `*Detalle del Pedido:*\n${itemsSummary}\n\n`;
+            msg += `*Total a Pagar:* RD$ ${totalAmount.toFixed(2)}\n\n`;
+            msg += `_Adjunto por aquí mi comprobante de pago del Banco Popular._`;
 
-          const encodedMsg = encodeURIComponent(msg);
-          const whatsappURL = `https://wa.me/18404040514?text=${encodedMsg}`;
+            const encodedMsg = encodeURIComponent(msg);
+            const whatsappURL = `https://wa.me/18404040514?text=${encodedMsg}`;
 
-          alert('¡Orden registrada exitosamente! Serás redirigido a WhatsApp para enviar el comprobante de pago.');
-          window.open(whatsappURL, '_blank');
+            alert('¡Orden registrada exitosamente! Haz clic en Aceptar para ser redirigido a WhatsApp y coordinar tu pago.');
+            window.location.href = whatsappURL;
         }
 
-        cart = [];
-        updateCartUI();
-        document.getElementById('order-form').reset();
-        document.getElementById('checkout-modal').classList.add('hidden');
-
-      } catch (error) {
-        console.error("Error al procesar la orden:", error);
-        alert("Redirigiendo a WhatsApp para procesar tu orden directamente...");
-        
-        const whatsappURL = `https://wa.me/18404040514?text=Hola,%20quisiera%20completar%20un%20pedido.%20Mi%20nombre%20es%20${encodeURIComponent(name)}`;
-        window.open(whatsappURL, '_blank');
-      }
-    });
+    } catch (error) {
+        console.error("Error al procesar el pedido:", error);
+        alert("Ocurrió un error al procesar tu orden. Por favor intenta de nuevo.");
+    }
+}
 
     window.onload = () => {
       renderProducts();
