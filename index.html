@@ -380,8 +380,8 @@
       try {
         await db.collection("pedidos").add(orderData);
 
-        if (email && email.trim() !== "") {
-            // SI TIENE CORREO: Envía la factura y termina en la web (NO abre WhatsApp)
+       if (email && email.trim() !== "") {
+            // SI TIENE CORREO: Envía la factura
             const templateParams = {
                 to_name: name,
                 to_email: email,
@@ -395,6 +395,17 @@
             await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
 
             alert('¡Muchas gracias por tu orden! Hemos registrado tu pedido y te enviamos la factura por correo.');
+
+            // --- LIMPIEZA DEL CARRITO Y MODAL ---
+            cart = []; // Vacía el arreglo del carrito
+            if (typeof updateCartUI === 'function') updateCartUI(); // Actualiza el contador
+            
+            // Cierra la ventana flotante del carrito
+            const checkoutModal = document.getElementById('checkout-modal') || document.getElementById('cart-modal');
+            if (checkoutModal) checkoutModal.classList.add('hidden');
+            
+            // Reinicia el formulario
+            e.target.reset();
 
         } else {
             // SI NO PUSO CORREO: Registra la orden y lo envía a WhatsApp
