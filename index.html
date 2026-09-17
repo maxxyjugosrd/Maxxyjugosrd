@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maxxy Jugos | Jugos Naturales en Santo Domingo</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- EmailJS SDK -->
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <script type="text/javascript">
+     (function(){
+        emailjs.init("17KJ7w9kR8Ej3mZIk");
+     })();
+  </script>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-amber-50 text-gray-800 font-sans flex flex-col min-h-screen">
+
+  <!-- Header / Navbar -->
+  <header class="bg-orange-500 text-white shadow-md sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 py-2 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <img src="https://i.ibb.co/Lhb85x6/logo.jpg" alt="Maxxy Jugos Logo" class="w-12 h-12 rounded-full border-2 border-yellow-300 object-cover">
+        <span class="text-2xl font-extrabold tracking-wide">MAXXY JUGOS</span>
+      </div>
+      
+      <div class="flex items-center space-x-6">
+        <a href="#contacto" class="hidden md:inline hover:underline text-sm font-medium">Contacto</a>
+        <button id="cart-btn" class="relative bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-full font-bold flex items-center gap-2 transition">
+          <i class="fa-solid fa-cart-shopping"></i>
+          <span>Carrito</span>
+          <span id="cart-count" class="bg-yellow-400 text-black text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="bg-gradient-to-r from-orange-400 to-amber-500 text-white py-10 px-4 text-center shadow-inner">
+    <div class="max-w-3xl mx-auto flex flex-col items-center">
+      <img src="https://i.ibb.co/Lhb85x6/logo.jpg" alt="Maxxy Jugos Logo" class="w-28 h-28 rounded-full border-4 border-white shadow-lg mb-4 object-cover">
+      <h1 class="text-4xl md:text-5xl font-black mb-2">¡Jugos 100% Naturales y Frescos!</h1>
+      <p class="text-lg md:text-xl font-light mb-4">Al por mayor y al detalle en presentaciones de 16 oz y Galones.</p>
+      <p class="inline-block bg-white text-orange-600 font-semibold px-4 py-1.5 rounded-full text-sm shadow">
+        <i class="fa-solid fa-truck-fast mr-1"></i> Envíos a todo Santo Domingo y Nivel Nacional (Aplica pedido mínimo)
+      </p>
+    </div>
+  </section>
+
+  <!-- Catalog Section -->
+  <main class="max-w-6xl mx-auto px-4 py-10 flex-grow">
+    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8 border-b-4 border-orange-400 inline-block pb-1">Nuestros Jugos</h2>
+    
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8" id="product-list">
+      <!-- Los productos se cargarán dinámicamente -->
+    </div>
+  </main>
+
+  <!-- Shopping Cart Modal -->
+  <div id="cart-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex justify-end">
+    <div class="bg-white w-full max-w-lg h-full p-6 flex flex-col justify-between overflow-y-auto shadow-2xl">
+      <div>
+        <div class="flex justify-between items-center border-b pb-4 mb-4">
+          <h3 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-basket-shopping text-orange-500 mr-2"></i>Tu Pedido</h3>
+          <button id="close-cart" class="text-gray-500 hover:text-red-500 text-2xl font-bold">&times;</button>
+        </div>
+
+        <div id="cart-items" class="space-y-4 mb-6">
+          <p class="text-gray-500 text-center py-8">Tu carrito está vacío.</p>
+        </div>
+      </div>
+
+      <div class="border-t pt-4">
+        <div class="flex justify-between text-xl font-bold mb-4">
+          <span>Total:</span>
+          <span id="cart-total" class="text-orange-600">RD$ 0.00</span>
+        </div>
+        <button id="checkout-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg text-center transition shadow-lg disabled:opacity-50" disabled>
+          Proceder a la Orden
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Checkout / Order Modal -->
+  <div id="checkout-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div class="flex justify-between items-center border-b pb-3 mb-4">
+        <h3 class="text-2xl font-extrabold text-orange-600">Completar Orden</h3>
+        <button id="close-checkout" class="text-gray-500 hover:text-red-500 text-2xl">&times;</button>
+      </div>
+
+      <!-- Datos Bancarios -->
+      <div class="bg-orange-50 border-l-4 border-orange-500 p-4 rounded mb-6 text-sm">
+        <h4 class="font-bold text-orange-800 text-base mb-1"><i class="fa-solid fa-building-columns mr-1"></i> Información de Pago</h4>
+        <p>Por favor realiza la transferencia a la siguiente cuenta:</p>
+        <div class="mt-2 font-mono bg-white p-2.5 rounded border text-gray-700">
+          <p><strong>Banco:</strong> Banco Popular</p>
+          <p><strong>No. Cuenta:</strong> 814423729</p>
+          <p><strong>Titular:</strong> LANDRA GUZMAN</p>
+        </div>
+        <p class="text-xs text-gray-600 mt-2">* Recuerda guardar el comprobante para enviarlo.</p>
+      </div>
+
+      <!-- Formulario del Cliente -->
+      <form id="order-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-bold text-gray-700 mb-1">Nombre Completo *</label>
+          <input type="text" id="cust-name" required class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400 outline-none" placeholder="Ej. Juan Pérez">
+        </div>
+
+        <div>
+          <label class="block text-sm font-bold text-gray-700 mb-1">Dirección de Entrega *</label>
+          <textarea id="cust-address" required rows="2" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400 outline-none" placeholder="Ej. Av. Winston Churchill, Apt 4B, Santo Domingo"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-bold text-gray-700 mb-1">Teléfono / WhatsApp *</label>
+          <input type="tel" id="cust-phone" required class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400 outline-none" placeholder="8091234567">
+        </div>
+
+        <div>
+          <label class="block text-sm font-bold text-gray-700 mb-1">Día Deseado de Recepción *</label>
+          <input type="date" id="cust-date" required class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400 outline-none">
+          <span class="text-xs text-gray-500">Pedidos con mínimo 2 días de anticipación.</span>
+        </div>
+
+        <div>
+          <label class="block text-sm font-bold text-gray-700 mb-1">Correo Electrónico <span class="text-gray-400 font-normal">(Opcional)</span></label>
+          <input type="email" id="cust-email" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400 outline-none" placeholder="correo@ejemplo.com">
+          <p class="text-xs text-gray-500 mt-1">Si dejas este campo vacío, la orden se enviará directamente por WhatsApp.</p>
+        </div>
+
+        <button type="submit" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-extrabold py-3 rounded-lg transition shadow-md">
+          <i class="fa-solid fa-paper-plane mr-2"></i> Confirmar y Enviar Orden
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer / Contact Info -->
+  <footer id="contacto" class="bg-gray-900 text-white pt-10 pb-6 mt-12">
+    <div class="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+      <div>
+        <div class="flex items-center space-x-3 mb-3">
+          <img src="https://i.ibb.co/Lhb85x6/logo.jpg" alt="Maxxy Jugos Logo" class="w-10 h-10 rounded-full border border-orange-400 object-cover">
+          <h4 class="text-xl font-bold text-orange-400">MAXXY JUGOS</h4>
+        </div>
+        <p class="text-gray-400 text-sm">Jugos naturales al por mayor y al detalle para clientes, eventos y empresas. Calidad y frescura garantizada.</p>
+        <p class="text-gray-400 text-sm mt-2"><i class="fa-solid fa-location-dot text-orange-400 mr-1"></i> SANTO DOMINGO, RD</p>
+      </div>
+
+      <div>
+        <h4 class="text-xl font-bold text-orange-400 mb-3">Contacto Directo</h4>
+        <ul class="space-y-2 text-sm text-gray-300">
+          <li>
+            <i class="fa-brands fa-whatsapp text-green-400 text-base w-5"></i>
+            <a href="https://wa.me/18404040514" target="_blank" class="hover:underline">840-404-0514 (WhatsApp)</a>
+          </li>
+          <li>
+            <i class="fa-solid fa-phone text-blue-400 text-base w-5"></i>
+            <a href="tel:8297726631" class="hover:underline">829-772-6631 (Llamadas)</a>
+          </li>
+          <li>
+            <i class="fa-solid fa-envelope text-yellow-400 text-base w-5"></i>
+            <a href="mailto:maxxyjugosrd@gmail.com" class="hover:underline">maxxyjugosrd@gmail.com</a>
+          </li>
+        </ul>
+      </div>
+
+      <div>
+        <h4 class="text-xl font-bold text-orange-400 mb-3">Síguenos</h4>
+        <a href="https://www.instagram.com/maxxyjugosrd/" target="_blank" class="inline-flex items-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-2 rounded-lg text-white font-medium hover:opacity-90 transition">
+          <i class="fa-brands fa-instagram text-xl"></i> @maxxyjugosrd
+        </a>
+      </div>
+    </div>
+
+    <div class="border-t border-gray-800 pt-4 text-center text-xs text-gray-500">
+      &copy; 2026 Maxxy Jugos. Todos los derechos reservados.
+    </div>
+  </footer>
+
+  <!-- SCRIPT LOGIC -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDV35AU8W2SCEEZXcKvhYIvVJjhbm9ns18",
+      authDomain: "maxxyjugos.firebaseapp.com",
+      projectId: "maxxyjugos",
+      storageBucket: "maxxyjugos.appspot.com",
+      messagingSenderId: "1029384756",
+      appId: "1:1029384756:web:abcd1234efgh"
+    };
+    
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore();
+
+    const EMAILJS_SERVICE_ID = "service_hq0ilqb";
+    const EMAILJS_TEMPLATE_ID = "template_255rdau";
+
+    const products = [
+      { id: 'chinola', name: 'Jugo de Chinola', img: 'https://images.unsplash.com/photo-1534353473418-4cfa6c56fd38?auto=format&fit=crop&w=500&q=80' },
+      { id: 'limon', name: 'Jugo de Limón', img: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=500&q=80' },
+      { id: 'tamarindo', name: 'Jugo de Tamarindo', img: 'https://images.unsplash.com/photo-1546173159-315724a31696?auto=format&fit=crop&w=500&q=80' },
+      { id: 'cereza', name: 'Jugo de Cereza', img: 'https://images.unsplash.com/photo-1527661591475-527312dd65f5?auto=format&fit=crop&w=500&q=80' },
+      { id: 'naranja', name: 'Jugo de Naranja', img: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&w=500&q=80' },
+      { id: 'avena_limon', name: 'Avena con Limón', img: 'https://images.unsplash.com/photo-1553530666-ba11a7da3888?auto=format&fit=crop&w=500&q=80' }
+    ];
+
+    const prices = {
+      '16oz': 120,
+      'galon': 450
+    };
+
+    let cart = [];
+
+    function renderProducts() {
+      const container = document.getElementById('product-list');
+      container.innerHTML = products.map(p => `
+        <div class="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition flex flex-col justify-between">
+          <div>
+            <img src="${p.img}" alt="${p.name}" class="w-full h-48 object-cover">
+            <div class="p-5">
+              <h3 class="text-xl font-bold text-gray-800 mb-2">${p.name}</h3>
+              <p class="text-sm text-gray-500 mb-4">Ingredientes 100% naturales, preparado al día.</p>
+              
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-xs font-semibold text-gray-600 mb-1">Tamaño:</label>
+                  <select id="size-${p.id}" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-orange-400 outline-none">
+                    <option value="16oz">16 oz - RD$ ${prices['16oz']}</option>
+                    <option value="galon">Galón - RD$ ${prices['galon']}</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-gray-600 mb-1">Cantidad:</label>
+                  <input type="number" id="qty-${p.id}" min="1" value="1" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-orange-400 outline-none">
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="p-5 pt-0">
+            <button onclick="addToCart('${p.id}', '${p.name}')" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-lg transition">
+              <i class="fa-solid fa-cart-plus mr-1"></i> Añadir al Carrito
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function addToCart(productId, productName) {
+      const sizeSelect = document.getElementById(`size-${productId}`);
+      const qtyInput = document.getElementById(`qty-${productId}`);
+
+      const size = sizeSelect.value;
+      const quantity = parseInt(qtyInput.value) || 1;
+      const unitPrice = prices[size];
+      const itemTotal = unitPrice * quantity;
+
+      const sizeLabel = size === '16oz' ? '16 oz' : 'Galón';
+
+      const existingIndex = cart.findIndex(item => item.id === productId && item.size === sizeLabel);
+      if (existingIndex > -1) {
+        cart[existingIndex].quantity += quantity;
+        cart[existingIndex].total += itemTotal;
+      } else {
+        cart.push({
+          id: productId,
+          name: productName,
+          size: sizeLabel,
+          unitPrice: unitPrice,
+          quantity: quantity,
+          total: itemTotal
+        });
+      }
+
+      updateCartUI();
+      document.getElementById('cart-modal').classList.remove('hidden');
+    }
+
+    function removeFromCart(index) {
+      cart.splice(index, 1);
+      updateCartUI();
+    }
+
+    function updateCartUI() {
+      const cartItemsContainer = document.getElementById('cart-items');
+      const cartCount = document.getElementById('cart-count');
+      const cartTotal = document.getElementById('cart-total');
+      const checkoutBtn = document.getElementById('checkout-btn');
+
+      const totalQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
+      const totalPrice = cart.reduce((sum, item) => sum + item.total, 0);
+
+      cartCount.textContent = totalQuantity;
+      cartTotal.textContent = `RD$ ${totalPrice.toFixed(2)}`;
+
+      if (cart.length === 0) {
+        cartItemsContainer.innerHTML = `<p class="text-gray-500 text-center py-8">Tu carrito está vacío.</p>`;
+        checkoutBtn.disabled = true;
+      } else {
+        checkoutBtn.disabled = false;
+        cartItemsContainer.innerHTML = cart.map((item, index) => `
+          <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border">
+            <div>
+              <h4 class="font-bold text-gray-800">${item.name}</h4>
+              <p class="text-xs text-gray-500">${item.size} x ${item.quantity} - RD$ ${item.unitPrice} c/u</p>
+              <p class="text-sm font-semibold text-orange-600">Subtotal: RD$ ${item.total}</p>
+            </div>
+            <button onclick="removeFromCart(${index})" class="text-red-500 hover:text-red-700 p-2">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        `).join('');
+      }
+    }
+
+    function setupDateRestriction() {
+      const dateInput = document.getElementById('cust-date');
+      const today = new Date();
+      const minDate = new Date(today.setDate(today.getDate() + 2));
+      const year = minDate.getFullYear();
+      const month = String(minDate.getMonth() + 1).padStart(2, '0');
+      const day = String(minDate.getDate()).padStart(2, '0');
+      
+      dateInput.min = `${year}-${month}-${day}`;
+    }
+
+    document.getElementById('cart-btn').addEventListener('click', () => {
+      document.getElementById('cart-modal').classList.remove('hidden');
+    });
+
+    document.getElementById('close-cart').addEventListener('click', () => {
+      document.getElementById('cart-modal').classList.add('hidden');
+    });
+
+    document.getElementById('checkout-btn').addEventListener('click', () => {
+      document.getElementById('cart-modal').classList.add('hidden');
+      document.getElementById('checkout-modal').classList.remove('hidden');
+    });
+
+    document.getElementById('close-checkout').addEventListener('click', () => {
+      document.getElementById('checkout-modal').classList.add('hidden');
+    });
+
+    document.getElementById('order-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const name = document.getElementById('cust-name').value.trim();
+      const address = document.getElementById('cust-address').value.trim();
+      const phone = document.getElementById('cust-phone').value.trim();
+      const date = document.getElementById('cust-date').value;
+      const email = document.getElementById('cust-email').value.trim();
+
+      const totalAmount = cart.reduce((sum, item) => sum + item.total, 0);
+
+      const itemsSummary = cart.map(i => `${i.quantity}x ${i.name} (${i.size}) - RD$${i.total}`).join('\n');
+
+      const orderData = {
+        cliente: name,
+        direccion: address,
+        telefono: phone,
+        fecha_entrega: date,
+        correo: email || 'No provisto',
+        pedido: cart,
+        total: totalAmount,
+        fecha_creacion: new Date().toISOString()
+      };
+
+      try {
+        await db.collection("pedidos").add(orderData);
+
+        if (email) {
+          const templateParams = {
+            to_name: name,
+            to_email: email,
+            phone: phone,
+            address: address,
+            delivery_date: date,
+            order_summary: itemsSummary,
+            total_price: `RD$ ${totalAmount.toFixed(2)}`
+          };
+
+          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+
+          alert('¡Muchas gracias por tu orden! Te hemos enviado un correo con la confirmación.');
+        } else {
+          let msg = `*¡Hola Maxxy Jugos! Quisiera realizar la siguiente orden:*\n\n`;
+          msg += `*Cliente:* ${name}\n`;
+          msg += `*Teléfono:* ${phone}\n`;
+          msg += `*Dirección:* ${address}\n`;
+          msg += `*Fecha de Entrega:* ${date}\n\n`;
+          msg += `*Detalle del Pedido:*\n${itemsSummary}\n\n`;
+          msg += `*Total a Pagar:* RD$ ${totalAmount.toFixed(2)}\n\n`;
+          msg += `_Adjunto por aquí mi comprobante de pago del Banco Popular._`;
+
+          const encodedMsg = encodeURIComponent(msg);
+          const whatsappURL = `https://wa.me/18404040514?text=${encodedMsg}`;
+
+          alert('¡Orden registrada exitosamente! Serás redirigido a WhatsApp para enviar el comprobante de pago.');
+          window.open(whatsappURL, '_blank');
+        }
+
+        cart = [];
+        updateCartUI();
+        document.getElementById('order-form').reset();
+        document.getElementById('checkout-modal').classList.add('hidden');
+
+      } catch (error) {
+        console.error("Error al procesar la orden:", error);
+        alert("Redirigiendo a WhatsApp para procesar tu orden directamente...");
+        
+        const whatsappURL = `https://wa.me/18404040514?text=Hola,%20quisiera%20completar%20un%20pedido.%20Mi%20nombre%20es%20${encodeURIComponent(name)}`;
+        window.open(whatsappURL, '_blank');
+      }
+    });
+
+    window.onload = () => {
+      renderProducts();
+      setupDateRestriction();
+    };
+  </script>
+</body>
+</html>
