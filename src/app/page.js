@@ -4,20 +4,13 @@ import { useState, useEffect } from "react";
 import { 
   ShoppingCart, 
   Search, 
-  Phone, 
-  Mail, 
-  Instagram, 
   Truck, 
   CheckCircle2, 
   Plus, 
   Minus, 
   X,
   Leaf,
-  Sparkles,
-  MapPin,
-  PackageCheck,
-  Flame,
-  Image as ImageIcon
+  PackageCheck
 } from "lucide-react";
 
 export default function Home() {
@@ -48,9 +41,15 @@ export default function Home() {
 
   useEffect(() => {
     const cargarCatalogo = () => {
-      const guardado = localStorage.getItem("maxxy_catalogo");
-      if (guardado) {
-        setCatalogoPanel(JSON.parse(guardado));
+      if (typeof window !== "undefined") {
+        const guardado = localStorage.getItem("maxxy_catalogo");
+        if (guardado) {
+          try {
+            setCatalogoPanel(JSON.parse(guardado));
+          } catch (e) {
+            console.error("Error al parsear el catálogo", e);
+          }
+        }
       }
     };
 
@@ -59,7 +58,7 @@ export default function Home() {
     return () => window.removeEventListener("storage", cargarCatalogo);
   }, []);
 
-  // Filtrar categorías del catálogo jalado del panel
+  // Filtrar categorías del catálogo
   const jugosNaturalesPanel = catalogoPanel.filter(p => p.categoria === "Botella 12 oz" && p.disponible);
   const galonesPanel = catalogoPanel.filter(p => p.categoria === "Galones" && p.disponible);
   const saludablesPanel = catalogoPanel.filter(p => p.categoria === "Saludables & Shots" && p.disponible);
@@ -134,7 +133,7 @@ export default function Home() {
       cantidad: 1,
       precio: 600,
       categoria: "Botella 12 oz",
-      imagen: "🥤"
+      imagen: ""
     };
 
     setCarrito([...carrito, item]);
@@ -182,7 +181,7 @@ export default function Home() {
       cantidad: 1,
       precio: 910,
       categoria: "Saludables & Shots",
-      imagen: "🥦"
+      imagen: ""
     };
     setCarrito([...carrito, item]);
     setIngredientesJugo([]);
@@ -198,7 +197,7 @@ export default function Home() {
       cantidad: 1,
       precio: 595,
       categoria: "Saludables & Shots",
-      imagen: "🫚"
+      imagen: ""
     };
     setCarrito([...carrito, item]);
     setIngredientesShot([]);
@@ -233,8 +232,8 @@ export default function Home() {
       telefono: datosEnvio.telefono,
       correo: datosEnvio.correo,
       direccion: datosEnvio.direccion,
-      zona: zonaActual.nombre,
-      tipoTransporte: zonaActual.tipo === "camion" ? `Camión ${tipoCamion}` : "Entrega Local",
+      zona: zonaActual ? zonaActual.nombre : "",
+      tipoTransporte: zonaActual?.tipo === "camion" ? `Camión ${tipoCamion}` : "Entrega Local",
       fechaEntrega: datosEnvio.fechaEntrega,
       productos: carrito,
       subtotal,
@@ -245,10 +244,12 @@ export default function Home() {
     };
 
     // 1. Guardar localmente
-    const pedidosExistentes = JSON.parse(localStorage.getItem("pedidos_maxxy") || "[]");
-    localStorage.setItem("pedidos_maxxy", JSON.stringify([nuevoPedido, ...pedidosExistentes]));
+    if (typeof window !== "undefined") {
+      const pedidosExistentes = JSON.parse(localStorage.getItem("pedidos_maxxy") || "[]");
+      localStorage.setItem("pedidos_maxxy", JSON.stringify([nuevoPedido, ...pedidosExistentes]));
+    }
 
-    // 2. Formatear resumen de compra para el correo
+    // 2. Formatear resumen de compra
     const detalleProductos = carrito
       .map((item) => `${item.cantidad}x ${item.nombre} (${item.tamano}) - RD$ ${item.precio * item.cantidad}`)
       .join("\n");
@@ -268,14 +269,13 @@ export default function Home() {
     };
 
     try {
-      // Envío de correo mediante API / EmailJS
       await fetch("https://api.emailjs.com/api/v1.0/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          service_id: "YOUR_SERVICE_ID", // Reemplazar con Service ID de EmailJS
-          template_id: "YOUR_TEMPLATE_ID", // Reemplazar con Template ID de EmailJS
-          user_id: "YOUR_PUBLIC_KEY", // Reemplazar con Public Key de EmailJS
+          service_id: "YOUR_SERVICE_ID",
+          template_id: "YOUR_TEMPLATE_ID",
+          user_id: "YOUR_PUBLIC_KEY",
           template_params: templateParams
         })
       });
@@ -386,28 +386,28 @@ export default function Home() {
         </div>
       </section>
 
-      {/* BARRA DE NAVEGACIÓN RÁPIDA (BOTONES PREDETERMINADOS) */}
+      {/* BARRA DE NAVEGACIÓN RÁPIDA */}
       <nav className="bg-slate-800 text-white sticky top-[68px] z-30 shadow-md border-t border-slate-700">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center sm:justify-start gap-2 overflow-x-auto text-xs font-bold">
           <button onClick={() => scrollToSection("inicio")} className="px-3 py-1.5 rounded-xl hover:bg-slate-700 transition whitespace-nowrap">
-            🏠 Inicio
+             Inicio
           </button>
           <button onClick={() => scrollToSection("jugos-naturales")} className="px-3 py-1.5 bg-amber-500 text-slate-950 rounded-xl hover:bg-amber-400 transition whitespace-nowrap">
-            🥤 Jugos Naturales
+             Jugos Naturales
           </button>
           <button onClick={() => scrollToSection("galones")} className="px-3 py-1.5 rounded-xl hover:bg-slate-700 transition whitespace-nowrap">
-            🧃 Galones
+             Galones
           </button>
           <button onClick={() => scrollToSection("saludables")} className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition whitespace-nowrap">
-            🥦 Jugo Saludable & Shots
+             Jugo Saludable & Shots
           </button>
           <button onClick={() => scrollToSection("contacto")} className="px-3 py-1.5 rounded-xl hover:bg-slate-700 transition whitespace-nowrap">
-            📞 Contactos
+             Contactos
           </button>
         </div>
       </nav>
 
-      {/* SECCIÓN 1: JUGOS NATURALES (MEDIA DOCENA 12 OZ) - HALADOS DEL PANEL */}
+      {/* SECCIÓN 1: JUGOS NATURALES */}
       <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6" id="jugos-naturales">
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-4">
@@ -436,7 +436,7 @@ export default function Home() {
                     {j.imagen ? (
                       <img src={j.imagen} alt={j.nombre} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-3xl">🥤</span>
+                      <span className="text-xs text-slate-400">Sin foto</span>
                     )}
                   </div>
                   <div>
@@ -477,7 +477,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SECCIÓN 2: GALONES CONCENTRADOS (UBICADO JUSTO DEBAJO DE JUGOS NATURALES) */}
+      {/* SECCIÓN 2: GALONES CONCENTRADOS */}
       <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-4" id="galones">
         <h3 className="text-xl font-extrabold text-slate-900">Galones Concentrados</h3>
         
@@ -495,7 +495,7 @@ export default function Home() {
                     {g.imagen ? (
                       <img src={g.imagen} alt={g.nombre} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-3xl">🧃</span>
+                      <span className="text-xs text-slate-400">Sin foto</span>
                     )}
                   </div>
                   <div>
@@ -516,7 +516,7 @@ export default function Home() {
         )}
       </section>
 
-      {/* SECCIÓN 3: SALUDABLES & SHOTS (HALADOS DEL PANEL) */}
+      {/* SECCIÓN 3: SALUDABLES & SHOTS */}
       <section className="bg-emerald-950 text-white py-12 px-4 sm:px-6 my-4" id="saludables">
         <div className="max-w-7xl mx-auto space-y-10">
           <div className="border-b border-emerald-800 pb-4">
@@ -532,7 +532,7 @@ export default function Home() {
           {/* PRODUCTOS REGISTRADOS EN EL PANEL */}
           <div className="space-y-4">
             <h3 className="text-xl font-black text-amber-400 flex items-center gap-2">
-              🥦 Opciones Registradas en el Panel
+               Opciones Registradas en el Panel
             </h3>
 
             {saludablesPanel.length === 0 ? (
@@ -549,7 +549,7 @@ export default function Home() {
                           {rec.imagen ? (
                             <img src={rec.imagen} alt={rec.nombre} className="w-full h-full object-cover" />
                           ) : (
-                            <span className="text-2xl">🥦</span>
+                            <span className="text-xs text-emerald-300">Sin foto</span>
                           )}
                         </div>
                         <span className="bg-emerald-800 text-emerald-200 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-700">
@@ -573,7 +573,7 @@ export default function Home() {
 
           {/* CREADOR PERSONALIZADO */}
           <div className="bg-emerald-900/40 border border-emerald-800 p-6 rounded-3xl space-y-6 pt-6">
-            <h3 className="text-lg font-extrabold text-white">⚙️ O crea tu propia combinación a medida:</h3>
+            <h3 className="text-lg font-extrabold text-white">O crea tu propia combinación a medida:</h3>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="space-y-3">
                 <p className="text-xs font-bold text-emerald-300">Jugo 8 oz (Máx 4 ingredientes):</p>
@@ -644,7 +644,7 @@ export default function Home() {
                   </div>
                   <h3 className="text-2xl font-black text-slate-900">¡Pedido Enviado con Éxito!</h3>
                   <p className="text-xs text-slate-500 leading-relaxed px-4">
-                    Tu pedido ha sido recibido directamente en nuestro **Panel de Control**. Nuestro equipo revisará la ruta y se comunicará contigo vía WhatsApp o llamada para confirmar el pago y los detalles del envío.
+                    Tu pedido ha sido recibido directamente en nuestro Panel de Control. Nuestro equipo revisará la ruta y se comunicará contigo vía WhatsApp o llamada para confirmar el pago y los detalles del envío.
                   </p>
                   <button
                     onClick={() => {
@@ -665,7 +665,7 @@ export default function Home() {
                         onClick={() => setMostrarCarrito(false)}
                         className="text-amber-600 font-bold text-xs hover:underline"
                       >
-                        ← Volver a ver productos
+                         Volver a ver productos
                       </button>
                     </div>
                   ) : (
@@ -740,7 +740,7 @@ export default function Home() {
                       {zonaActual?.tipo === "camion" && (
                         <div className="bg-amber-50 p-3 rounded-2xl border border-amber-200 space-y-2">
                           <p className="text-[11px] font-bold text-amber-900">
-                            🚚 Mínimo para Camión: 6 docenas. Selecciona tipo:
+                             Mínimo para Camión: 6 docenas. Selecciona tipo:
                           </p>
                           <div className="flex gap-4 text-xs font-bold">
                             <label className="flex items-center gap-1.5 cursor-pointer">
