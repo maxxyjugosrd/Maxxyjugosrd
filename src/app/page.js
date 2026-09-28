@@ -217,38 +217,44 @@ export default function Home() {
   const costoEnvio = subtotal > 0 ? calcularCostoEnvio() : 0;
   const total = subtotal + costoEnvio;
 
-  // Enviar Pedido por Email y registrar en el Panel
-  const enviarPedidoAlPanel = async (e) => {
-    e.preventDefault();
-    if (carrito.length === 0) return alert("El carrito está vacío.");
-    if (!datosEnvio.nombre || !datosEnvio.telefono || !datosEnvio.direccion || !datosEnvio.fechaEntrega) {
-      return alert("Por favor completa los campos requeridos.");
-    }
+  import { db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
-    const idPedido = `PED-${Date.now().toString().slice(-4)}`;
+// Enviar Pedido a la Base de Datos en la Nube + Correo
+const enviarPedidoAlPanel = async (e) => {
+  e.preventDefault();
+  if (carrito.length === 0) return alert("El carrito está vacío.");
+  if (!datosEnvio.nombre || !datosEnvio.telefono || !datosEnvio.direccion || !datosEnvio.fechaEntrega) {
+    return alert("Por favor completa los campos requeridos.");
+  }
 
-    const nuevoPedido = {
-      id: idPedido,
-      cliente: `${datosEnvio.nombre} ${datosEnvio.apellido}`,
-      telefono: datosEnvio.telefono,
-      correo: datosEnvio.correo,
-      direccion: datosEnvio.direccion,
-      zona: zonaActual.nombre,
-      tipoTransporte: zonaActual.tipo === "camion" ? `Camión ${tipoCamion}` : "Entrega Local",
-      fechaEntrega: datosEnvio.fechaEntrega,
-      productos: carrito,
-      subtotal,
-      envio: costoEnvio,
-      total,
-      estado: "Pendiente",
-      fechaCreacion: new Date().toISOString()
-    };
+  const idPedido = `PED-${Date.now().toString().slice(-4)}`;
 
-    // 1. Guardar localmente
-    const pedidosExistentes = JSON.parse(localStorage.getItem("pedidos_maxxy") || "[]");
-    localStorage.setItem("pedidos_maxxy", JSON.stringify([nuevoPedido, ...pedidosExistentes]));
+  const nuevoPedido = {
+    id: idPedido,
+    cliente: `${datosEnvio.nombre} ${datosEnvio.apellido}`,
+    telefono: datosEnvio.telefono,
+    correo: datosEnvio.correo,
+    direccion: datosEnvio.direccion,
+    zona: zonaActual.nombre,
+    tipoTransporte: zonaActual.tipo === "camion" ? `Camión ${tipoCamion}` : "Entrega Local",
+    fechaEntrega: datosEnvio.fechaEntrega,
+    productos: carrito,
+    subtotal,
+    envio: costoEnvio,
+    total,
+    estado: "Pendiente",
+    fechaCreacion: new Date().toISOString()
+  };
 
-    // 2. Formatear resumen de compra para el correo
+  try {
+    // 1. Guardar en la Base de Datos Firebase Cloud
+    await addDoc(collection(db, "pedidos"), {
+      ...nuevoPedido,
+      creadoEn: serverTimestamp()
+    });
+
+    // 2. Formatear resumen para el correo automático
     const detalleProductos = carrito
       .map((item) => `${item.cantidad}x ${item.nombre} (${item.tamano}) - RD$ ${item.precio * item.cantidad}`)
       .join("\n");
@@ -267,25 +273,25 @@ export default function Home() {
       bank_account: "814423729 (Banco Popular - LANDRA GUZMAN)"
     };
 
-    try {
-      // Envío de correo mediante API / EmailJS
-      await fetch("https://api.emailjs.com/api/v1.0/email/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          service_id: "YOUR_SERVICE_ID", // Reemplazar con Service ID de EmailJS
-          template_id: "YOUR_TEMPLATE_ID", // Reemplazar con Template ID de EmailJS
-          user_id: "YOUR_PUBLIC_KEY", // Reemplazar con Public Key de EmailJS
-          template_params: templateParams
-        })
-      });
-    } catch (error) {
-      console.log("Notificación por correo procesada.");
-    }
+    // Envío del correo por EmailJS
+    await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        service_id: "service_maxxy", // ID de EmailJS
+        template_id: "template_maxxy", // Template ID de EmailJS
+        user_id: "public_key_maxxy", // Public Key de EmailJS
+        template_params: templateParams
+      })
+    });
 
     setPedidoExitoso(true);
     setCarrito([]);
-  };
+  } catch (error) {
+    console.error("Error guardando el pedido:", error);
+    alert("Hubo un detalle procesando el pedido. Inténtalo de nuevo.");
+  }
+};
 
   const scrollToSection = (id) => {
     const el = document.getElementById(id);
