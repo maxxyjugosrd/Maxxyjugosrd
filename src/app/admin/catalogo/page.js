@@ -1,14 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Edit2, Trash2, Check, X, Image as ImageIcon, Upload } from "lucide-react";
+import { Plus, Edit2, Trash2, Check, X, Image as ImageIcon, Upload, Leaf, Flame, ShieldAlert } from "lucide-react";
 
 export default function CatalogoPage() {
+  const [categoriaActiva, setCategoriaActiva] = useState("Botella 12 oz");
+
   const [jugos, setJugos] = useState([
+    // Botellas 12 oz
     { id: 1, nombre: "Jugo de Chinola Natural", precio: 100, tamano: "12 oz", categoria: "Botella 12 oz", imagen: "", disponible: true },
     { id: 2, nombre: "Morir Soñando Tradicional", precio: 120, tamano: "12 oz", categoria: "Botella 12 oz", imagen: "", disponible: true },
     { id: 3, nombre: "Jugo de Fresa Natural", precio: 110, tamano: "12 oz", categoria: "Botella 12 oz", imagen: "", disponible: true },
-    { id: 4, nombre: "Jugo de Chinola en Galón", precio: 650, tamano: "1 Galón", categoria: "Galones", imagen: "", disponible: true },
+    { id: 4, nombre: "Jugo de Zapote Concentrado", precio: 110, tamano: "12 oz", categoria: "Botella 12 oz", imagen: "", disponible: true },
+    { id: 5, nombre: "Jugo de Mango Natural", precio: 100, tamano: "12 oz", categoria: "Botella 12 oz", imagen: "", disponible: true },
+
+    // Galones
+    { id: 101, nombre: "Jugo de Chinola en Galón", precio: 650, tamano: "1 Galón", categoria: "Galones", imagen: "", disponible: true },
+    { id: 102, nombre: "Morir Soñando en Galón", precio: 750, tamano: "1 Galón", categoria: "Galones", imagen: "", disponible: true },
+    { id: 103, nombre: "Jugo de Fresa en Galón", precio: 700, tamano: "1 Galón", categoria: "Galones", imagen: "", disponible: true },
+
+    // Línea Saludable (Verde & Shots)
+    { id: 201, nombre: "Jugo Para las Defensas", precio: 910, tamano: "Pack 7 Unidades (8 oz)", categoria: "Saludables & Shots", imagen: "", disponible: true },
+    { id: 202, nombre: "Jugo Para Desinflamar", precio: 910, tamano: "Pack 7 Unidades (8 oz)", categoria: "Saludables & Shots", imagen: "", disponible: true },
+    { id: 203, nombre: "Jugo Para Quemar Grasa", precio: 910, tamano: "Pack 7 Unidades (8 oz)", categoria: "Saludables & Shots", imagen: "", disponible: true },
+    { id: 204, nombre: "Shot Para la Piel & Glow", precio: 595, tamano: "Pack 7 Unidades (2 oz)", categoria: "Saludables & Shots", imagen: "", disponible: true },
+    { id: 205, nombre: "Shot Desinflamante Digestivo", precio: 595, tamano: "Pack 7 Unidades (2 oz)", categoria: "Saludables & Shots", imagen: "", disponible: true },
+    { id: 206, nombre: "Shot Quemador Energizante", precio: 595, tamano: "Pack 7 Unidades (2 oz)", categoria: "Saludables & Shots", imagen: "", disponible: true },
   ]);
 
   const [mostrarModal, setMostrarModal] = useState(false);
@@ -23,7 +40,7 @@ export default function CatalogoPage() {
 
   const abrirModalNuevo = () => {
     setEditandoId(null);
-    setFormJugo({ nombre: "", precio: "", tamano: "12 oz", categoria: "Botella 12 oz", imagen: "" });
+    setFormJugo({ nombre: "", precio: "", tamano: "12 oz", categoria: categoriaActiva, imagen: "" });
     setMostrarModal(true);
   };
 
@@ -39,7 +56,6 @@ export default function CatalogoPage() {
     setMostrarModal(true);
   };
 
-  // Cargar imagen desde archivo del dispositivo
   const handleSeleccionarArchivo = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -56,7 +72,6 @@ export default function CatalogoPage() {
     if (!formJugo.nombre || !formJugo.precio) return;
 
     if (editandoId) {
-      // Editar
       setJugos(
         jugos.map((j) =>
           j.id === editandoId
@@ -65,7 +80,6 @@ export default function CatalogoPage() {
         )
       );
     } else {
-      // Agregar nuevo
       setJugos([
         ...jugos,
         {
@@ -81,7 +95,7 @@ export default function CatalogoPage() {
   };
 
   const eliminarJugo = (id) => {
-    if (confirm("¿Seguro que deseas eliminar este jugo del catálogo?")) {
+    if (confirm("¿Seguro que deseas eliminar este producto del catálogo?")) {
       setJugos(jugos.filter((j) => j.id !== id));
     }
   };
@@ -92,23 +106,43 @@ export default function CatalogoPage() {
     );
   };
 
+  const jugosFiltrados = jugos.filter((j) => j.categoria === categoriaActiva);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Administrador del Menú & Catálogo</h1>
-          <p className="text-slate-500 text-sm">Sube fotos desde tu archivo o URL, edita precios y activa/desactiva productos.</p>
+          <p className="text-slate-500 text-sm">Gestiona jugos tradicionales, galones y la línea saludable (verdes/shots).</p>
         </div>
         <button
           onClick={abrirModalNuevo}
           className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition"
         >
-          <Plus className="w-5 h-5" /> Agregar Nuevo Jugo
+          <Plus className="w-5 h-5" /> Agregar Producto
         </button>
       </div>
 
+      {/* Pestañas de Categoría */}
+      <div className="flex gap-2 border-b pb-2 overflow-x-auto">
+        {["Botella 12 oz", "Galones", "Saludables & Shots"].map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setCategoriaActiva(cat)}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+              categoriaActiva === cat
+                ? "bg-slate-900 text-amber-400 shadow-sm"
+                : "bg-white text-slate-600 border hover:bg-slate-50"
+            }`}
+          >
+            {cat === "Saludables & Shots" ? "🥦 " + cat : cat}
+          </button>
+        ))}
+      </div>
+
+      {/* Grid de Productos */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {jugos.map((jugo) => (
+        {jugosFiltrados.map((jugo) => (
           <div
             key={jugo.id}
             className={`bg-white p-6 rounded-2xl border transition shadow-sm space-y-4 flex flex-col justify-between ${
@@ -169,19 +203,32 @@ export default function CatalogoPage() {
         ))}
       </div>
 
-      {/* MODAL CREAR / EDITAR JUGO CON SUBIDA DE ARCHIVO */}
+      {/* MODAL CREAR / EDITAR */}
       {mostrarModal && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
           <form onSubmit={guardarJugo} className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
             <h2 className="text-lg font-bold text-slate-800">
-              {editandoId ? "Editar Jugo" : "Agregar Nuevo Jugo"}
+              {editandoId ? "Editar Producto" : "Agregar Nuevo Producto"}
             </h2>
 
             <div>
-              <label className="text-xs font-bold text-slate-600">Nombre del Jugo / Producto</label>
+              <label className="text-xs font-bold text-slate-600">Categoría</label>
+              <select
+                value={formJugo.categoria}
+                onChange={(e) => setFormJugo({ ...formJugo, categoria: e.target.value })}
+                className="w-full p-2.5 border rounded-xl text-xs mt-1 outline-none focus:ring-2 focus:ring-amber-500 font-semibold"
+              >
+                <option value="Botella 12 oz">Botella 12 oz</option>
+                <option value="Galones">Galones</option>
+                <option value="Saludables & Shots">Saludables & Shots</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-600">Nombre del Producto</label>
               <input
                 type="text"
-                placeholder="Ej. Jugo de Chinola Natural"
+                placeholder="Ej. Jugo Para las Defensas"
                 value={formJugo.nombre}
                 onChange={(e) => setFormJugo({ ...formJugo, nombre: e.target.value })}
                 className="w-full p-2.5 border rounded-xl text-xs mt-1 outline-none focus:ring-2 focus:ring-amber-500"
@@ -203,10 +250,10 @@ export default function CatalogoPage() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-600">Presentación / Tamaño</label>
+                <label className="text-xs font-bold text-slate-600">Presentación / Detalle</label>
                 <input
                   type="text"
-                  placeholder="Ej. 12 oz, Galón, 8 oz, Shot 2 oz"
+                  placeholder="Ej. Pack 7 Unidades (8 oz)"
                   value={formJugo.tamano}
                   onChange={(e) => setFormJugo({ ...formJugo, tamano: e.target.value })}
                   className="w-full p-2.5 border rounded-xl text-xs mt-1 outline-none focus:ring-2 focus:ring-amber-500"
@@ -215,11 +262,9 @@ export default function CatalogoPage() {
               </div>
             </div>
 
-            {/* SECCIÓN DE SUBIDA DE FOTO */}
             <div className="space-y-2 border-t pt-3">
               <label className="text-xs font-bold text-slate-600 block">Fotografía del Producto</label>
               
-              {/* Vista previa de la imagen */}
               {formJugo.imagen && (
                 <div className="w-20 h-20 bg-slate-100 rounded-xl overflow-hidden border mx-auto relative group">
                   <img src={formJugo.imagen} alt="Vista previa" className="w-full h-full object-cover" />
@@ -233,7 +278,6 @@ export default function CatalogoPage() {
                 </div>
               )}
 
-              {/* Botón para seleccionar archivo local */}
               <div className="flex flex-col gap-2">
                 <label className="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition">
                   <Upload className="w-4 h-4 text-amber-500" /> Cargar Foto desde Dispositivo
@@ -245,11 +289,9 @@ export default function CatalogoPage() {
                   />
                 </label>
 
-                <div className="text-center text-[10px] text-slate-400 uppercase font-bold">— o ingresar enlace URL —</div>
-
                 <input
                   type="text"
-                  placeholder="Ej. https://mis-imagenes.com/jugo.jpg"
+                  placeholder="O pega enlace de imagen URL..."
                   value={formJugo.imagen}
                   onChange={(e) => setFormJugo({ ...formJugo, imagen: e.target.value })}
                   className="w-full p-2 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500"
@@ -259,7 +301,7 @@ export default function CatalogoPage() {
 
             <div className="flex gap-2 pt-2 border-t">
               <button type="submit" className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition">
-                Guardar Producto
+                Guardar
               </button>
               <button
                 type="button"
