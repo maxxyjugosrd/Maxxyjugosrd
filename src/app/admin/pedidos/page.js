@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ShoppingCart, Plus, Trash2, Send, User, Phone, MapPin, Bike } from "lucide-react";
+import { ShoppingCart, Plus, Trash2, Send, User, Phone, MapPin, Bike, Loader2 } from "lucide-react";
+import { crearPedido } from "../../../services/pedidosService";
 
 export default function PedidosManuales() {
   // Lista de productos (Jugos de Frutas Naturales)
@@ -18,6 +19,7 @@ export default function PedidosManuales() {
   const [carrito, setCarrito] = useState([]);
   const [deliveryAsignado, setDeliveryAsignado] = useState("Delivery 1");
   const [metodoPago, setMetodoPago] = useState("Efectivo");
+  const [guardando, setGuardando] = useState(false);
 
   // Agregar jugo al carrito
   const agregarAlCarrito = (producto) => {
@@ -41,16 +43,43 @@ export default function PedidosManuales() {
   // Cálculos del pedido
   const totalPedido = carrito.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
 
-  const handleSubmit = (e) => {
+  // Enviar pedido a Firestore
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (carrito.length === 0) {
       alert("Por favor agrega al menos un jugo al pedido.");
       return;
     }
-    alert(`¡Pedido de RD$ ${totalPedido} registrado con éxito para ${cliente.nombre}!`);
-    // Limpiar formulario
-    setCliente({ nombre: "", telefono: "", direccion: "" });
-    setCarrito([]);
+
+    if (!cliente.nombre.trim()) {
+      alert("Ingresa el nombre del cliente.");
+      return;
+    }
+
+    setGuardando(true);
+
+    const objetoPedido = {
+      cliente,
+      items: carrito,
+      total: totalPedido,
+      deliveryAsignado,
+      metodoPago,
+      origen: "WhatsApp / Manual",
+      estado: "pendiente",
+    };
+
+    const resultado = await crearPedido(objetoPedido);
+
+    setGuardando(false);
+
+    if (resultado.exito) {
+      alert(`¡Pedido registrado en Firestore con éxito por RD$ ${totalPedido}!`);
+      // Limpiar formulario
+      setCliente({ nombre: "", telefono: "", direccion: "" });
+      setCarrito([]);
+    } else {
+      alert("Ocurrió un error al guardar el pedido en la base de datos.");
+    }
   };
 
   return (
@@ -192,9 +221,18 @@ export default function PedidosManuales() {
             </div>
             <button
               onClick={handleSubmit}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-white py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 transition shadow-md"
+              disabled={guardando}
+              className="w-full bg-amber-500 hover:bg-amber-600 text-white py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 transition shadow-md disabled:opacity-50"
             >
-              <Send className="w-4 h-4" /> Confirmar y Guardar Pedido
+              {guardando ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" /> Guardando en Firestore...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" /> Confirmar y Guardar Pedido
+                </>
+              )}
             </button>
           </div>
         </div>
