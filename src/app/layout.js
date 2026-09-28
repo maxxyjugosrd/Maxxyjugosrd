@@ -1,4 +1,4 @@
-import "./globals.css"; // o los estilos de Tailwind
+import "./globals.css";
 
 export const metadata = {
   title: "Maxi Jugos",
