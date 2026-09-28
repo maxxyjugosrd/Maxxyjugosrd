@@ -9,7 +9,7 @@ export default function AdminDashboard() {
   const [pedidos, setPedidos] = useState([]);
   const [cargando, setCargando] = useState(true);
   
-  // Gastos y comisiones fijados/estimados temporalmente (se conectarán al servicio de gastos)
+  // Gastos y comisiones fijados/estimados temporalmente
   const [gastosHoy] = useState(3200);   // Compras de frutas e insumos
   const [comisionesHoy] = useState(1500); // Vendedores + Deliveries
 
@@ -23,7 +23,7 @@ export default function AdminDashboard() {
     return () => desuscribir();
   }, []);
 
-  // Calcular las ventas totales acumuladas del día desde los pedidos registrados
+  // Calcular las ventas totales acumuladas desde los pedidos registrados
   const ventasHoy = pedidos.reduce((total, p) => total + (p.total || 0), 0);
 
   // Ganancia Neta Limpia = Ventas totales - (Gastos + Comisiones)
@@ -113,26 +113,42 @@ export default function AdminDashboard() {
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {pedidos.map((pedido) => (
-              <div key={pedido.id} className="p-4 flex justify-between items-center hover:bg-slate-50 transition">
-                <div>
-                  <p className="font-semibold text-slate-800 text-sm">
-                    {pedido.cliente?.nombre || "Cliente sin nombre"}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {pedido.cliente?.telefono || "Sin teléfono"} • {pedido.metodoPago || "Efectivo"}
-                  </p>
+            {pedidos.map((pedido) => {
+              // Manejo flexible para soportar tanto objetos de cliente como strings simples
+              const nombreCliente = typeof pedido.cliente === 'string' 
+                ? pedido.cliente 
+                : (pedido.cliente?.nombre || "Cliente sin nombre");
+                
+              const telefonoCliente = pedido.telefono || pedido.cliente?.telefono || "Sin teléfono";
+
+              return (
+                <div key={pedido.id} className="p-4 flex justify-between items-center hover:bg-slate-50 transition">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-slate-800 text-sm">
+                        {nombreCliente}
+                      </p>
+                      {pedido.id && (
+                        <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">
+                          {pedido.id}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {telefonoCliente} • {pedido.metodoPago || "Pendiente"} {pedido.origen ? `• ${pedido.origen}` : ""}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-slate-800 block text-sm">
+                      RD$ {(pedido.total || 0).toLocaleString()}
+                    </span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 capitalize font-medium inline-block mt-0.5">
+                      {pedido.estado || "Pendiente"}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="font-bold text-slate-800 block text-sm">
-                    RD$ {(pedido.total || 0).toLocaleString()}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 capitalize font-medium">
-                    {pedido.estado || "pendiente"}
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
