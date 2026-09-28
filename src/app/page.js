@@ -18,7 +18,8 @@ import {
   PackageCheck,
   Flame,
   ShieldAlert,
-  Smile
+  Smile,
+  Image as ImageIcon
 } from "lucide-react";
 
 export default function Home() {
@@ -92,20 +93,35 @@ export default function Home() {
     }
   ];
 
-  // Galones
   const galonesIniciales = [
-    { id: 101, nombre: "Jugo de Chinola en Galón", tamano: "1 Galón", precio: 650, categoria: "Galones", imagen: "🧃" },
-    { id: 102, nombre: "Morir Soñando en Galón", tamano: "1 Galón", precio: 750, categoria: "Galones", imagen: "🧃" },
-    { id: 103, nombre: "Jugo de Fresa en Galón", tamano: "1 Galón", precio: 700, categoria: "Galones", imagen: "🧃" },
+    { id: 101, nombre: "Jugo de Chinola en Galón", tamano: "1 Galón", precio: 650, categoria: "Galones", imagen: "" },
+    { id: 102, nombre: "Morir Soñando en Galón", tamano: "1 Galón", precio: 750, categoria: "Galones", imagen: "" },
+    { id: 103, nombre: "Jugo de Fresa en Galón", tamano: "1 Galón", precio: 700, categoria: "Galones", imagen: "" },
   ];
 
   const sabore12oz = ["Chinola", "Morir Soñando", "Fresa", "Zapote", "Mango"];
   const ingredientesSaludables = ["Espinaca", "Manzana Verde", "Pepino", "Apio", "Jengibre", "Limón", "Piña", "Perejil", "Cúrcuma", "Remolacha", "Naranja"];
 
-  // Estados de Búsqueda
+  // SINCRONIZAR CATÁLOGO EDITABLE DESDE EL PANEL DE CONTROL
+  const [catalogoEnvivo, setCatalogoEnvivo] = useState([]);
+
+  useEffect(() => {
+    const cargarCatalogo = () => {
+      const guardado = localStorage.getItem("maxxy_catalogo");
+      if (guardado) {
+        setCatalogoEnvivo(JSON.parse(guardado));
+      }
+    };
+
+    cargarCatalogo();
+    window.addEventListener("storage", cargarCatalogo);
+    return () => window.removeEventListener("storage", cargarCatalogo);
+  }, []);
+
+  // Búsqueda
   const [busqueda, setBusqueda] = useState("");
 
-  // Estados de Personalización de Media Docena
+  // Personalización de Media Docena
   const [mediaDocena, setMediaDocena] = useState({
     Chinola: 0,
     "Morir Soñando": 0,
@@ -120,11 +136,11 @@ export default function Home() {
   const [mensajeNotificacion, setMensajeNotificacion] = useState("");
   const [pedidoExitoso, setPedidoExitoso] = useState(false);
 
-  // Mezclas Personalizadas Saludables
+  // Mezclas Personalizadas
   const [ingredientesJugo, setIngredientesJugo] = useState([]);
   const [ingredientesShot, setIngredientesShot] = useState([]);
 
-  // Formulario y Envío
+  // Formulario de Envío
   const [zonaSeleccionada, setZonaSeleccionada] = useState(zonasEnvio[0].id);
   const [tipoCamion, setTipoCamion] = useState("normal");
   const [datosEnvio, setDatosEnvio] = useState({
@@ -186,7 +202,7 @@ export default function Home() {
     notificar("¡Media docena agregada al carrito!");
   };
 
-  // Agregar Recetas Pre-seleccionadas Saludables
+  // Recetas Saludables
   const agregarRecetaSaludable = (receta) => {
     const item = {
       id: `saludable-receta-${Date.now()}`,
@@ -215,7 +231,7 @@ export default function Home() {
     notificar(`¡${receta.nombre} agregado al carrito!`);
   };
 
-  // Toggle Ingredientes Personalizados
+  // Toggle Ingredientes
   const toggleIngredienteJugo = (ing) => {
     if (ingredientesJugo.includes(ing)) {
       setIngredientesJugo(ingredientesJugo.filter((i) => i !== ing));
@@ -278,7 +294,7 @@ export default function Home() {
     notificar(`¡${galon.nombre} agregado!`);
   };
 
-  // Cálculo de Envío
+  // Cálculo de Envíos
   const zonaActual = zonasEnvio.find((z) => z.id === zonaSeleccionada);
   const calcularCostoEnvio = () => {
     if (!zonaActual) return 0;
@@ -290,7 +306,7 @@ export default function Home() {
   const costoEnvio = subtotal > 0 ? calcularCostoEnvio() : 0;
   const total = subtotal + costoEnvio;
 
-  // Enviar Pedido al Panel de Control
+  // Enviar Pedido al Panel
   const enviarPedidoAlPanel = (e) => {
     e.preventDefault();
     if (carrito.length === 0) return alert("El carrito está vacío.");
@@ -322,16 +338,12 @@ export default function Home() {
     setCarrito([]);
   };
 
-  // Renderizador de Imágenes o Emojis
-  const renderImagenProducto = (imgSrc, altText, emojiFallback = "🧃") => {
-    if (imgSrc && (imgSrc.startsWith("http://") || imgSrc.startsWith("https://") || imgSrc.startsWith("/"))) {
-      return <img src={imgSrc} alt={altText} className="w-16 h-16 object-cover rounded-2xl shadow-sm" />;
-    }
-    return <span className="text-4xl">{imgSrc || emojiFallback}</span>;
-  };
+  // Obtener Galones filtrados desde el panel o por defecto
+  const galonesParaMostrar = catalogoEnvivo.filter(p => p.categoria === "Galones").length > 0
+    ? catalogoEnvivo.filter(p => p.categoria === "Galones" && p.disponible)
+    : galonesIniciales;
 
-  // Filtrado por Barra de Búsqueda
-  const galonesFiltrados = galonesIniciales.filter(g => 
+  const galonesFiltrados = galonesParaMostrar.filter(g => 
     g.nombre.toLowerCase().includes(busqueda.toLowerCase())
   );
 
@@ -344,7 +356,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Header / Navegación */}
+      {/* Header */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 space-y-3">
           <div className="flex justify-between items-center gap-4">
@@ -360,7 +372,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* BARRA DE BÚSQUEDA RESTAURADA */}
+            {/* Búsqueda Desktop */}
             <div className="hidden md:flex flex-1 max-w-md relative">
               <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
               <input
@@ -403,7 +415,7 @@ export default function Home() {
             </button>
           </div>
 
-          {/* BARRA DE BÚSQUEDA EN MÓVIL */}
+          {/* Búsqueda Móvil */}
           <div className="flex md:hidden relative">
             <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
             <input
@@ -417,7 +429,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Banner Principal */}
+      {/* Banner */}
       <section className="bg-slate-900 text-white py-8 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
           <div className="space-y-3">
@@ -450,7 +462,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SECCIÓN 1: MEDIA DOCENA PERSONALIZABLE (BOTELLAS 12 OZ) */}
+      {/* SECCIÓN 1: MEDIA DOCENA */}
       <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-4">
@@ -504,7 +516,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SECCIÓN 2: RECETAS PRE-DISEÑADAS DE JUGOS SALUDABLES & SHOTS */}
+      {/* SECCIÓN 2: SALUDABLES & SHOTS */}
       <section className="bg-emerald-950 text-white py-12 px-4 sm:px-6 my-4">
         <div className="max-w-7xl mx-auto space-y-10">
           <div className="border-b border-emerald-800 pb-4">
@@ -517,7 +529,7 @@ export default function Home() {
             </p>
           </div>
 
-          {/* COMBOS PRE-DISEÑADOS DE JUGOS SALUDABLES (8 OZ) */}
+          {/* COMBOS DE JUGOS SALUDABLES */}
           <div className="space-y-4">
             <h3 className="text-xl font-black text-amber-400 flex items-center gap-2">
               🥦 Jugos Saludables (8 oz) — Pack de 7 Unidades (RD$ 910)
@@ -548,7 +560,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* COMBOS PRE-DISEÑADOS DE SHOTS (2 OZ) */}
+          {/* COMBOS DE SHOTS */}
           <div className="space-y-4 pt-6 border-t border-emerald-900">
             <h3 className="text-xl font-black text-rose-400 flex items-center gap-2">
               🫚 Shots Concentrados (2 oz) — Pack de 7 Unidades (RD$ 595)
@@ -579,11 +591,10 @@ export default function Home() {
             </div>
           </div>
 
-          {/* CREADOR DE MEZCLAS PERSONALIZADAS */}
+          {/* CREADOR PERSONALIZADO */}
           <div className="bg-emerald-900/40 border border-emerald-800 p-6 rounded-3xl space-y-6 pt-6">
             <h3 className="text-lg font-extrabold text-white">⚙️ O prefiere crear tu mezcla personalizada:</h3>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Personalizar Jugo */}
               <div className="space-y-3">
                 <p className="text-xs font-bold text-emerald-300">Jugo 8 oz (Máx 4 ingredientes):</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -604,7 +615,6 @@ export default function Home() {
                 </button>
               </div>
 
-              {/* Personalizar Shot */}
               <div className="space-y-3">
                 <p className="text-xs font-bold text-rose-300">Shot 2 oz (Máx 3 ingredientes):</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -629,14 +639,20 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SECCIÓN 3: GALONES PARA CAFETERÍAS Y COLMADOS */}
+      {/* SECCIÓN 3: GALONES CON FOTOS DEL PANEL */}
       <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-4">
         <h3 className="text-xl font-extrabold text-slate-900">Galones Concentrados</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           {galonesFiltrados.map((g) => (
             <div key={g.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex justify-between items-center">
               <div className="flex items-center gap-4">
-                {renderImagenProducto(g.imagen, g.nombre, "🧃")}
+                <div className="w-16 h-16 bg-slate-100 rounded-2xl overflow-hidden border flex items-center justify-center shrink-0">
+                  {g.imagen && g.imagen.length > 5 ? (
+                    <img src={g.imagen} alt={g.nombre} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-3xl">🧃</span>
+                  )}
+                </div>
                 <div>
                   <h4 className="font-bold text-slate-800 text-sm">{g.nombre}</h4>
                   <p className="text-xs text-slate-400">{g.tamano}</p>
@@ -654,13 +670,12 @@ export default function Home() {
         </div>
       </section>
 
-      {/* MODAL / SLIDE OVER DEL CARRITO CON BOTÓN DE CIERRE 'X' */}
+      {/* CARRITO Y CHECKOUT */}
       {mostrarCarrito && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-end">
           <div className="bg-white w-full max-w-lg h-full p-6 overflow-y-auto flex flex-col justify-between shadow-2xl relative">
             
             <div className="space-y-6">
-              {/* Cabecera del Carrito con Botón 'X' */}
               <div className="flex justify-between items-center border-b pb-4">
                 <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
                   <ShoppingCart className="w-5 h-5 text-amber-500" /> Tu Pedido
@@ -668,13 +683,11 @@ export default function Home() {
                 <button
                   onClick={() => setMostrarCarrito(false)}
                   className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition"
-                  title="Cerrar Carrito"
                 >
                   <X className="w-6 h-6" />
                 </button>
               </div>
 
-              {/* Pantalla de Pedido Exitoso */}
               {pedidoExitoso ? (
                 <div className="text-center py-12 space-y-4">
                   <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
@@ -696,7 +709,6 @@ export default function Home() {
                 </div>
               ) : (
                 <>
-                  {/* Items en el Carrito */}
                   {carrito.length === 0 ? (
                     <div className="text-center py-12 space-y-3">
                       <p className="text-slate-400 text-sm">Tu carrito está vacío.</p>
@@ -721,7 +733,6 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* FORMULARIO Y CALCULADORA DE ENVÍOS */}
                   {carrito.length > 0 && (
                     <form onSubmit={enviarPedidoAlPanel} className="space-y-4 border-t pt-4">
                       <h3 className="font-bold text-slate-800 text-sm">Datos del Cliente & Entrega</h3>
@@ -762,7 +773,6 @@ export default function Home() {
                         required
                       />
 
-                      {/* Selector de Zona */}
                       <div>
                         <label className="text-xs font-bold text-slate-600 block mb-1">Zona de Envío *</label>
                         <select
@@ -778,11 +788,10 @@ export default function Home() {
                         </select>
                       </div>
 
-                      {/* Selector de Camión */}
                       {zonaActual?.tipo === "camion" && (
                         <div className="bg-amber-50 p-3 rounded-2xl border border-amber-200 space-y-2">
                           <p className="text-[11px] font-bold text-amber-900">
-                            🚚 Mínimo de compra para Camión: 6 docenas. Selecciona el tipo:
+                            🚚 Mínimo para Camión: 6 docenas. Selecciona tipo:
                           </p>
                           <div className="flex gap-4 text-xs font-bold">
                             <label className="flex items-center gap-1.5 cursor-pointer">
