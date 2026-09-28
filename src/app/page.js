@@ -72,7 +72,10 @@ export default function TiendaCliente() {
       origen: "Web Cliente",
       estado: "pendiente",
     });
-
+    
+// Enviar correo de confirmación de fondo
+enviarCorreoConfirmacion({ cliente, items: carrito, total });
+    
     setEnviando(false);
 
     // 2. Formatear mensaje para WhatsApp
