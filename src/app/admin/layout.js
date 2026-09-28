@@ -6,7 +6,10 @@ import {
   LayoutDashboard, 
   ShoppingCart, 
   BookOpen, 
+  Users,
   UtensilsCrossed, 
+  BarChart3,
+  UserCheck,
   LogOut 
 } from "lucide-react";
 import { getAuth, signOut } from "firebase/auth";
@@ -25,8 +28,11 @@ export default function AdminLayout({ children }) {
   const menuItems = [
     { nombre: "Dashboard", ruta: "/admin", icono: LayoutDashboard },
     { nombre: "Punto de Venta (POS)", ruta: "/admin/pos", icono: ShoppingCart },
-    { nombre: "Contabilidad", ruta: "/admin/contabilidad", icono: BookOpen },
-    { nombre: "Catálogo / Menú", ruta: "/admin/catalogo", icono: UtensilsCrossed },
+    { nombre: "Contabilidad Full", ruta: "/admin/contabilidad", icono: BookOpen },
+    { nombre: "Personal & Recibos", ruta: "/admin/personal", icono: Users },
+    { nombre: "Catálogo & Menú", ruta: "/admin/catalogo", icono: UtensilsCrossed },
+    { nombre: "Métricas & Analítica", ruta: "/admin/metricas", icono: BarChart3 },
+    { nombre: "Clientes (CRM)", ruta: "/admin/clientes", icono: UserCheck },
   ];
 
   return (
