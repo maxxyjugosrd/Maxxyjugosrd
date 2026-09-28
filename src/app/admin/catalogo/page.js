@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Edit2, Trash2, Check, X, Image as ImageIcon, Upload, Leaf, Flame, ShieldAlert } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Edit2, Trash2, Check, X, Image as ImageIcon, Upload } from "lucide-react";
 
 export default function CatalogoPage() {
   const [categoriaActiva, setCategoriaActiva] = useState("Botella 12 oz");
 
-  const [jugos, setJugos] = useState([
+  const productosIniciales = [
     // Botellas 12 oz
     { id: 1, nombre: "Jugo de Chinola Natural", precio: 100, tamano: "12 oz", categoria: "Botella 12 oz", imagen: "", disponible: true },
     { id: 2, nombre: "Morir Soñando Tradicional", precio: 120, tamano: "12 oz", categoria: "Botella 12 oz", imagen: "", disponible: true },
@@ -19,14 +19,33 @@ export default function CatalogoPage() {
     { id: 102, nombre: "Morir Soñando en Galón", precio: 750, tamano: "1 Galón", categoria: "Galones", imagen: "", disponible: true },
     { id: 103, nombre: "Jugo de Fresa en Galón", precio: 700, tamano: "1 Galón", categoria: "Galones", imagen: "", disponible: true },
 
-    // Línea Saludable (Verde & Shots)
+    // Línea Saludable
     { id: 201, nombre: "Jugo Para las Defensas", precio: 910, tamano: "Pack 7 Unidades (8 oz)", categoria: "Saludables & Shots", imagen: "", disponible: true },
     { id: 202, nombre: "Jugo Para Desinflamar", precio: 910, tamano: "Pack 7 Unidades (8 oz)", categoria: "Saludables & Shots", imagen: "", disponible: true },
     { id: 203, nombre: "Jugo Para Quemar Grasa", precio: 910, tamano: "Pack 7 Unidades (8 oz)", categoria: "Saludables & Shots", imagen: "", disponible: true },
     { id: 204, nombre: "Shot Para la Piel & Glow", precio: 595, tamano: "Pack 7 Unidades (2 oz)", categoria: "Saludables & Shots", imagen: "", disponible: true },
     { id: 205, nombre: "Shot Desinflamante Digestivo", precio: 595, tamano: "Pack 7 Unidades (2 oz)", categoria: "Saludables & Shots", imagen: "", disponible: true },
     { id: 206, nombre: "Shot Quemador Energizante", precio: 595, tamano: "Pack 7 Unidades (2 oz)", categoria: "Saludables & Shots", imagen: "", disponible: true },
-  ]);
+  ];
+
+  const [jugos, setJugos] = useState([]);
+
+  // Cargar productos al iniciar
+  useEffect(() => {
+    const guardados = localStorage.getItem("maxxy_catalogo");
+    if (guardados) {
+      setJugos(JSON.parse(guardados));
+    } else {
+      setJugos(productosIniciales);
+      localStorage.setItem("maxxy_catalogo", JSON.stringify(productosIniciales));
+    }
+  }, []);
+
+  // Función para guardar en localStorage
+  const actualizarYGuardar = (nuevaLista) => {
+    setJugos(nuevaLista);
+    localStorage.setItem("maxxy_catalogo", JSON.stringify(nuevaLista));
+  };
 
   const [mostrarModal, setMostrarModal] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
@@ -71,16 +90,13 @@ export default function CatalogoPage() {
     e.preventDefault();
     if (!formJugo.nombre || !formJugo.precio) return;
 
+    let nuevaLista;
     if (editandoId) {
-      setJugos(
-        jugos.map((j) =>
-          j.id === editandoId
-            ? { ...j, ...formJugo, precio: Number(formJugo.precio) }
-            : j
-        )
+      nuevaLista = jugos.map((j) =>
+        j.id === editandoId ? { ...j, ...formJugo, precio: Number(formJugo.precio) } : j
       );
     } else {
-      setJugos([
+      nuevaLista = [
         ...jugos,
         {
           id: Date.now(),
@@ -88,22 +104,23 @@ export default function CatalogoPage() {
           precio: Number(formJugo.precio),
           disponible: true,
         },
-      ]);
+      ];
     }
 
+    actualizarYGuardar(nuevaLista);
     setMostrarModal(false);
   };
 
   const eliminarJugo = (id) => {
     if (confirm("¿Seguro que deseas eliminar este producto del catálogo?")) {
-      setJugos(jugos.filter((j) => j.id !== id));
+      const nuevaLista = jugos.filter((j) => j.id !== id);
+      actualizarYGuardar(nuevaLista);
     }
   };
 
   const toggleDisponible = (id) => {
-    setJugos(
-      jugos.map((j) => (j.id === id ? { ...j, disponible: !j.disponible } : j))
-    );
+    const nuevaLista = jugos.map((j) => (j.id === id ? { ...j, disponible: !j.disponible } : j));
+    actualizarYGuardar(nuevaLista);
   };
 
   const jugosFiltrados = jugos.filter((j) => j.categoria === categoriaActiva);
@@ -113,7 +130,7 @@ export default function CatalogoPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Administrador del Menú & Catálogo</h1>
-          <p className="text-slate-500 text-sm">Gestiona jugos tradicionales, galones y la línea saludable (verdes/shots).</p>
+          <p className="text-slate-500 text-sm">Todo cambio realizado aquí se sincroniza en vivo con la tienda web.</p>
         </div>
         <button
           onClick={abrirModalNuevo}
