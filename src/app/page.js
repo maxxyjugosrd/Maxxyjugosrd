@@ -17,8 +17,6 @@ import {
   MapPin,
   PackageCheck,
   Flame,
-  ShieldAlert,
-  Smile,
   Image as ImageIcon
 } from "lucide-react";
 
@@ -43,73 +41,16 @@ export default function Home() {
     { id: "azua", nombre: "Azua", tipo: "camion", costoNormal: 3500, costoFrio: 4500 },
   ];
 
-  // Recetas Pre-seleccionadas de Jugos Saludables
-  const recetasJugosSaludables = [
-    {
-      id: "rec-defensa",
-      nombre: "Jugo Para las Defensas",
-      beneficio: "Inmunidad & Vitamina C",
-      ingredientes: ["Naranja", "Jengibre", "Limón", "Cúrcuma"],
-      icono: "🛡️"
-    },
-    {
-      id: "rec-desinflamar",
-      nombre: "Jugo Para Desinflamar",
-      beneficio: "Digestión & Antiinflamatorio",
-      ingredientes: ["Pepino", "Apio", "Piña", "Jengibre"],
-      icono: "🌿"
-    },
-    {
-      id: "rec-grasa",
-      nombre: "Jugo Para Quemar Grasa",
-      beneficio: "Detox & Metabolismo",
-      ingredientes: ["Manzana Verde", "Espinaca", "Pepino", "Limón"],
-      icono: "🔥"
-    }
-  ];
-
-  // Recetas Pre-seleccionadas de Shots
-  const recetasShots = [
-    {
-      id: "shot-piel",
-      nombre: "Shot Para la Piel & Glow",
-      beneficio: "Antioxidante & Piel Radiante",
-      ingredientes: ["Cúrcuma", "Naranja", "Jengibre"],
-      icono: "🌟"
-    },
-    {
-      id: "shot-desinflamar",
-      nombre: "Shot Desinflamante Digestivo",
-      beneficio: "Alivio Abdominal Rápido",
-      ingredientes: ["Jengibre", "Limón", "Manzana Verde"],
-      icono: "🔋"
-    },
-    {
-      id: "shot-quemador",
-      nombre: "Shot Quemador Energizante",
-      beneficio: "Activa el Metabolismo",
-      ingredientes: ["Jengibre", "Limón", "Cúrcuma"],
-      icono: "⚡"
-    }
-  ];
-
-  const galonesIniciales = [
-    { id: 101, nombre: "Jugo de Chinola en Galón", tamano: "1 Galón", precio: 650, categoria: "Galones", imagen: "" },
-    { id: 102, nombre: "Morir Soñando en Galón", tamano: "1 Galón", precio: 750, categoria: "Galones", imagen: "" },
-    { id: 103, nombre: "Jugo de Fresa en Galón", tamano: "1 Galón", precio: 700, categoria: "Galones", imagen: "" },
-  ];
-
-  const sabore12oz = ["Chinola", "Morir Soñando", "Fresa", "Zapote", "Mango"];
   const ingredientesSaludables = ["Espinaca", "Manzana Verde", "Pepino", "Apio", "Jengibre", "Limón", "Piña", "Perejil", "Cúrcuma", "Remolacha", "Naranja"];
 
-  // SINCRONIZAR CATÁLOGO EDITABLE DESDE EL PANEL DE CONTROL
-  const [catalogoEnvivo, setCatalogoEnvivo] = useState([]);
+  // CATÁLOGOS QUE SE HALAN DEL PANEL EN VIVO
+  const [catalogoPanel, setCatalogoPanel] = useState([]);
 
   useEffect(() => {
     const cargarCatalogo = () => {
       const guardado = localStorage.getItem("maxxy_catalogo");
       if (guardado) {
-        setCatalogoEnvivo(JSON.parse(guardado));
+        setCatalogoPanel(JSON.parse(guardado));
       }
     };
 
@@ -118,17 +59,16 @@ export default function Home() {
     return () => window.removeEventListener("storage", cargarCatalogo);
   }, []);
 
+  // Filtrar categorías del catálogo jalado del panel
+  const jugosNaturalesPanel = catalogoPanel.filter(p => p.categoria === "Botella 12 oz" && p.disponible);
+  const galonesPanel = catalogoPanel.filter(p => p.categoria === "Galones" && p.disponible);
+  const saludablesPanel = catalogoPanel.filter(p => p.categoria === "Saludables & Shots" && p.disponible);
+
   // Búsqueda
   const [busqueda, setBusqueda] = useState("");
 
   // Personalización de Media Docena
-  const [mediaDocena, setMediaDocena] = useState({
-    Chinola: 0,
-    "Morir Soñando": 0,
-    Fresa: 0,
-    Zapote: 0,
-    Mango: 0
-  });
+  const [mediaDocena, setMediaDocena] = useState({});
 
   // Carrito y Notificaciones
   const [carrito, setCarrito] = useState([]);
@@ -166,14 +106,14 @@ export default function Home() {
   // Manejo de Media Docena
   const totalJugosMediaDocena = Object.values(mediaDocena).reduce((a, b) => a + b, 0);
 
-  const cambiarCantidadSaborMediaDocena = (sabor, cambio) => {
-    const actual = mediaDocena[sabor];
+  const cambiarCantidadSaborMediaDocena = (nombreJugo, cambio) => {
+    const actual = mediaDocena[nombreJugo] || 0;
     if (cambio > 0 && totalJugosMediaDocena >= 6) {
       alert("Ya has completado las 6 unidades de la media docena.");
       return;
     }
     if (actual + cambio < 0) return;
-    setMediaDocena({ ...mediaDocena, [sabor]: actual + cambio });
+    setMediaDocena({ ...mediaDocena, [nombreJugo]: actual + cambio });
   };
 
   const agregarMediaDocenaAlCarrito = () => {
@@ -198,37 +138,18 @@ export default function Home() {
     };
 
     setCarrito([...carrito, item]);
-    setMediaDocena({ Chinola: 0, "Morir Soñando": 0, Fresa: 0, Zapote: 0, Mango: 0 });
+    setMediaDocena({});
     notificar("¡Media docena agregada al carrito!");
   };
 
-  // Recetas Saludables
-  const agregarRecetaSaludable = (receta) => {
-    const item = {
-      id: `saludable-receta-${Date.now()}`,
-      nombre: `Pack 7: ${receta.nombre} (${receta.ingredientes.join(", ")})`,
-      tamano: "Pack 7 Unidades (8 oz)",
-      cantidad: 1,
-      precio: 910,
-      categoria: "Saludables",
-      imagen: receta.icono
-    };
-    setCarrito([...carrito, item]);
-    notificar(`¡${receta.nombre} agregado al carrito!`);
-  };
-
-  const agregarRecetaShot = (receta) => {
-    const item = {
-      id: `shot-receta-${Date.now()}`,
-      nombre: `Pack 7: ${receta.nombre} (${receta.ingredientes.join(", ")})`,
-      tamano: "Pack 7 Unidades (2 oz)",
-      cantidad: 1,
-      precio: 595,
-      categoria: "Saludables",
-      imagen: receta.icono
-    };
-    setCarrito([...carrito, item]);
-    notificar(`¡${receta.nombre} agregado al carrito!`);
+  const agregarProductoDirecto = (prod) => {
+    const existente = carrito.find((i) => i.id === prod.id);
+    if (existente) {
+      setCarrito(carrito.map((i) => i.id === prod.id ? { ...i, cantidad: i.cantidad + 1 } : i));
+    } else {
+      setCarrito([...carrito, { ...prod, cantidad: 1 }]);
+    }
+    notificar(`¡${prod.nombre} agregado!`);
   };
 
   // Toggle Ingredientes
@@ -260,7 +181,7 @@ export default function Home() {
       tamano: "Pack 7 Unidades (8 oz)",
       cantidad: 1,
       precio: 910,
-      categoria: "Saludables",
+      categoria: "Saludables & Shots",
       imagen: "🥦"
     };
     setCarrito([...carrito, item]);
@@ -276,22 +197,12 @@ export default function Home() {
       tamano: "Pack 7 Unidades (2 oz)",
       cantidad: 1,
       precio: 595,
-      categoria: "Saludables",
+      categoria: "Saludables & Shots",
       imagen: "🫚"
     };
     setCarrito([...carrito, item]);
     setIngredientesShot([]);
     notificar("¡Pack Shots Personalizado agregado!");
-  };
-
-  const agregarGalon = (galon) => {
-    const existente = carrito.find((i) => i.id === galon.id);
-    if (existente) {
-      setCarrito(carrito.map((i) => i.id === galon.id ? { ...i, cantidad: i.cantidad + 1 } : i));
-    } else {
-      setCarrito([...carrito, { ...galon, cantidad: 1 }]);
-    }
-    notificar(`¡${galon.nombre} agregado!`);
   };
 
   // Cálculo de Envíos
@@ -338,17 +249,13 @@ export default function Home() {
     setCarrito([]);
   };
 
-  // Obtener Galones filtrados desde el panel o por defecto
-  const galonesParaMostrar = catalogoEnvivo.filter(p => p.categoria === "Galones").length > 0
-    ? catalogoEnvivo.filter(p => p.categoria === "Galones" && p.disponible)
-    : galonesIniciales;
-
-  const galonesFiltrados = galonesParaMostrar.filter(g => 
-    g.nombre.toLowerCase().includes(busqueda.toLowerCase())
-  );
+  const scrollToSection = (id) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth" });
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans scroll-smooth">
       {/* Notificación Flotante */}
       {mensajeNotificacion && (
         <div className="fixed top-4 right-4 z-50 bg-emerald-600 text-white font-bold px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2 animate-bounce">
@@ -357,7 +264,7 @@ export default function Home() {
       )}
 
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm" id="inicio">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 space-y-3">
           <div className="flex justify-between items-center gap-4">
             <div className="flex items-center gap-3">
@@ -389,15 +296,6 @@ export default function Home() {
               )}
             </div>
 
-            <div className="hidden lg:flex items-center gap-4 text-xs font-semibold text-slate-600">
-              <a href="https://wa.me/18494040514" target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-emerald-600">
-                <Phone className="w-4 h-4 text-emerald-500" /> 849-404-0514
-              </a>
-              <a href="tel:8297726631" className="flex items-center gap-1 hover:text-amber-600">
-                <Phone className="w-4 h-4 text-amber-500" /> 829-772-6631
-              </a>
-            </div>
-
             <button
               onClick={() => {
                 setPedidoExitoso(false);
@@ -414,22 +312,10 @@ export default function Home() {
               )}
             </button>
           </div>
-
-          {/* Búsqueda Móvil */}
-          <div className="flex md:hidden relative">
-            <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar jugos, galones, shots..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-100 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
-            />
-          </div>
         </div>
       </header>
 
-      {/* Banner */}
+      {/* BANNER PRINCIPAL */}
       <section className="bg-slate-900 text-white py-8 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
           <div className="space-y-3">
@@ -444,7 +330,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="bg-slate-800 p-5 rounded-3xl border border-slate-700 space-y-2 text-xs">
+          <div className="bg-slate-800 p-5 rounded-3xl border border-slate-700 space-y-2 text-xs" id="contacto">
             <h3 className="font-bold text-amber-400 text-xs uppercase tracking-wider">Atención Directa & Contacto</h3>
             <div className="flex justify-between border-b border-slate-700 pb-1.5">
               <span className="text-slate-400">WhatsApp:</span>
@@ -462,8 +348,29 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SECCIÓN 1: MEDIA DOCENA */}
-      <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
+      {/* BARRA DE NAVEGACIÓN RÁPIDA (BOTONES PREDETERMINADOS) */}
+      <nav className="bg-slate-800 text-white sticky top-[68px] z-30 shadow-md border-t border-slate-700">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center sm:justify-start gap-2 overflow-x-auto text-xs font-bold">
+          <button onClick={() => scrollToSection("inicio")} className="px-3 py-1.5 rounded-xl hover:bg-slate-700 transition whitespace-nowrap">
+            🏠 Inicio
+          </button>
+          <button onClick={() => scrollToSection("jugos-naturales")} className="px-3 py-1.5 bg-amber-500 text-slate-950 rounded-xl hover:bg-amber-400 transition whitespace-nowrap">
+            🥤 Jugos Naturales
+          </button>
+          <button onClick={() => scrollToSection("galones")} className="px-3 py-1.5 rounded-xl hover:bg-slate-700 transition whitespace-nowrap">
+            🧃 Galones
+          </button>
+          <button onClick={() => scrollToSection("saludables")} className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition whitespace-nowrap">
+            🥦 Jugo Saludable & Shots
+          </button>
+          <button onClick={() => scrollToSection("contacto")} className="px-3 py-1.5 rounded-xl hover:bg-slate-700 transition whitespace-nowrap">
+            📞 Contactos
+          </button>
+        </div>
+      </nav>
+
+      {/* SECCIÓN 1: JUGOS NATURALES (MEDIA DOCENA 12 OZ) - HALADOS DEL PANEL */}
+      <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6" id="jugos-naturales">
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-4">
             <div>
@@ -471,30 +378,46 @@ export default function Home() {
                 Mínimo: 6 Unidades (Media Docena)
               </span>
               <h3 className="text-2xl font-black text-slate-900 mt-2">Arma tu Media Docena de Jugos (12 oz)</h3>
-              <p className="text-xs text-slate-500">Elige sabor por sabor hasta completar las 6 botellas.</p>
+              <p className="text-xs text-slate-500">Selecciona los sabores registrados en tu panel de control.</p>
             </div>
             <div className="bg-slate-900 text-white px-4 py-2 rounded-2xl text-xs font-extrabold">
               Progreso: <span className="text-amber-400 text-sm">{totalJugosMediaDocena} / 6</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {sabore12oz.map((sabor) => (
-              <div key={sabor} className="bg-slate-50 p-4 rounded-2xl border flex flex-col justify-between items-center text-center space-y-3">
-                <span className="text-3xl">🥤</span>
-                <p className="font-extrabold text-sm text-slate-800">{sabor}</p>
-                <div className="flex items-center gap-3 bg-white px-3 py-1.5 rounded-xl border shadow-sm">
-                  <button onClick={() => cambiarCantidadSaborMediaDocena(sabor, -1)} className="text-slate-500 hover:text-slate-900">
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <span className="font-black text-slate-900 text-sm">{mediaDocena[sabor]}</span>
-                  <button onClick={() => cambiarCantidadSaborMediaDocena(sabor, 1)} className="text-slate-500 hover:text-slate-900">
-                    <Plus className="w-4 h-4" />
-                  </button>
+          {jugosNaturalesPanel.length === 0 ? (
+            <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed">
+              <p className="text-slate-500 text-xs font-semibold">No hay jugos de 12 oz registrados en el panel aún.</p>
+              <p className="text-slate-400 text-[11px] mt-1">Ingresa a `/admin/catalogo` para agregarlos.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {jugosNaturalesPanel.map((j) => (
+                <div key={j.id} className="bg-slate-50 p-4 rounded-2xl border flex flex-col justify-between items-center text-center space-y-3">
+                  <div className="w-16 h-16 bg-white rounded-xl overflow-hidden border flex items-center justify-center">
+                    {j.imagen ? (
+                      <img src={j.imagen} alt={j.nombre} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-3xl">🥤</span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-extrabold text-sm text-slate-800">{j.nombre}</p>
+                    <p className="text-xs text-amber-600 font-bold">RD$ {j.precio}</p>
+                  </div>
+                  <div className="flex items-center gap-3 bg-white px-3 py-1.5 rounded-xl border shadow-sm">
+                    <button onClick={() => cambiarCantidadSaborMediaDocena(j.nombre, -1)} className="text-slate-500 hover:text-slate-900">
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <span className="font-black text-slate-900 text-sm">{mediaDocena[j.nombre] || 0}</span>
+                    <button onClick={() => cambiarCantidadSaborMediaDocena(j.nombre, 1)} className="text-slate-500 hover:text-slate-900">
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           <div className="flex justify-between items-center pt-4 border-t">
             <div>
@@ -516,84 +439,103 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SECCIÓN 2: SALUDABLES & SHOTS */}
-      <section className="bg-emerald-950 text-white py-12 px-4 sm:px-6 my-4">
+      {/* SECCIÓN 2: GALONES CONCENTRADOS (UBICADO JUSTO DEBAJO DE JUGOS NATURALES) */}
+      <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-4" id="galones">
+        <h3 className="text-xl font-extrabold text-slate-900">Galones Concentrados</h3>
+        
+        {galonesPanel.length === 0 ? (
+          <div className="text-center py-8 bg-white rounded-2xl border border-dashed">
+            <p className="text-slate-500 text-xs font-semibold">No hay galones registrados en el panel aún.</p>
+            <p className="text-slate-400 text-[11px] mt-1">Ingresa a `/admin/catalogo` y selecciona la categoría "Galones".</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {galonesPanel.map((g) => (
+              <div key={g.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 bg-slate-100 rounded-2xl overflow-hidden border flex items-center justify-center shrink-0">
+                    {g.imagen ? (
+                      <img src={g.imagen} alt={g.nombre} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-3xl">🧃</span>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-sm">{g.nombre}</h4>
+                    <p className="text-xs text-slate-400">{g.tamano}</p>
+                    <p className="text-lg font-black text-slate-900 mt-1">RD$ {g.precio}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => agregarProductoDirecto(g)}
+                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 p-3 rounded-2xl font-bold transition shadow-sm"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* SECCIÓN 3: SALUDABLES & SHOTS (HALADOS DEL PANEL) */}
+      <section className="bg-emerald-950 text-white py-12 px-4 sm:px-6 my-4" id="saludables">
         <div className="max-w-7xl mx-auto space-y-10">
           <div className="border-b border-emerald-800 pb-4">
             <span className="bg-emerald-500/20 text-emerald-400 font-bold text-xs px-3 py-1 rounded-full inline-flex items-center gap-1 border border-emerald-500/30">
               <Leaf className="w-3.5 h-3.5" /> Entregas Especiales los Domingos
             </span>
-            <h2 className="text-3xl font-black text-white mt-2">Jugos Saludables & Shots Pre-diseñados</h2>
+            <h2 className="text-3xl font-black text-white mt-2">Menú Especial: Jugos Saludables & Shots</h2>
             <p className="text-xs text-emerald-200/70 mt-1">
-              ¿No sabes cómo combinar? Elige nuestras recetas funcionales listas o crea tu mezcla personalizada.
+              Jugos verdes funcionales y shots concentrados creados en tu panel o armados a medida.
             </p>
           </div>
 
-          {/* COMBOS DE JUGOS SALUDABLES */}
+          {/* PRODUCTOS REGISTRADOS EN EL PANEL */}
           <div className="space-y-4">
             <h3 className="text-xl font-black text-amber-400 flex items-center gap-2">
-              🥦 Jugos Saludables (8 oz) — Pack de 7 Unidades (RD$ 910)
+              🥦 Opciones Registradas en el Panel
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              {recetasJugosSaludables.map((rec) => (
-                <div key={rec.id} className="bg-emerald-900/80 border border-emerald-700/60 p-6 rounded-3xl flex flex-col justify-between space-y-4 shadow-lg">
-                  <div>
-                    <div className="flex justify-between items-start">
-                      <span className="text-4xl">{rec.icono}</span>
-                      <span className="bg-emerald-800 text-emerald-200 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-700">
-                        {rec.beneficio}
-                      </span>
-                    </div>
-                    <h4 className="font-extrabold text-lg text-white mt-3">{rec.nombre}</h4>
-                    <p className="text-xs text-emerald-200/80 mt-2">
-                      <strong className="text-white">Ingredientes:</strong> {rec.ingredientes.join(", ")}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => agregarRecetaSaludable(rec)}
-                    className="w-full bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-2xl text-xs transition shadow-md"
-                  >
-                    Agregar Pack al Carrito
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
 
-          {/* COMBOS DE SHOTS */}
-          <div className="space-y-4 pt-6 border-t border-emerald-900">
-            <h3 className="text-xl font-black text-rose-400 flex items-center gap-2">
-              🫚 Shots Concentrados (2 oz) — Pack de 7 Unidades (RD$ 595)
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              {recetasShots.map((rec) => (
-                <div key={rec.id} className="bg-emerald-900/80 border border-emerald-700/60 p-6 rounded-3xl flex flex-col justify-between space-y-4 shadow-lg">
-                  <div>
-                    <div className="flex justify-between items-start">
-                      <span className="text-4xl">{rec.icono}</span>
-                      <span className="bg-rose-900/50 text-rose-200 text-[10px] font-bold px-2.5 py-1 rounded-full border border-rose-700/50">
-                        {rec.beneficio}
-                      </span>
+            {saludablesPanel.length === 0 ? (
+              <div className="text-center py-6 bg-emerald-900/40 rounded-2xl border border-emerald-800 text-emerald-200 text-xs">
+                No hay jugos saludables o shots creados en el panel. ¡Agrega tus recetas en `/admin/catalogo`!
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                {saludablesPanel.map((rec) => (
+                  <div key={rec.id} className="bg-emerald-900/80 border border-emerald-700/60 p-6 rounded-3xl flex flex-col justify-between space-y-4 shadow-lg">
+                    <div>
+                      <div className="flex justify-between items-start">
+                        <div className="w-14 h-14 bg-emerald-800 rounded-2xl overflow-hidden border border-emerald-600 flex items-center justify-center">
+                          {rec.imagen ? (
+                            <img src={rec.imagen} alt={rec.nombre} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-2xl">🥦</span>
+                          )}
+                        </div>
+                        <span className="bg-emerald-800 text-emerald-200 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-700">
+                          {rec.tamano}
+                        </span>
+                      </div>
+                      <h4 className="font-extrabold text-lg text-white mt-3">{rec.nombre}</h4>
+                      <p className="text-lg font-black text-amber-400 mt-1">RD$ {rec.precio}</p>
                     </div>
-                    <h4 className="font-extrabold text-lg text-white mt-3">{rec.nombre}</h4>
-                    <p className="text-xs text-emerald-200/80 mt-2">
-                      <strong className="text-white">Ingredientes:</strong> {rec.ingredientes.join(", ")}
-                    </p>
+                    <button
+                      onClick={() => agregarProductoDirecto(rec)}
+                      className="w-full bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-2xl text-xs transition shadow-md"
+                    >
+                      Agregar Pack al Carrito
+                    </button>
                   </div>
-                  <button
-                    onClick={() => agregarRecetaShot(rec)}
-                    className="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-2.5 rounded-2xl text-xs transition shadow-md"
-                  >
-                    Agregar Pack al Carrito
-                  </button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* CREADOR PERSONALIZADO */}
           <div className="bg-emerald-900/40 border border-emerald-800 p-6 rounded-3xl space-y-6 pt-6">
-            <h3 className="text-lg font-extrabold text-white">⚙️ O prefiere crear tu mezcla personalizada:</h3>
+            <h3 className="text-lg font-extrabold text-white">⚙️ O crea tu propia combinación a medida:</h3>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="space-y-3">
                 <p className="text-xs font-bold text-emerald-300">Jugo 8 oz (Máx 4 ingredientes):</p>
@@ -622,7 +564,7 @@ export default function Home() {
                     <button
                       key={ing}
                       onClick={() => toggleIngredienteShot(ing)}
-                      className={`px-2.5 py-1 rounded-xl text-xs font-bold transition ${
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                         ingredientesShot.includes(ing) ? "bg-rose-500 text-white" : "bg-emerald-800/80 text-emerald-100"
                       }`}
                     >
@@ -636,37 +578,6 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* SECCIÓN 3: GALONES CON FOTOS DEL PANEL */}
-      <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-4">
-        <h3 className="text-xl font-extrabold text-slate-900">Galones Concentrados</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          {galonesFiltrados.map((g) => (
-            <div key={g.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-slate-100 rounded-2xl overflow-hidden border flex items-center justify-center shrink-0">
-                  {g.imagen && g.imagen.length > 5 ? (
-                    <img src={g.imagen} alt={g.nombre} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-3xl">🧃</span>
-                  )}
-                </div>
-                <div>
-                  <h4 className="font-bold text-slate-800 text-sm">{g.nombre}</h4>
-                  <p className="text-xs text-slate-400">{g.tamano}</p>
-                  <p className="text-lg font-black text-slate-900 mt-1">RD$ {g.precio}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => agregarGalon(g)}
-                className="bg-amber-500 hover:bg-amber-600 text-slate-950 p-3 rounded-2xl font-bold transition shadow-sm"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
-            </div>
-          ))}
         </div>
       </section>
 
