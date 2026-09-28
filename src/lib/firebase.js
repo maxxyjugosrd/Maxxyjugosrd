@@ -1,24 +1,15 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { initializeApp, getApps } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
 
-// Configuración de la app leyendo las variables de entorno de Vercel/Next.js
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyDV35AU8W2SCEEZXcKvhYIvVJjhbm9ns18",
+  authDomain: "maxxyjugos.firebaseapp.com",
+  projectId: "maxxyjugos",
+  storageBucket: "maxxyjugos.firebasestorage.app",
+  messagingSenderId: "18494704643",
+  appId: "1:18494704643:web:4fa37fa78b263c70ccd236",
+  measurementId: "G-V773BY5R83"
 };
 
-// Evita duplicar la inicialización en Next.js durante el desarrollo (Fast Refresh)
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-
-// Exportamos los servicios esenciales para Maxi Jugos
-export const auth = getAuth(app);
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 export const db = getFirestore(app);
-export const storage = getStorage(app);
-
-export default app;
