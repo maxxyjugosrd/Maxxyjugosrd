@@ -50,8 +50,8 @@ export default function TiendaCliente() {
 
   const total = carrito.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
 
-  // Enviar pedido por WhatsApp y guardar en Firestore
-  const enviarPedidoWhatsApp = async (e) => {
+  // Enviar pedido por WhatsApp y guardar en Firestore + Email
+  const enviarPedidoWhatsApp = (e) => {
     e.preventDefault();
     if (carrito.length === 0) {
       alert("Por favor agrega al menos un jugo a tu carrito.");
@@ -62,23 +62,7 @@ export default function TiendaCliente() {
       return;
     }
 
-    setEnviando(true);
-
-    // 1. Guardar en Firestore para la contabilidad
-    await crearPedido({
-      cliente,
-      items: carrito,
-      total,
-      origen: "Web Cliente",
-      estado: "pendiente",
-    });
-    
-// Enviar correo de confirmación de fondo
-enviarCorreoConfirmacion({ cliente, items: carrito, total });
-    
-    setEnviando(false);
-
-    // 2. Formatear mensaje para WhatsApp
+    // 1. Formatear mensaje para WhatsApp
     let mensaje = `*¡Nuevo Pedido en Maxi Jugos! 🥤*\n\n`;
     mensaje += `*Cliente:* ${cliente.nombre}\n`;
     mensaje += `*Teléfono:* ${cliente.telefono}\n`;
@@ -92,18 +76,30 @@ enviarCorreoConfirmacion({ cliente, items: carrito, total });
     mensaje += `\n*Total a pagar:* RD$ ${total}\n`;
     mensaje += `\n¡Quedo a la espera de la confirmación!`;
 
-    // Número de teléfono de Maxi Jugos (Reemplazar por el tuyo)
-    const numeroWhatsApp = "8095550199"; 
+    // Número de teléfono de Maxi Jugos
+    const numeroWhatsApp = "8494040514"; 
     const urlWhatsApp = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(mensaje)}`;
 
-    // Abrir WhatsApp
+    // 2. Abrir WhatsApp inmediatamente sin bloquear la UI
     window.open(urlWhatsApp, "_blank");
 
-    // Limpiar formulario
+    // 3. Guardar en Firestore y enviar email en segundo plano (sin await)
+    crearPedido({
+      cliente,
+      items: carrito,
+      total,
+      origen: "Web Cliente",
+      estado: "pendiente",
+    }).catch((err) => console.error("Error al guardar en Firestore:", err));
+
+    enviarCorreoConfirmacion({ cliente, items: carrito, total })
+      .catch((err) => console.error("Error al enviar email:", err));
+
+    // 4. Limpiar formulario
     setCarrito([]);
     setCliente({ nombre: "", telefono: "", direccion: "" });
   };
-
+  
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
       {/* Navbar de la Tienda */}
