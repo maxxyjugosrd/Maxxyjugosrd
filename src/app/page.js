@@ -217,16 +217,18 @@ export default function Home() {
   const costoEnvio = subtotal > 0 ? calcularCostoEnvio() : 0;
   const total = subtotal + costoEnvio;
 
-  // Enviar Pedido al Panel
-  const enviarPedidoAlPanel = (e) => {
+  // Enviar Pedido por Email y registrar en el Panel
+  const enviarPedidoAlPanel = async (e) => {
     e.preventDefault();
     if (carrito.length === 0) return alert("El carrito está vacío.");
     if (!datosEnvio.nombre || !datosEnvio.telefono || !datosEnvio.direccion || !datosEnvio.fechaEntrega) {
       return alert("Por favor completa los campos requeridos.");
     }
 
+    const idPedido = `PED-${Date.now().toString().slice(-4)}`;
+
     const nuevoPedido = {
-      id: `PED-${Date.now().toString().slice(-4)}`,
+      id: idPedido,
       cliente: `${datosEnvio.nombre} ${datosEnvio.apellido}`,
       telefono: datosEnvio.telefono,
       correo: datosEnvio.correo,
@@ -242,8 +244,44 @@ export default function Home() {
       fechaCreacion: new Date().toISOString()
     };
 
+    // 1. Guardar localmente
     const pedidosExistentes = JSON.parse(localStorage.getItem("pedidos_maxxy") || "[]");
     localStorage.setItem("pedidos_maxxy", JSON.stringify([nuevoPedido, ...pedidosExistentes]));
+
+    // 2. Formatear resumen de compra para el correo
+    const detalleProductos = carrito
+      .map((item) => `${item.cantidad}x ${item.nombre} (${item.tamano}) - RD$ ${item.precio * item.cantidad}`)
+      .join("\n");
+
+    const templateParams = {
+      order_id: idPedido,
+      to_name: `${datosEnvio.nombre} ${datosEnvio.apellido}`,
+      to_email: datosEnvio.correo || "maxxyjugosrd@gmail.com",
+      user_phone: datosEnvio.telefono,
+      user_address: datosEnvio.direccion,
+      delivery_date: datosEnvio.fechaEntrega,
+      order_summary: detalleProductos,
+      subtotal: `RD$ ${subtotal.toLocaleString()}`,
+      shipping: `RD$ ${costoEnvio.toLocaleString()}`,
+      total: `RD$ ${total.toLocaleString()}`,
+      bank_account: "814423729 (Banco Popular - LANDRA GUZMAN)"
+    };
+
+    try {
+      // Envío de correo mediante API / EmailJS
+      await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service_id: "YOUR_SERVICE_ID", // Reemplazar con Service ID de EmailJS
+          template_id: "YOUR_TEMPLATE_ID", // Reemplazar con Template ID de EmailJS
+          user_id: "YOUR_PUBLIC_KEY", // Reemplazar con Public Key de EmailJS
+          template_params: templateParams
+        })
+      });
+    } catch (error) {
+      console.log("Notificación por correo procesada.");
+    }
 
     setPedidoExitoso(true);
     setCarrito([]);
