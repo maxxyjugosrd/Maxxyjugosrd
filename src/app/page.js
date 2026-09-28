@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ShoppingBag, Plus, Minus, Trash2, Send, CheckCircle, Flame } from "lucide-react";
 import { crearPedido } from "../services/pedidosService";
+import { enviarCorreoConfirmacion } from "../services/emailService";
 
 export default function TiendaCliente() {
   // Lista de jugos naturales disponibles en el menú
