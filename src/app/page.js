@@ -13,6 +13,10 @@ import {
   PackageCheck
 } from "lucide-react";
 
+// --- IMPORTACIÓN DE FIREBASE AGREGADA ---
+import { db } from "@/lib/firebase"; 
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+
 export default function Home() {
   // Lista de Zonas y Tarifas de Envíos
   const zonasEnvio = [
@@ -216,7 +220,7 @@ export default function Home() {
   const costoEnvio = subtotal > 0 ? calcularCostoEnvio() : 0;
   const total = subtotal + costoEnvio;
 
-  // Enviar Pedido por Email y registrar en el Panel
+  // --- FUNCIÓN ACTUALIZADA CON FIREBASE ---
   const enviarPedidoAlPanel = async (e) => {
     e.preventDefault();
     if (carrito.length === 0) return alert("El carrito está vacío.");
@@ -225,6 +229,10 @@ export default function Home() {
     }
 
     const idPedido = `PED-${Date.now().toString().slice(-4)}`;
+
+    const resumenDetalles = carrito
+      .map((item) => `${item.cantidad}x ${item.nombre}`)
+      .join(", ");
 
     const nuevoPedido = {
       id: idPedido,
@@ -236,20 +244,33 @@ export default function Home() {
       tipoTransporte: zonaActual?.tipo === "camion" ? `Camión ${tipoCamion}` : "Entrega Local",
       fechaEntrega: datosEnvio.fechaEntrega,
       productos: carrito,
+      detalles: resumenDetalles,
       subtotal,
       envio: costoEnvio,
       total,
+      metodoPago: "Pendiente / Transferencia",
       estado: "Pendiente",
+      origen: "Tienda Web",
+      fecha: serverTimestamp(),
       fechaCreacion: new Date().toISOString()
     };
 
-    // 1. Guardar localmente
+    try {
+      // 1. REGISTRAR DIRECTAMENTE EN FIREBASE FIRESTORE
+      if (db) {
+        await addDoc(collection(db, "pedidos"), nuevoPedido);
+      }
+    } catch (firebaseError) {
+      console.error("Error al guardar en Firebase:", firebaseError);
+    }
+
+    // 2. Guardar copia localmente
     if (typeof window !== "undefined") {
       const pedidosExistentes = JSON.parse(localStorage.getItem("pedidos_maxxy") || "[]");
       localStorage.setItem("pedidos_maxxy", JSON.stringify([nuevoPedido, ...pedidosExistentes]));
     }
 
-    // 2. Formatear resumen de compra
+    // 3. Formatear y enviar correo por EmailJS
     const detalleProductos = carrito
       .map((item) => `${item.cantidad}x ${item.nombre} (${item.tamano}) - RD$ ${item.precio * item.cantidad}`)
       .join("\n");
