@@ -13,7 +13,7 @@ import {
   PackageCheck
 } from "lucide-react";
 
-// --- IMPORTACIÓN DE FIREBASE AGREGADA ---
+// --- IMPORTACIÓN DE FIREBASE ---
 import { db } from "@/lib/firebase"; 
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
@@ -220,7 +220,7 @@ export default function Home() {
   const costoEnvio = subtotal > 0 ? calcularCostoEnvio() : 0;
   const total = subtotal + costoEnvio;
 
-  // --- FUNCIÓN ACTUALIZADA CON FIREBASE ---
+  // --- ENVIAR PEDIDO CORREGIDO (FIREBASE + EMAILJS) ---
   const enviarPedidoAlPanel = async (e) => {
     e.preventDefault();
     if (carrito.length === 0) return alert("El carrito está vacío.");
@@ -234,11 +234,14 @@ export default function Home() {
       .map((item) => `${item.cantidad}x ${item.nombre}`)
       .join(", ");
 
+    const nombreCompleto = `${datosEnvio.nombre} ${datosEnvio.apellido}`.trim();
+    const correoDestino = datosEnvio.correo || "maxxyjugosrd@gmail.com";
+
     const nuevoPedido = {
       id: idPedido,
-      cliente: `${datosEnvio.nombre} ${datosEnvio.apellido}`,
+      cliente: nombreCompleto,
       telefono: datosEnvio.telefono,
-      correo: datosEnvio.correo,
+      correo: correoDestino,
       direccion: datosEnvio.direccion,
       zona: zonaActual ? zonaActual.nombre : "",
       tipoTransporte: zonaActual?.tipo === "camion" ? `Camión ${tipoCamion}` : "Entrega Local",
@@ -249,14 +252,14 @@ export default function Home() {
       envio: costoEnvio,
       total,
       metodoPago: "Pendiente / Transferencia",
-      estado: "Pendiente",
+      estado: "pendiente",
       origen: "Tienda Web",
       fecha: serverTimestamp(),
       fechaCreacion: new Date().toISOString()
     };
 
+    // 1. REGISTRAR EN FIREBASE FIRESTORE
     try {
-      // 1. REGISTRAR DIRECTAMENTE EN FIREBASE FIRESTORE
       if (db) {
         await addDoc(collection(db, "pedidos"), nuevoPedido);
       }
@@ -270,15 +273,17 @@ export default function Home() {
       localStorage.setItem("pedidos_maxxy", JSON.stringify([nuevoPedido, ...pedidosExistentes]));
     }
 
-    // 3. Formatear y enviar correo por EmailJS
+    // 3. ENVIAR CORREO CON EMAILJS USANDO LAS CREDENCIALES CONFIGURADAS
     const detalleProductos = carrito
       .map((item) => `${item.cantidad}x ${item.nombre} (${item.tamano}) - RD$ ${item.precio * item.cantidad}`)
       .join("\n");
 
     const templateParams = {
       order_id: idPedido,
-      to_name: `${datosEnvio.nombre} ${datosEnvio.apellido}`,
-      to_email: datosEnvio.correo || "maxxyjugosrd@gmail.com",
+      name: nombreCompleto,
+      to_name: nombreCompleto,
+      to_email: correoDestino,
+      email: correoDestino,
       user_phone: datosEnvio.telefono,
       user_address: datosEnvio.direccion,
       delivery_date: datosEnvio.fechaEntrega,
@@ -294,14 +299,14 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          service_id: "YOUR_SERVICE_ID",
-          template_id: "YOUR_TEMPLATE_ID",
-          user_id: "YOUR_PUBLIC_KEY",
+          service_id: "service_hq0ilqb",
+          template_id: "template_255rdau",
+          user_id: "17KJ7w9kR8Ej3mZIk",
           template_params: templateParams
         })
       });
     } catch (error) {
-      console.log("Notificación por correo procesada.");
+      console.warn("Aviso EmailJS:", error);
     }
 
     setPedidoExitoso(true);
@@ -733,6 +738,14 @@ export default function Home() {
                         onChange={(e) => setDatosEnvio({ ...datosEnvio, telefono: e.target.value })}
                         className="w-full p-2.5 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500"
                         required
+                      />
+
+                      <input
+                        type="email"
+                        placeholder="Correo electrónico (opcional)"
+                        value={datosEnvio.correo}
+                        onChange={(e) => setDatosEnvio({ ...datosEnvio, correo: e.target.value })}
+                        className="w-full p-2.5 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500"
                       />
 
                       <textarea
