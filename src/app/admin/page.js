@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { DollarSign, TrendingUp, ShoppingBag, PlusCircle, ArrowUpRight, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { obtenerPedidosEnVivo } from "@/services/pedidosService";
+import { obtenerPedidosEnVivo } from "../../services/pedidosService";
 
 export default function AdminDashboard() {
   const [pedidos, setPedidos] = useState([]);
