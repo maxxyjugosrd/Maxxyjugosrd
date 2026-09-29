@@ -1,45 +1,138 @@
 "use client";
 
-import { useState } from "react";
-import { DollarSign, TrendingUp, TrendingDown, Plus, Receipt, ShoppingCart, Truck, Users } from "lucide-react";
+import { useState, useEffect } from "react";
+import {
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  Plus,
+  Receipt,
+  Trash2,
+  Pencil,
+  X,
+} from "lucide-react";
 
 export default function ContabilidadPage() {
-  // Datos de ingresos y gastos de ejemplo
-  const [ingresosTotales, setIngresosTotales] = useState(48500); // RD$ Ventas totales
-  const [gastos, setGastos] = useState([
-    { id: 1, concepto: "Compra de Chinola y Fresa (Mercado)", Categoria: "Frutas/Insumos", monto: 8500, fecha: "2026-09-25" },
-    { id: 2, concepto: "Vasos de 16oz, tapas y sorbetes", Categoria: "Empaques", monto: 3200, fecha: "2026-09-26" },
-    { id: 3, concepto: "Pago comisiones a Deliveries", Categoria: "Delivery", monto: 4200, fecha: "2026-09-27" },
-    { id: 4, concepto: "Pago sueldo preparador", Categoria: "Sueldos", monto: 5000, fecha: "2026-09-28" },
-  ]);
+  // 1. Calcular ventas desde pedidos con estatus 'completado'
+  const [ingresosTotales, setIngresosTotales] = useState(0);
 
-  const [nuevoGasto, setNuevoGasto] = useState({ concepto: "", categoria: "Frutas/Insumos", monto: "" });
+  // 2. Gastos registrados manualmente (sin datos predeterminados)
+  const [gastos, setGastos] = useState([]);
+
+  // Estado del formulario
+  const [gastoForm, setGastoForm] = useState({
+    id: null,
+    concepto: "",
+    categoria: "Frutas/Insumos",
+    monto: "",
+  });
+
   const [mostrarModal, setMostrarModal] = useState(false);
+  const [editando, setEditando] = useState(false);
+
+  // Cargar datos al montar el componente
+  useEffect(() => {
+    // Cargar Ventas reales desde LocalStorage (pedidos)
+    const pedidosGuardados = localStorage.getItem("pedidos");
+    if (pedidosGuardados) {
+      try {
+        const listaPedidos = JSON.parse(pedidosGuardados);
+        // Filtrar SOLO los que tienen estado completado o entregado
+        const totalVentasCompletadas = listaPedidos
+          .filter((p) => {
+            const estado = (p.estado || p.status || "").toLowerCase();
+            return estado === "completado" || estado === "entregado";
+          })
+          .reduce((sum, p) => sum + Number(p.total || 0), 0);
+
+        setIngresosTotales(totalVentasCompletadas);
+      } catch (error) {
+        console.error("Error al leer pedidos:", error);
+      }
+    }
+
+    // Cargar Gastos guardados
+    const gastosGuardados = localStorage.getItem("gastos_contabilidad");
+    if (gastosGuardados) {
+      try {
+        setGastos(JSON.parse(gastosGuardados));
+      } catch (error) {
+        console.error("Error al leer gastos:", error);
+      }
+    }
+  }, []);
+
+  // Guardar gastos en LocalStorage cada vez que cambien
+  const actualizarGastosState = (nuevosGastos) => {
+    setGastos(nuevosGastos);
+    localStorage.setItem("gastos_contabilidad", JSON.stringify(nuevosGastos));
+  };
 
   // Calculadora de Gastos Totales
   const totalGastos = gastos.reduce((sum, g) => sum + Number(g.monto), 0);
 
   // Fórmula: Ganancia Neta = Ventas Totales - Gastos Totales
   const gananciaNeta = ingresosTotales - totalGastos;
-  const margenGanancia = ingresosTotales > 0 ? ((gananciaNeta / ingresosTotales) * 100).toFixed(1) : 0;
+  const margenGanancia =
+    ingresosTotales > 0 ? ((gananciaNeta / ingresosTotales) * 100).toFixed(1) : 0;
 
-  const registrarGasto = (e) => {
+  // Abrir modal para crear
+  const abrirModalCrear = () => {
+    setGastoForm({ id: null, concepto: "", categoria: "Frutas/Insumos", monto: "" });
+    setEditando(false);
+    setMostrarModal(true);
+  };
+
+  // Abrir modal para editar
+  const abrirModalEditar = (gasto) => {
+    setGastoForm({
+      id: gasto.id,
+      concepto: gasto.concepto,
+      categoria: gasto.categoria || gasto.Categoria || "Frutas/Insumos",
+      monto: gasto.monto,
+      fecha: gasto.fecha,
+    });
+    setEditando(true);
+    setMostrarModal(true);
+  };
+
+  // Guardar o Editar Gasto
+  const guardarGasto = (e) => {
     e.preventDefault();
-    if (!nuevoGasto.concepto || !nuevoGasto.monto) return;
+    if (!gastoForm.concepto || !gastoForm.monto) return;
 
-    setGastos([
-      ...gastos,
-      {
+    if (editando) {
+      const gastosActualizados = gastos.map((g) =>
+        g.id === gastoForm.id
+          ? {
+              ...g,
+              concepto: gastoForm.concepto,
+              categoria: gastoForm.categoria,
+              monto: Number(gastoForm.monto),
+            }
+          : g
+      );
+      actualizarGastosState(gastosActualizados);
+    } else {
+      const nuevo = {
         id: Date.now(),
-        concepto: nuevoGasto.concepto,
-        categoria: nuevoGasto.categoria,
-        monto: Number(nuevoGasto.monto),
+        concepto: gastoForm.concepto,
+        categoria: gastoForm.categoria,
+        monto: Number(gastoForm.monto),
         fecha: new Date().toISOString().split("T")[0],
-      },
-    ]);
+      };
+      actualizarGastosState([...gastos, nuevo]);
+    }
 
-    setNuevoGasto({ concepto: "", categoria: "Frutas/Insumos", monto: "" });
     setMostrarModal(false);
+  };
+
+  // Eliminar Gasto
+  const eliminarGasto = (id) => {
+    if (confirm("¿Estás seguro de que deseas eliminar este gasto?")) {
+      const gastosFiltrados = gastos.filter((g) => g.id !== id);
+      actualizarGastosState(gastosFiltrados);
+    }
   };
 
   return (
@@ -51,7 +144,7 @@ export default function ContabilidadPage() {
           <p className="text-slate-500 text-sm">Resumen claro de ingresos, gastos operativos y ganancia neta real.</p>
         </div>
         <button
-          onClick={() => setMostrarModal(true)}
+          onClick={abrirModalCrear}
           className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition"
         >
           <Plus className="w-5 h-5" /> Registrar Gasto
@@ -60,7 +153,7 @@ export default function ContabilidadPage() {
 
       {/* Tarjetas de Métricas Principales */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Ventas Totales */}
+        {/* Ventas Totales (Solo Completadas) */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
           <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider">
             <span>Ventas Totales</span>
@@ -69,7 +162,7 @@ export default function ContabilidadPage() {
             </div>
           </div>
           <p className="text-3xl font-black text-slate-900">RD$ {ingresosTotales.toLocaleString()}</p>
-          <p className="text-xs text-emerald-600 font-semibold">Ingresos brutos cobrados</p>
+          <p className="text-xs text-emerald-600 font-semibold">Solo pedidos completados/cobrados</p>
         </div>
 
         {/* Gastos Totales */}
@@ -81,7 +174,7 @@ export default function ContabilidadPage() {
             </div>
           </div>
           <p className="text-3xl font-black text-rose-600">RD$ {totalGastos.toLocaleString()}</p>
-          <p className="text-xs text-rose-500 font-semibold">Frutas, insumos, envíos y sueldos</p>
+          <p className="text-xs text-rose-500 font-semibold">Gastos ingresados manualmente</p>
         </div>
 
         {/* Ganancia Neta Limpia */}
@@ -111,40 +204,76 @@ export default function ContabilidadPage() {
                 <th className="pb-3">Concepto / Detalle</th>
                 <th className="pb-3">Categoría</th>
                 <th className="pb-3 text-right">Monto</th>
+                <th className="pb-3 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {gastos.map((gasto) => (
-                <tr key={gasto.id} className="hover:bg-slate-50">
-                  <td className="py-3 text-slate-500">{gasto.fecha}</td>
-                  <td className="py-3 font-semibold text-slate-800">{gasto.concepto}</td>
-                  <td className="py-3">
-                    <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-bold">
-                      {gasto.categoria}
-                    </span>
-                  </td>
-                  <td className="py-3 text-right font-extrabold text-rose-600">
-                    - RD$ {gasto.monto.toLocaleString()}
+              {gastos.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="py-8 text-center text-slate-400 text-sm">
+                    No has registrado ningún gasto todavía.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                gastos.map((gasto) => (
+                  <tr key={gasto.id} className="hover:bg-slate-50">
+                    <td className="py-3 text-slate-500">{gasto.fecha}</td>
+                    <td className="py-3 font-semibold text-slate-800">{gasto.concepto}</td>
+                    <td className="py-3">
+                      <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-bold">
+                        {gasto.categoria || gasto.Categoria}
+                      </span>
+                    </td>
+                    <td className="py-3 text-right font-extrabold text-rose-600">
+                      - RD$ {Number(gasto.monto).toLocaleString()}
+                    </td>
+                    <td className="py-3 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => abrirModalEditar(gasto)}
+                          className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                          title="Editar gasto"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => eliminarGasto(gasto.id)}
+                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                          title="Eliminar gasto"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Modal Registrar Gasto */}
+      {/* Modal Registrar / Editar Gasto */}
       {mostrarModal && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
-          <form onSubmit={registrarGasto} className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
-            <h2 className="text-lg font-bold text-slate-800">Registrar Nuevo Gasto</h2>
+          <form onSubmit={guardarGasto} className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+            <button
+              type="button"
+              onClick={() => setMostrarModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-lg font-bold text-slate-800">
+              {editando ? "Editar Gasto" : "Registrar Nuevo Gasto"}
+            </h2>
             <div>
               <label className="text-xs font-bold text-slate-600">Concepto / Descripción</label>
               <input
                 type="text"
                 placeholder="Ej. Compra de 50 lbs de Chinola"
-                value={nuevoGasto.concepto}
-                onChange={(e) => setNuevoGasto({ ...nuevoGasto, concepto: e.target.value })}
+                value={gastoForm.concepto}
+                onChange={(e) => setGastoForm({ ...gastoForm, concepto: e.target.value })}
                 className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 mt-1"
                 required
               />
@@ -152,8 +281,8 @@ export default function ContabilidadPage() {
             <div>
               <label className="text-xs font-bold text-slate-600">Categoría</label>
               <select
-                value={nuevoGasto.categoria}
-                onChange={(e) => setNuevoGasto({ ...nuevoGasto, categoria: e.target.value })}
+                value={gastoForm.categoria}
+                onChange={(e) => setGastoForm({ ...gastoForm, categoria: e.target.value })}
                 className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 mt-1"
               >
                 <option value="Frutas/Insumos">Frutas e Insumos</option>
@@ -168,15 +297,15 @@ export default function ContabilidadPage() {
               <input
                 type="number"
                 placeholder="0.00"
-                value={nuevoGasto.monto}
-                onChange={(e) => setNuevoGasto({ ...nuevoGasto, monto: e.target.value })}
+                value={gastoForm.monto}
+                onChange={(e) => setGastoForm({ ...gastoForm, monto: e.target.value })}
                 className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 mt-1"
                 required
               />
             </div>
             <div className="flex gap-2 pt-3">
-              <button type="submit" className="flex-1 bg-amber-500 hover:bg-amber-600 font-bold py-2.5 rounded-xl text-sm transition">
-                Guardar Gasto
+              <button type="submit" className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2.5 rounded-xl text-sm transition">
+                {editando ? "Actualizar Gasto" : "Guardar Gasto"}
               </button>
               <button
                 type="button"
