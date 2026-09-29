@@ -11,6 +11,12 @@ import {
   Pencil,
   Trash2,
   X,
+  Eye,
+  Calendar,
+  MapPin,
+  Phone,
+  Mail,
+  Package,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -28,6 +34,7 @@ export default function AdminDashboard() {
   const [cargando, setCargando] = useState(true);
   const [actualizandoId, setActualizandoId] = useState(null);
   const [pedidoAEditar, setPedidoAEditar] = useState(null);
+  const [pedidoVerDetalles, setPedidoVerDetalles] = useState(null);
 
   // Gastos y comisiones fijados/estimados temporalmente
   const [gastosHoy] = useState(3200); // Compras de frutas e insumos
@@ -89,6 +96,25 @@ export default function AdminDashboard() {
     } else {
       alert("Error al actualizar el pedido.");
     }
+  };
+
+  // Helper para formatear fechas
+  const formatearFecha = (fechaRaw) => {
+    if (!fechaRaw) return "No especificada";
+    if (fechaRaw.seconds) {
+      return new Date(fechaRaw.seconds * 1000).toLocaleString("es-DO", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
+    }
+    if (typeof fechaRaw === "string") {
+      const fecha = new Date(fechaRaw);
+      return isNaN(fecha.getTime()) ? fechaRaw : fecha.toLocaleString("es-DO", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
+    }
+    return String(fechaRaw);
   };
 
   // Calcular las ventas totales acumuladas desde los pedidos registrados
@@ -246,8 +272,8 @@ export default function AdminDashboard() {
                     </p>
                   </div>
 
-                  <div className="text-right flex items-center gap-3">
-                    <span className="font-bold text-slate-800 block text-sm">
+                  <div className="text-right flex items-center gap-2">
+                    <span className="font-bold text-slate-800 block text-sm mr-2">
                       RD$ {(pedido.total || 0).toLocaleString()}
                     </span>
 
@@ -272,6 +298,15 @@ export default function AdminDashboard() {
                         <Loader2 className="w-3 h-3 animate-spin absolute right-1 top-2 text-slate-500" />
                       )}
                     </div>
+
+                    {/* Botón Ver Detalles (Ojo) */}
+                    <button
+                      onClick={() => setPedidoVerDetalles(pedido)}
+                      className="p-1.5 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+                      title="Ver detalles completos del pedido"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
 
                     {/* Botón Editar (Lápiz) */}
                     <button
@@ -304,6 +339,162 @@ export default function AdminDashboard() {
           </div>
         )}
       </div>
+
+      {/* Modal para Ver Detalles Completos del Pedido */}
+      {pedidoVerDetalles && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-lg w-full space-y-5 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <h3 className="font-bold text-slate-800 text-lg">
+                  Detalles de la Orden
+                </h3>
+                <p className="text-xs text-slate-400 font-mono">
+                  ID: {pedidoVerDetalles.idDoc || pedidoVerDetalles.id}
+                </p>
+              </div>
+              <button
+                onClick={() => setPedidoVerDetalles(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Fechas */}
+            <div className="bg-slate-50 p-3 rounded-xl space-y-1 text-xs text-slate-600 border border-slate-100">
+              <div className="flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-amber-500" />
+                <span className="font-semibold">Fecha de Pedido:</span>{" "}
+                {formatearFecha(
+                  pedidoVerDetalles.fecha || pedidoVerDetalles.fechaCreacion
+                )}
+              </div>
+              {pedidoVerDetalles.datosEnvio?.fechaEntrega && (
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-emerald-500" />
+                  <span className="font-semibold">Fecha Programada de Entrega:</span>{" "}
+                  {pedidoVerDetalles.datosEnvio.fechaEntrega}
+                </div>
+              )}
+            </div>
+
+            {/* Datos del Cliente y Envío */}
+            <div className="space-y-2 text-sm text-slate-700">
+              <h4 className="font-bold text-slate-800 border-b pb-1 text-xs uppercase tracking-wider text-slate-400">
+                Información de Envío & Cliente
+              </h4>
+              <p className="flex items-center gap-2">
+                <span className="font-semibold text-slate-900">Cliente:</span>{" "}
+                {typeof pedidoVerDetalles.cliente === "string"
+                  ? pedidoVerDetalles.cliente
+                  : pedidoVerDetalles.cliente?.nombre || "N/A"}
+              </p>
+              <p className="flex items-center gap-2 text-xs text-slate-600">
+                <Phone className="w-3.5 h-3.5 text-slate-400" />
+                {pedidoVerDetalles.telefono ||
+                  pedidoVerDetalles.datosEnvio?.telefono ||
+                  "Sin teléfono"}
+              </p>
+              {pedidoVerDetalles.correoDestino && (
+                <p className="flex items-center gap-2 text-xs text-slate-600">
+                  <Mail className="w-3.5 h-3.5 text-slate-400" />
+                  {pedidoVerDetalles.correoDestino}
+                </p>
+              )}
+              <div className="flex items-start gap-2 text-xs text-slate-600 bg-amber-50/50 p-2.5 rounded-xl border border-amber-100">
+                <MapPin className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-slate-800">
+                    Dirección de Entrega:
+                  </p>
+                  <p>
+                    {pedidoVerDetalles.direccion ||
+                      pedidoVerDetalles.datosEnvio?.direccion ||
+                      "No especificada"}
+                  </p>
+                  {pedidoVerDetalles.zonaActual && (
+                    <p className="text-[11px] text-amber-700 font-medium mt-0.5">
+                      Zona: {pedidoVerDetalles.zonaActual.nombre || pedidoVerDetalles.zonaActual}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Productos Solicitados */}
+            <div className="space-y-2">
+              <h4 className="font-bold text-slate-800 border-b pb-1 text-xs uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Package className="w-4 h-4 text-slate-500" /> Productos / Orden
+              </h4>
+              {pedidoVerDetalles.productos &&
+              pedidoVerDetalles.productos.length > 0 ? (
+                <div className="divide-y divide-slate-100 text-xs">
+                  {pedidoVerDetalles.productos.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="py-2 flex justify-between items-center"
+                    >
+                      <div>
+                        <p className="font-semibold text-slate-800">
+                          {item.cantidad || 1}x {item.nombre || item.titulo}
+                        </p>
+                        {item.tamano && (
+                          <p className="text-slate-400 text-[11px]">
+                            Tamaño/Presentación: {item.tamano}
+                          </p>
+                        )}
+                      </div>
+                      <span className="font-medium text-slate-700">
+                        RD${" "}
+                        {(
+                          (item.precio || 0) * (item.cantidad || 1)
+                        ).toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 italic">
+                  {pedidoVerDetalles.detalles || "Sin detalle especificado."}
+                </p>
+              )}
+            </div>
+
+            {/* Resumen de Pago */}
+            <div className="border-t pt-3 space-y-1 text-xs text-slate-600">
+              {pedidoVerDetalles.subtotal && (
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>RD$ {Number(pedidoVerDetalles.subtotal).toLocaleString()}</span>
+                </div>
+              )}
+              {pedidoVerDetalles.envio !== undefined && (
+                <div className="flex justify-between">
+                  <span>Costo de Envío:</span>
+                  <span>RD$ {Number(pedidoVerDetalles.envio).toLocaleString()}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold text-slate-800 text-sm pt-1 border-t">
+                <span>Total a Pagar:</span>
+                <span className="text-amber-600">
+                  RD$ {Number(pedidoVerDetalles.total || 0).toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setPedidoVerDetalles(null)}
+                className="w-full py-2.5 rounded-xl text-slate-600 bg-slate-100 hover:bg-slate-200 font-medium text-sm transition-colors"
+              >
+                Cerrar Detalles
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal para Editar Pedido */}
       {pedidoAEditar && (
