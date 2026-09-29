@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ShoppingCart, Plus, Minus, Trash2, Send, User, Phone, MapPin, Bike, Loader2, Sparkles, Check, Zap } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, Send, User, Phone, MapPin, Bike, Loader2, Sparkles, Check, Zap, Users } from "lucide-react";
 import { crearPedido } from "@/services/pedidosService";
 import { obtenerProductosEnVivo, obtenerIngredientesEnVivo } from "@/services/catalogoService";
 
@@ -9,12 +9,17 @@ export default function PedidosManuales() {
   const [productosDisponibles, setProductosDisponibles] = useState([]);
   const [cargandoProductos, setCargandoProductos] = useState(true);
 
+  // Listas dinámicas de personal (Deliveries y Vendedores)
+  const [listaDeliveries, setListaDeliveries] = useState([]);
+  const [listaVendedores, setListaVendedores] = useState([]);
+
   // Listas dinámicas de ingredientes desde Firestore
   const [listaIngredientesVerdes, setListaIngredientesVerdes] = useState([]);
   const [listaIngredientesShots, setListaIngredientesShots] = useState([]);
 
-  // Cargar catálogo e ingredientes en tiempo real desde Firestore
+  // Cargar catálogo, ingredientes y personal al iniciar
   useEffect(() => {
+    // 1. Cargar catálogo e ingredientes desde Firestore
     const desuscribirProductos = obtenerProductosEnVivo((datos) => {
       setProductosDisponibles(datos);
       setCargandoProductos(false);
@@ -29,6 +34,18 @@ export default function PedidosManuales() {
       );
     });
 
+    // 2. Cargar personal guardado en localStorage (Módulo de Personal)
+    const personalGuardado = localStorage.getItem("maxi_personal");
+    if (personalGuardado) {
+      try {
+        const personalArr = JSON.parse(personalGuardado);
+        setListaDeliveries(personalArr.filter((p) => p.rol === "Delivery"));
+        setListaVendedores(personalArr.filter((p) => p.rol === "Vendedor"));
+      } catch (e) {
+        console.error("Error al parsear el personal:", e);
+      }
+    }
+
     return () => {
       desuscribirProductos && desuscribirProductos();
       desuscribirIngredientes && desuscribirIngredientes();
@@ -38,7 +55,8 @@ export default function PedidosManuales() {
   // Datos del cliente y pedido
   const [cliente, setCliente] = useState({ nombre: "", telefono: "", direccion: "" });
   const [carrito, setCarrito] = useState([]);
-  const [deliveryAsignado, setDeliveryAsignado] = useState("Delivery 1");
+  const [deliveryAsignado, setDeliveryAsignado] = useState("");
+  const [vendedorAsignado, setVendedorAsignado] = useState("");
   const [metodoPago, setMetodoPago] = useState("Efectivo");
   const [guardando, setGuardando] = useState(false);
 
@@ -70,7 +88,7 @@ export default function PedidosManuales() {
     }
   };
 
-  // Agregar el Jugo Verde personalizado al carrito (mínimo 4 ingredientes)
+  // Agregar el Jugo Verde personalizado al carrito
   const agregarJugoVerdePersonalizado = () => {
     if (ingredientesVerdes.length < 4) {
       alert("Debes seleccionar al menos 4 ingredientes para el jugo verde.");
@@ -170,7 +188,8 @@ export default function PedidosManuales() {
       direccion: cliente.direccion.trim() || "Local / Mostrador",
       productos: carrito,
       total: totalPedido,
-      deliveryAsignado,
+      deliveryAsignado: deliveryAsignado || "Sin asignar",
+      vendedorAsignado: vendedorAsignado || "Sin asignar",
       metodoPago,
       origen: "WhatsApp / Manual",
       estado: "pendiente",
@@ -185,6 +204,8 @@ export default function PedidosManuales() {
       alert(`¡Pedido registrado en Firestore con éxito por RD$ ${totalPedido.toLocaleString()}!`);
       setCliente({ nombre: "", telefono: "", direccion: "" });
       setCarrito([]);
+      setDeliveryAsignado("");
+      setVendedorAsignado("");
     } else {
       alert("Ocurrió un error al guardar el pedido en la base de datos.");
     }
@@ -194,7 +215,7 @@ export default function PedidosManuales() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-800">Registrar Pedido (WhatsApp / Teléfono) 🥤</h1>
-        <p className="text-slate-500 text-sm">Ingresa ventas manuales permitiendo personalizar jugos verdes y shots a medida.</p>
+        <p className="text-slate-500 text-sm">Ingresa ventas manuales asignando vendedor y personal de entrega en ruta.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -374,17 +395,44 @@ export default function PedidosManuales() {
           <div className="space-y-3 border-t pt-3">
             <div>
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
-                <Bike className="w-3.5 h-3.5" /> Asignar Delivery
+                <Bike className="w-3.5 h-3.5" /> Asignar Delivery (Personal)
               </label>
               <select
                 value={deliveryAsignado}
                 onChange={(e) => setDeliveryAsignado(e.target.value)}
                 className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
               >
-                <option value="Delivery 1">Delivery 1 (Juan)</option>
-                <option value="Delivery 2">Delivery 2 (Carlos)</option>
+                <option value="">-- Seleccionar Delivery --</option>
+                {listaDeliveries.length === 0 ? (
+                  <option disabled>No hay deliveries registrados en Personal</option>
+                ) : (
+                  listaDeliveries.map((del) => (
+                    <option key={del.id} value={del.nombre}>{del.nombre}</option>
+                  ))
+                )}
               </select>
             </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
+                <Users className="w-3.5 h-3.5" /> Asignar Vendedor
+              </label>
+              <select
+                value={vendedorAsignado}
+                onChange={(e) => setVendedorAsignado(e.target.value)}
+                className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+              >
+                <option value="">-- Seleccionar Vendedor --</option>
+                {listaVendedores.length === 0 ? (
+                  <option disabled>No hay vendedores registrados en Personal</option>
+                ) : (
+                  listaVendedores.map((vend) => (
+                    <option key={vend.id} value={vend.nombre}>{vend.nombre} ({vend.valorConfigurado}%)</option>
+                  ))
+                )}
+              </select>
+            </div>
+
             <div>
               <label className="text-xs font-semibold text-slate-600 mb-1 block">Método de Pago</label>
               <select
