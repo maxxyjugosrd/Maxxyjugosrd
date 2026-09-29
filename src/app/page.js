@@ -10,10 +10,12 @@ import {
   Minus, 
   X,
   Leaf,
-  PackageCheck
+  PackageCheck,
+  Trash2
 } from "lucide-react";
 
 import { obtenerProductosEnVivo } from "@/services/catalogoService";
+import { db } from "@/firebase/config"; // Asegúrate de ajustar la ruta si tu archivo firebase está en otro path
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export default function Home() {
@@ -39,27 +41,30 @@ export default function Home() {
 
   const ingredientesSaludables = ["Espinaca", "Manzana Verde", "Pepino", "Apio", "Jengibre", "Limón", "Piña", "Perejil", "Cúrcuma", "Remolacha", "Naranja"];
 
-// CATÁLOGOS QUE SE HALAN DEL PANEL EN VIVO EN FIRESTORE
+  // CATÁLOGOS QUE SE HALAN DEL PANEL EN VIVO EN FIRESTORE
   const [catalogoPanel, setCatalogoPanel] = useState([]);
   const [cargandoCatalogo, setCargandoCatalogo] = useState(true);
 
   useEffect(() => {
     // Escucha Firestore en tiempo real
     const desuscribir = obtenerProductosEnVivo((datos) => {
-      setCatalogoPanel(datos);
+      setCatalogoPanel(datos || []);
       setCargandoCatalogo(false);
     });
 
     return () => desuscribir();
   }, []);
 
-  // Filtrar categorías del catálogo
-  const jugosNaturalesPanel = catalogoPanel.filter(p => p.categoria === "Botella 12 oz" && p.disponible);
-  const galonesPanel = catalogoPanel.filter(p => p.categoria === "Galones" && p.disponible);
-  const saludablesPanel = catalogoPanel.filter(p => p.categoria === "Saludables & Shots" && p.disponible);
-
-  // Búsqueda
+  // Búsqueda y Filtrado
   const [busqueda, setBusqueda] = useState("");
+
+  const productosFiltrados = catalogoPanel.filter((p) => 
+    p.disponible && p.nombre.toLowerCase().includes(busqueda.toLowerCase())
+  );
+
+  const jugosNaturalesPanel = productosFiltrados.filter(p => p.categoria === "Botella 12 oz");
+  const galonesPanel = productosFiltrados.filter(p => p.categoria === "Galones");
+  const saludablesPanel = productosFiltrados.filter(p => p.categoria === "Saludables & Shots");
 
   // Personalización de Media Docena
   const [mediaDocena, setMediaDocena] = useState({});
@@ -146,6 +151,21 @@ export default function Home() {
     notificar(`¡${prod.nombre} agregado!`);
   };
 
+  // Gestión de cantidades dentro del Carrito
+  const modificarCantidadCarrito = (id, cambio) => {
+    setCarrito(carrito.map((item) => {
+      if (item.id === id) {
+        const nuevaCantidad = item.cantidad + cambio;
+        return nuevaCantidad > 0 ? { ...item, cantidad: nuevaCantidad } : null;
+      }
+      return item;
+    }).filter(Boolean));
+  };
+
+  const eliminarDelCarrito = (id) => {
+    setCarrito(carrito.filter((item) => item.id !== id));
+  };
+
   // Toggle Ingredientes
   const toggleIngredienteJugo = (ing) => {
     if (ingredientesJugo.includes(ing)) {
@@ -211,7 +231,7 @@ export default function Home() {
   const costoEnvio = subtotal > 0 ? calcularCostoEnvio() : 0;
   const total = subtotal + costoEnvio;
 
-  // --- ENVIAR PEDIDO CORREGIDO (FIREBASE + EMAILJS) ---
+  // ENVIAR PEDIDO (FIREBASE + EMAILJS)
   const enviarPedidoAlPanel = async (e) => {
     e.preventDefault();
     if (carrito.length === 0) return alert("El carrito está vacío.");
@@ -264,9 +284,9 @@ export default function Home() {
       localStorage.setItem("pedidos_maxxy", JSON.stringify([nuevoPedido, ...pedidosExistentes]));
     }
 
-    // 3. ENVIAR CORREO CON EMAILJS USANDO LAS CREDENCIALES CONFIGURADAS
+    // 3. ENVIAR CORREO CON EMAILJS
     const detalleProductos = carrito
-      .map((item) => `${item.cantidad}x ${item.nombre} (${item.tamano}) - RD$ ${item.precio * item.cantidad}`)
+      .map((item) => `${item.cantidad}x ${item.nombre} (${item.tamano}) - RD$ ${(item.precio * item.cantidad).toLocaleString()}`)
       .join("\n");
 
     const templateParams = {
@@ -440,7 +460,11 @@ export default function Home() {
             </div>
           </div>
 
-          {jugosNaturalesPanel.length === 0 ? (
+          {cargandoCatalogo ? (
+            <div className="text-center py-8">
+              <p className="text-slate-400 text-xs animate-pulse">Cargando catálogo en vivo...</p>
+            </div>
+          ) : jugosNaturalesPanel.length === 0 ? (
             <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed">
               <p className="text-slate-500 text-xs font-semibold">No hay jugos de 12 oz registrados en el panel aún.</p>
               <p className="text-slate-400 text-[11px] mt-1">Ingresa a `/admin/catalogo` para agregarlos.</p>
@@ -688,12 +712,25 @@ export default function Home() {
                   ) : (
                     <div className="space-y-3">
                       {carrito.map((item) => (
-                        <div key={item.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl border text-xs">
-                          <div>
+                        <div key={item.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl border text-xs gap-2">
+                          <div className="flex-1">
                             <p className="font-bold text-slate-800">{item.nombre}</p>
                             <p className="text-slate-400">{item.tamano} • RD$ {item.precio}</p>
                           </div>
-                          <span className="font-black text-slate-900 text-sm">x{item.cantidad}</span>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 bg-white border rounded-xl px-2 py-1">
+                              <button onClick={() => modificarCantidadCarrito(item.id, -1)} className="text-slate-500 hover:text-slate-900">
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+                              <span className="font-bold text-slate-900 text-xs w-4 text-center">{item.cantidad}</span>
+                              <button onClick={() => modificarCantidadCarrito(item.id, 1)} className="text-slate-500 hover:text-slate-900">
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            <button onClick={() => eliminarDelCarrito(item.id)} className="text-rose-500 hover:text-rose-700 p-1">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
