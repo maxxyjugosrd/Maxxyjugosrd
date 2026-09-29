@@ -3,27 +3,37 @@
 import { useState, useEffect } from "react";
 import { ShoppingCart, Plus, Minus, Trash2, Send, User, Phone, MapPin, Bike, Loader2, Sparkles, Check, Zap } from "lucide-react";
 import { crearPedido } from "@/services/pedidosService";
-import { obtenerProductosEnVivo } from "@/services/catalogoService";
-import { obtenerIngredientesEnVivo } from "@/services/catalogoService";
+import { obtenerProductosEnVivo, obtenerIngredientesEnVivo } from "@/services/catalogoService";
 
 export default function PedidosManuales() {
   const [productosDisponibles, setProductosDisponibles] = useState([]);
   const [cargandoProductos, setCargandoProductos] = useState(true);
-  const [listaIngredientesVerdes, setListaIngredientesVerdes] = useState([]);
-const [listaIngredientesShots, setListaIngredientesShots] = useState([]);
 
-useEffect(() => {
-  const desuscribir = obtenerIngredientesEnVivo((datos) => {
-    // Filtramos solo los que están disponibles y según su tipo
-    setListaIngredientesVerdes(
-      datos.filter((i) => i.tipo === "verde" && i.disponible !== false)
-    );
-    setListaIngredientesShots(
-      datos.filter((i) => i.tipo === "shot" && i.disponible !== false)
-    );
-  });
-  return () => desuscribir();
-}, []);
+  // Listas dinámicas de ingredientes desde Firestore
+  const [listaIngredientesVerdes, setListaIngredientesVerdes] = useState([]);
+  const [listaIngredientesShots, setListaIngredientesShots] = useState([]);
+
+  // Cargar catálogo e ingredientes en tiempo real desde Firestore
+  useEffect(() => {
+    const desuscribirProductos = obtenerProductosEnVivo((datos) => {
+      setProductosDisponibles(datos);
+      setCargandoProductos(false);
+    });
+
+    const desuscribirIngredientes = obtenerIngredientesEnVivo((datos) => {
+      setListaIngredientesVerdes(
+        datos.filter((i) => i.tipo === "verde" && i.disponible !== false)
+      );
+      setListaIngredientesShots(
+        datos.filter((i) => i.tipo === "shot" && i.disponible !== false)
+      );
+    });
+
+    return () => {
+      desuscribirProductos && desuscribirProductos();
+      desuscribirIngredientes && desuscribirIngredientes();
+    };
+  }, []);
 
   // Datos del cliente y pedido
   const [cliente, setCliente] = useState({ nombre: "", telefono: "", direccion: "" });
@@ -36,60 +46,27 @@ useEffect(() => {
   const [modalVerdeAbierto, setModalVerdeAbierto] = useState(false);
   const [ingredientesVerdes, setIngredientesVerdes] = useState([]);
   const [tamanoJugoVerde, setTamanoJugoVerde] = useState("12 oz");
-  const [precioJugoVerde, setPrecioJugoVerde] = useState(180);
 
   // Estado para el Modal de Personalización de Shots
   const [modalShotAbierto, setModalShotAbierto] = useState(false);
   const [ingredientesShot, setIngredientesShot] = useState([]);
-  const [precioShot] = useState(100); // Precio fijo o base para el shot personalizado
-
-  // Listas completas de ingredientes
-  const listaIngredientesVerdes = [
-    { id: "epinaca", nombre: "Espinaca Fresca" },
-    { id: "apio", nombre: "Apio Orgánico" },
-    { id: "pepino", nombre: "Pepino Verde" },
-    { id: "manzana", nombre: "Manzana Verde" },
-    { id: "jengibre", nombre: "Jengibre Rayado" },
-    { id: "limon", nombre: "Jugo de Limón" },
-    { id: "piña", nombre: "Piña Dulce" },
-    { id: "perejil", nombre: "Perejil Fresco" }
-  ];
-
-  const listaIngredientesShots = [
-    { id: "jengibre_puro", nombre: "Jengibre Puro" },
-    { id: "cucurma", nombre: "Cúrcuma Fresca" },
-    { id: "limon_con_cayena", nombre: "Limón con Pimienta Cayena" },
-    { id: "miel_abeja", nombre: "Miel de Abeja Pura" },
-    { id: "ajo_macerado", nombre: "Ajo Macerado" },
-    { id: "spirulina", nombre: "Spirulina en Polvo" },
-    { id: "menta", nombre: "Extracto de Menta" }
-  ];
-
-  // Cargar catálogo en tiempo real desde catalogoService
-  useEffect(() => {
-    const desuscribir = obtenerProductosEnVivo((datos) => {
-      setProductosDisponibles(datos);
-      setCargandoProductos(false);
-    });
-
-    return () => desuscribir();
-  }, []);
+  const [precioShot] = useState(100);
 
   // Manejar selección de ingredientes para Jugo Verde
-  const toggleIngredienteVerde = (ing) => {
-    if (ingredientesVerdes.includes(ing.nombre)) {
-      setIngredientesVerdes(ingredientesVerdes.filter((i) => i !== ing.nombre));
+  const toggleIngredienteVerde = (nombreIng) => {
+    if (ingredientesVerdes.includes(nombreIng)) {
+      setIngredientesVerdes(ingredientesVerdes.filter((i) => i !== nombreIng));
     } else {
-      setIngredientesVerdes([...ingredientesVerdes, ing.nombre]);
+      setIngredientesVerdes([...ingredientesVerdes, nombreIng]);
     }
   };
 
   // Manejar selección de ingredientes para Shots
-  const toggleIngredienteShot = (ing) => {
-    if (ingredientesShot.includes(ing.nombre)) {
-      setIngredientesShot(ingredientesShot.filter((i) => i !== ing.nombre));
+  const toggleIngredienteShot = (nombreIng) => {
+    if (ingredientesShot.includes(nombreIng)) {
+      setIngredientesShot(ingredientesShot.filter((i) => i !== nombreIng));
     } else {
-      setIngredientesShot([...ingredientesShot, ing.nombre]);
+      setIngredientesShot([...ingredientesShot, nombreIng]);
     }
   };
 
@@ -115,7 +92,7 @@ useEffect(() => {
     setModalVerdeAbierto(false);
   };
 
-  // Agregar el Shot personalizado al carrito (mínimo 1 ingrediente)
+  // Agregar el Shot personalizado al carrito
   const agregarShotPersonalizado = () => {
     if (ingredientesShot.length === 0) {
       alert("Selecciona al menos un ingrediente para armar el Shot.");
@@ -223,10 +200,7 @@ useEffect(() => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Columna 1 y 2: Botones de Personalización + Catálogo */}
         <div className="lg:col-span-2 space-y-5">
-          
-          {/* Botones de Acceso Rápido para Personalizar */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Banner Jugo Verde */}
             <div className="bg-gradient-to-r from-emerald-500 to-teal-600 p-4 rounded-2xl text-white shadow-sm flex flex-col justify-between gap-3">
               <div>
                 <h3 className="font-bold text-base flex items-center gap-1.5">
@@ -243,7 +217,6 @@ useEffect(() => {
               </button>
             </div>
 
-            {/* Banner Shots */}
             <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-4 rounded-2xl text-white shadow-sm flex flex-col justify-between gap-3">
               <div>
                 <h3 className="font-bold text-base flex items-center gap-1.5">
@@ -513,7 +486,7 @@ useEffect(() => {
                     <button
                       type="button"
                       key={ing.id}
-                      onClick={() => toggleIngredienteVerde(ing)}
+                      onClick={() => toggleIngredienteVerde(ing.nombre)}
                       className={`p-2.5 rounded-xl border text-left text-xs font-medium flex items-center justify-between transition ${
                         seleccionado
                           ? "bg-emerald-50 border-emerald-500 text-emerald-900 shadow-sm"
@@ -582,7 +555,7 @@ useEffect(() => {
                     <button
                       type="button"
                       key={ing.id}
-                      onClick={() => toggleIngredienteShot(ing)}
+                      onClick={() => toggleIngredienteShot(ing.nombre)}
                       className={`p-2.5 rounded-xl border text-left text-xs font-medium flex items-center justify-between transition ${
                         seleccionado
                           ? "bg-amber-50 border-amber-500 text-amber-900 shadow-sm"
