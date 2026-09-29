@@ -11,12 +11,13 @@ import {
   Pencil,
   X,
 } from "lucide-react";
+import { obtenerPedidosEnVivo } from "@/services/pedidosService";
 
 export default function ContabilidadPage() {
   // 1. Calcular ventas desde pedidos con estatus 'completado'
   const [ingresosTotales, setIngresosTotales] = useState(0);
 
-  // 2. Gastos registrados manualmente (sin datos predeterminados)
+  // 2. Gastos registrados manualmente
   const [gastos, setGastos] = useState([]);
 
   // Estado del formulario
@@ -32,26 +33,19 @@ export default function ContabilidadPage() {
 
   // Cargar datos al montar el componente
   useEffect(() => {
-    // Cargar Ventas reales desde LocalStorage (pedidos)
-    const pedidosGuardados = localStorage.getItem("pedidos");
-    if (pedidosGuardados) {
-      try {
-        const listaPedidos = JSON.parse(pedidosGuardados);
-        // Filtrar SOLO los que tienen estado completado o entregado
-        const totalVentasCompletadas = listaPedidos
-          .filter((p) => {
-            const estado = (p.estado || p.status || "").toLowerCase();
-            return estado === "Completado" || estado === "entregado";
-          })
-          .reduce((sum, p) => sum + Number(p.total || 0), 0);
+    // 1. Escuchar pedidos en tiempo real desde Firestore
+    const unsubscribe = obtenerPedidosEnVivo((listaPedidos) => {
+      const totalVentasCompletadas = listaPedidos
+        .filter((p) => {
+          const estado = String(p.estado || p.status || "").toLowerCase();
+          return estado === "completado" || estado === "entregado";
+        })
+        .reduce((sum, p) => sum + Number(p.total || 0), 0);
 
-        setIngresosTotales(totalVentasCompletadas);
-      } catch (error) {
-        console.error("Error al leer pedidos:", error);
-      }
-    }
+      setIngresosTotales(totalVentasCompletadas);
+    });
 
-    // Cargar Gastos guardados
+    // 2. Cargar Gastos guardados de localStorage
     const gastosGuardados = localStorage.getItem("gastos_contabilidad");
     if (gastosGuardados) {
       try {
@@ -60,190 +54,190 @@ export default function ContabilidadPage() {
         console.error("Error al leer gastos:", error);
       }
     }
+
+    return () => unsubscribe && unsubscribe();
   }, []);
 
-  // Guardar gastos en LocalStorage cada vez que cambien
-  const actualizarGastosState = (nuevosGastos) => {
-    setGastos(nuevosGastos);
-    localStorage.setItem("gastos_contabilidad", JSON.stringify(nuevosGastos));
-  };
+  // Guardar gastos en localStorage cada vez que cambien
+  useEffect(() => {
+    localStorage.setItem("gastos_contabilidad", JSON.stringify(gastos));
+  }, [gastos]);
 
-  // Calculadora de Gastos Totales
-  const totalGastos = gastos.reduce((sum, g) => sum + Number(g.monto), 0);
-
-  // Fórmula: Ganancia Neta = Ventas Totales - Gastos Totales
-  const gananciaNeta = ingresosTotales - totalGastos;
-  const margenGanancia =
-    ingresosTotales > 0 ? ((gananciaNeta / ingresosTotales) * 100).toFixed(1) : 0;
-
-  // Abrir modal para crear
-  const abrirModalCrear = () => {
-    setGastoForm({ id: null, concepto: "", categoria: "Frutas/Insumos", monto: "" });
-    setEditando(false);
-    setMostrarModal(true);
-  };
-
-  // Abrir modal para editar
-  const abrirModalEditar = (gasto) => {
-    setGastoForm({
-      id: gasto.id,
-      concepto: gasto.concepto,
-      categoria: gasto.categoria || gasto.Categoria || "Frutas/Insumos",
-      monto: gasto.monto,
-      fecha: gasto.fecha,
-    });
-    setEditando(true);
-    setMostrarModal(true);
-  };
-
-  // Guardar o Editar Gasto
-  const guardarGasto = (e) => {
+  // Manejadores para el formulario de gastos
+  const handleAgregarOGuardarGasto = (e) => {
     e.preventDefault();
     if (!gastoForm.concepto || !gastoForm.monto) return;
 
     if (editando) {
-      const gastosActualizados = gastos.map((g) =>
-        g.id === gastoForm.id
-          ? {
-              ...g,
-              concepto: gastoForm.concepto,
-              categoria: gastoForm.categoria,
-              monto: Number(gastoForm.monto),
-            }
-          : g
+      setGastos((prev) =>
+        prev.map((g) =>
+          g.id === gastoForm.id
+            ? { ...gastoForm, monto: Number(gastoForm.monto) }
+            : g
+        )
       );
-      actualizarGastosState(gastosActualizados);
     } else {
-      const nuevo = {
+      const nuevoGasto = {
+        ...gastoForm,
         id: Date.now(),
-        concepto: gastoForm.concepto,
-        categoria: gastoForm.categoria,
         monto: Number(gastoForm.monto),
-        fecha: new Date().toISOString().split("T")[0],
+        fecha: new Date().toLocaleDateString("es-DO"),
       };
-      actualizarGastosState([...gastos, nuevo]);
+      setGastos((prev) => [nuevoGasto, ...prev]);
     }
 
+    cerrarModal();
+  };
+
+  const handleEditar = (gasto) => {
+    setGastoForm(gasto);
+    setEditando(true);
+    setMostrarModal(true);
+  };
+
+  const handleEliminar = (id) => {
+    setGastos((prev) => prev.filter((g) => g.id !== id));
+  };
+
+  const cerrarModal = () => {
+    setGastoForm({
+      id: null,
+      concepto: "",
+      categoria: "Frutas/Insumos",
+      monto: "",
+    });
+    setEditando(false);
     setMostrarModal(false);
   };
 
-  // Eliminar Gasto
-  const eliminarGasto = (id) => {
-    if (confirm("¿Estás seguro de que deseas eliminar este gasto?")) {
-      const gastosFiltrados = gastos.filter((g) => g.id !== id);
-      actualizarGastosState(gastosFiltrados);
-    }
-  };
+  // Cálculos financieros
+  const totalGastos = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0);
+  const gananciaNeta = ingresosTotales - totalGastos;
 
   return (
-    <div className="space-y-8">
-      {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Contabilidad & Finanzas</h1>
-          <p className="text-slate-500 text-sm">Resumen claro de ingresos, gastos operativos y ganancia neta real.</p>
+          <h1 className="text-2xl font-bold text-slate-800">Contabilidad Full</h1>
+          <p className="text-sm text-slate-500">
+            Control financiero en tiempo real (Ventas completadas vs. Gastos)
+          </p>
         </div>
         <button
-          onClick={abrirModalCrear}
-          className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition"
+          onClick={() => setMostrarModal(true)}
+          className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-medium text-sm transition-all shadow-sm"
         >
-          <Plus className="w-5 h-5" /> Registrar Gasto
+          <Plus className="w-4 h-4" /> Registrar Gasto
         </button>
       </div>
 
-      {/* Tarjetas de Métricas Principales */}
+      {/* Tarjetas resumen */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Ventas Totales (Solo Completadas) */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider">
-            <span>Ventas Totales</span>
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-              <TrendingUp className="w-5 h-5" />
-            </div>
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-sm text-slate-500 font-medium">Ventas Totales</p>
+            <h3 className="text-2xl font-bold text-slate-800 mt-1">
+              RD$ {ingresosTotales.toLocaleString()}
+            </h3>
+            <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+              <TrendingUp className="w-3 h-3" /> Pedidos Completados
+            </p>
           </div>
-          <p className="text-3xl font-black text-slate-900">RD$ {ingresosTotales.toLocaleString()}</p>
-          <p className="text-xs text-emerald-600 font-semibold">Solo pedidos completados/cobrados</p>
+          <div className="p-3 bg-emerald-50 text-emerald-500 rounded-xl">
+            <DollarSign className="w-6 h-6" />
+          </div>
         </div>
 
-        {/* Gastos Totales */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider">
-            <span>Gastos Operativos</span>
-            <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">
-              <TrendingDown className="w-5 h-5" />
-            </div>
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-sm text-slate-500 font-medium">Gastos Totales</p>
+            <h3 className="text-2xl font-bold text-slate-800 mt-1">
+              RD$ {totalGastos.toLocaleString()}
+            </h3>
+            <p className="text-xs text-rose-500 mt-1 flex items-center gap-1">
+              <TrendingDown className="w-3 h-3" /> Insumos / Pagos
+            </p>
           </div>
-          <p className="text-3xl font-black text-rose-600">RD$ {totalGastos.toLocaleString()}</p>
-          <p className="text-xs text-rose-500 font-semibold">Gastos ingresados manualmente</p>
+          <div className="p-3 bg-rose-50 text-rose-500 rounded-xl">
+            <Receipt className="w-6 h-6" />
+          </div>
         </div>
 
-        {/* Ganancia Neta Limpia */}
-        <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-md space-y-2">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-bold uppercase tracking-wider">
-            <span>Ganancia Neta Limpia</span>
-            <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl">
-              <DollarSign className="w-5 h-5" />
-            </div>
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-sm text-slate-500 font-medium">Ganancia Neta</p>
+            <h3
+              className={`text-2xl font-bold mt-1 ${
+                gananciaNeta >= 0 ? "text-emerald-600" : "text-rose-600"
+              }`}
+            >
+              RD$ {gananciaNeta.toLocaleString()}
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              {gananciaNeta >= 0 ? "Balance Positivo" : "Balance Negativo"}
+            </p>
           </div>
-          <p className="text-3xl font-black text-amber-400">RD$ {gananciaNeta.toLocaleString()}</p>
-          <p className="text-xs text-amber-300 font-semibold">Margen Neto: {margenGanancia}% libre de costos</p>
+          <div
+            className={`p-3 rounded-xl ${
+              gananciaNeta >= 0
+                ? "bg-emerald-50 text-emerald-500"
+                : "bg-rose-50 text-rose-500"
+            }`}
+          >
+            <TrendingUp className="w-6 h-6" />
+          </div>
         </div>
       </div>
 
-      {/* Historial de Gastos */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-        <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-          <Receipt className="w-5 h-5 text-amber-500" /> Registro de Compras y Egresos
-        </h2>
-
+      {/* Tabla de Gastos */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100">
+          <h2 className="text-lg font-bold text-slate-800">Registro de Gastos</h2>
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b text-slate-400 uppercase text-xs font-bold">
-                <th className="pb-3">Fecha</th>
-                <th className="pb-3">Concepto / Detalle</th>
-                <th className="pb-3">Categoría</th>
-                <th className="pb-3 text-right">Monto</th>
-                <th className="pb-3 text-center">Acciones</th>
+          <table className="w-full text-left text-sm text-slate-600">
+            <thead className="bg-slate-50 text-slate-400 font-medium border-b border-slate-100">
+              <tr>
+                <th className="p-4">Fecha</th>
+                <th className="p-4">Concepto</th>
+                <th className="p-4">Categoría</th>
+                <th className="p-4">Monto</th>
+                <th className="p-4 text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody>
               {gastos.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="py-8 text-center text-slate-400 text-sm">
-                    No has registrado ningún gasto todavía.
+                  <td colSpan="5" className="p-8 text-center text-slate-400">
+                    No hay gastos registrados.
                   </td>
                 </tr>
               ) : (
-                gastos.map((gasto) => (
-                  <tr key={gasto.id} className="hover:bg-slate-50">
-                    <td className="py-3 text-slate-500">{gasto.fecha}</td>
-                    <td className="py-3 font-semibold text-slate-800">{gasto.concepto}</td>
-                    <td className="py-3">
-                      <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-bold">
-                        {gasto.categoria || gasto.Categoria}
+                gastos.map((g) => (
+                  <tr key={g.id} className="border-b border-slate-50 hover:bg-slate-50">
+                    <td className="p-4 text-xs text-slate-400">{g.fecha}</td>
+                    <td className="p-4 font-medium text-slate-800">{g.concepto}</td>
+                    <td className="p-4">
+                      <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs">
+                        {g.categoria}
                       </span>
                     </td>
-                    <td className="py-3 text-right font-extrabold text-rose-600">
-                      - RD$ {Number(gasto.monto).toLocaleString()}
+                    <td className="p-4 font-semibold text-rose-500">
+                      RD$ {Number(g.monto).toLocaleString()}
                     </td>
-                    <td className="py-3 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => abrirModalEditar(gasto)}
-                          className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
-                          title="Editar gasto"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => eliminarGasto(gasto.id)}
-                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                          title="Eliminar gasto"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                    <td className="p-4 text-right flex justify-end gap-2">
+                      <button
+                        onClick={() => handleEditar(g)}
+                        className="p-1.5 hover:bg-slate-100 text-slate-500 rounded-lg"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleEliminar(g.id)}
+                        className="p-1.5 hover:bg-rose-50 text-rose-500 rounded-lg"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -253,69 +247,86 @@ export default function ContabilidadPage() {
         </div>
       </div>
 
-      {/* Modal Registrar / Editar Gasto */}
+      {/* Modal para agregar/editar gasto */}
       {mostrarModal && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
-          <form onSubmit={guardarGasto} className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
-            <button
-              type="button"
-              onClick={() => setMostrarModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <h2 className="text-lg font-bold text-slate-800">
-              {editando ? "Editar Gasto" : "Registrar Nuevo Gasto"}
-            </h2>
-            <div>
-              <label className="text-xs font-bold text-slate-600">Concepto / Descripción</label>
-              <input
-                type="text"
-                placeholder="Ej. Compra de 50 lbs de Chinola"
-                value={gastoForm.concepto}
-                onChange={(e) => setGastoForm({ ...gastoForm, concepto: e.target.value })}
-                className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 mt-1"
-                required
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-600">Categoría</label>
-              <select
-                value={gastoForm.categoria}
-                onChange={(e) => setGastoForm({ ...gastoForm, categoria: e.target.value })}
-                className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 mt-1"
-              >
-                <option value="Frutas/Insumos">Frutas e Insumos</option>
-                <option value="Empaques">Empaques / Vasos / Sorbetes</option>
-                <option value="Delivery">Comisiones de Delivery</option>
-                <option value="Sueldos">Sueldos y Personal</option>
-                <option value="Gastos Fijos">Gastos Fijos (Luz, Local, Agua)</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-600">Monto (RD$)</label>
-              <input
-                type="number"
-                placeholder="0.00"
-                value={gastoForm.monto}
-                onChange={(e) => setGastoForm({ ...gastoForm, monto: e.target.value })}
-                className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 mt-1"
-                required
-              />
-            </div>
-            <div className="flex gap-2 pt-3">
-              <button type="submit" className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2.5 rounded-xl text-sm transition">
-                {editando ? "Actualizar Gasto" : "Guardar Gasto"}
-              </button>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 shadow-xl">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="font-bold text-slate-800">
+                {editando ? "Editar Gasto" : "Registrar Nuevo Gasto"}
+              </h3>
               <button
-                type="button"
-                onClick={() => setMostrarModal(false)}
-                className="bg-slate-100 hover:bg-slate-200 font-bold px-4 py-2.5 rounded-xl text-sm transition"
+                onClick={cerrarModal}
+                className="text-slate-400 hover:text-slate-600"
               >
-                Cancelar
+                <X className="w-5 h-5" />
               </button>
             </div>
-          </form>
+            <form onSubmit={handleAgregarOGuardarGasto} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  Concepto / Descripción
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Compra de Piñas / Pago de Delivery"
+                  value={gastoForm.concepto}
+                  onChange={(e) =>
+                    setGastoForm({ ...gastoForm, concepto: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-orange-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  Categoría
+                </label>
+                <select
+                  value={gastoForm.categoria}
+                  onChange={(e) =>
+                    setGastoForm({ ...gastoForm, categoria: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-orange-500"
+                >
+                  <option value="Frutas/Insumos">Frutas / Insumos</option>
+                  <option value="Comisión Delivery">Comisión Delivery</option>
+                  <option value="Servicios/Local">Servicios / Local</option>
+                  <option value="Otros">Otros</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  Monto (RD$)
+                </label>
+                <input
+                  type="number"
+                  required
+                  placeholder="0.00"
+                  value={gastoForm.monto}
+                  onChange={(e) =>
+                    setGastoForm({ ...gastoForm, monto: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-orange-500"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={cerrarModal}
+                  className="flex-1 py-2 rounded-xl text-slate-500 bg-slate-100 hover:bg-slate-200 font-medium text-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded-xl text-white bg-orange-500 hover:bg-orange-600 font-medium text-sm"
+                >
+                  {editando ? "Guardar Cambios" : "Agregar Gasto"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
