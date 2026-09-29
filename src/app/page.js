@@ -594,47 +594,72 @@ export default function Home() {
             </p>
           </div>
 
-          {/* PRODUCTOS REGISTRADOS EN EL PANEL */}
-          <div className="space-y-4">
-            <h3 className="text-xl font-black text-amber-400 flex items-center gap-2">
-               Opciones Registradas en el Panel
-            </h3>
+         <div className="bg-emerald-50/60 p-6 rounded-3xl border border-emerald-200 mt-8">
+  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+    <div>
+      <h2 className="text-2xl font-bold text-slate-800">🥬 Jugos Verdes & Saludables</h2>
+      <p className="text-sm text-slate-600">
+        Elige cualquier combinación de sabores (Mínimo 7 unidades para el plan).
+      </p>
+    </div>
 
-            {saludablesPanel.length === 0 ? (
-              <div className="text-center py-6 bg-emerald-900/40 rounded-2xl border border-emerald-800 text-emerald-200 text-xs">
-                No hay jugos saludables o shots creados en el panel. ¡Agrega tus recetas en `/admin/catalogo`!
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                {saludablesPanel.map((rec) => (
-                  <div key={rec.id} className="bg-emerald-900/80 border border-emerald-700/60 p-6 rounded-3xl flex flex-col justify-between space-y-4 shadow-lg">
-                    <div>
-                      <div className="flex justify-between items-start">
-                        <div className="w-14 h-14 bg-emerald-800 rounded-2xl overflow-hidden border border-emerald-600 flex items-center justify-center">
-                          {rec.imagen ? (
-                            <img src={rec.imagen} alt={rec.nombre} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-xs text-emerald-300">Sin foto</span>
-                          )}
-                        </div>
-                        <span className="bg-emerald-800 text-emerald-200 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-700">
-                          {rec.tamano}
-                        </span>
-                      </div>
-                      <h4 className="font-extrabold text-lg text-white mt-3">{rec.nombre}</h4>
-                      <p className="text-lg font-black text-amber-400 mt-1">RD$ {rec.precio}</p>
-                    </div>
-                    <button
-                      onClick={() => agregarProductoDirecto(rec)}
-                      className="w-full bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-2xl text-xs transition shadow-md"
-                    >
-                      Agregar Pack al Carrito
-                    </button>
-                  </div>
-                ))}
-              </div>
+    <div className="flex items-center gap-3">
+      <span className={`text-sm font-bold px-4 py-2 rounded-xl ${
+        totalSaludablesSeleccionados >= 7 
+          ? "bg-emerald-200 text-emerald-900" 
+          : "bg-amber-100 text-amber-800"
+      }`}>
+        Llevas: {totalSaludablesSeleccionados} / 7 min.
+      </span>
+
+      <button
+        onClick={agregarSaludablesAlCarrito}
+        disabled={totalSaludablesSeleccionados < 7}
+        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition shadow"
+      >
+        Agregar Plan al Carrito
+      </button>
+    </div>
+  </div>
+
+  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+    {saludablesPanel.map((jugo) => {
+      const cantidad = mediaDocena[jugo.id] || 0;
+      return (
+        <div key={jugo.id} className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col justify-between shadow-sm">
+          <div>
+            {jugo.imagen && (
+              <img src={jugo.imagen} alt={jugo.nombre} className="w-full h-32 object-cover rounded-xl mb-3" />
             )}
+            <h3 className="font-bold text-slate-800">{jugo.nombre}</h3>
+            <p className="text-amber-600 font-extrabold text-sm mt-1">RD$ {jugo.precio}</p>
           </div>
+
+          <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-3">
+            <span className="text-xs font-semibold text-slate-500">Cantidad:</span>
+            <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+              <button
+                type="button"
+                onClick={() => manejarCantidadSaludable(jugo.id, -1)}
+                className="w-7 h-7 flex items-center justify-center bg-white rounded-md text-slate-700 font-bold hover:bg-slate-200"
+              >
+                -
+              </button>
+              <span className="font-extrabold text-xs px-2 text-slate-800">{cantidad}</span>
+              <button
+                type="button"
+                onClick={() => manejarCantidadSaludable(jugo.id, 1)}
+                className="w-7 h-7 flex items-center justify-center bg-white rounded-md text-slate-700 font-bold hover:bg-slate-200"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</div>
 
           {/* CREADOR PERSONALIZADO */}
           <div className="bg-emerald-900/40 border border-emerald-800 p-6 rounded-3xl space-y-6 pt-6">
