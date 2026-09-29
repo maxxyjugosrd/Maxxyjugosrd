@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { ShoppingCart, Plus, Trash2, Send, User, Phone, MapPin, Bike, Loader2 } from "lucide-react";
-import { crearPedido } from "../../../services/pedidosService";
-import { obtenerProductosEnVivo } from "../../../services/pedidosService"; // O la ruta correspondiente de tu servicio
+import { crearPedido } from "@/services/pedidosService";
+import { obtenerProductosEnVivo } from "@/services/catalogoService";
 
 export default function PedidosManuales() {
   // Estado para guardar los productos trayéndolos desde Firestore en tiempo real
@@ -17,7 +17,7 @@ export default function PedidosManuales() {
   const [metodoPago, setMetodoPago] = useState("Efectivo");
   const [guardando, setGuardando] = useState(false);
 
-  // Cargar catálogo en tiempo real
+  // Cargar catálogo en tiempo real desde catalogoService
   useEffect(() => {
     const desuscribir = obtenerProductosEnVivo((datos) => {
       setProductosDisponibles(datos);
@@ -72,7 +72,7 @@ export default function PedidosManuales() {
       metodoPago,
       origen: "WhatsApp / Manual",
       estado: "pendiente",
-      fecha: new Date().toISOString()
+      fechaCreacion: Date.now()
     };
 
     const resultado = await crearPedido(objetoPedido);
