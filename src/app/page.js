@@ -112,6 +112,11 @@ export default function Home() {
     alert("¡Paquete de jugos verdes agregado al carrito!");
   };
 
+  // Eliminar producto del carrito
+  const removerDelCarrito = (idProducto) => {
+    setCarrito((prevCarrito) => prevCarrito.filter(item => item.id !== idProducto));
+  };
+
   // Carrito y Notificaciones
   const [carrito, setCarrito] = useState([]);
   const [mostrarCarrito, setMostrarCarrito] = useState(false);
@@ -759,18 +764,30 @@ export default function Home() {
                       </button>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      {carrito.map((item) => (
-                        <div key={item.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl border text-xs">
-                          <div>
-                            <p className="font-bold text-slate-800">{item.nombre}</p>
-                            <p className="text-slate-400">{item.tamano} • RD$ {item.precio}</p>
-                          </div>
-                          <span className="font-black text-slate-900 text-sm">x{item.cantidad}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                   {carrito.map((item) => (
+  <div key={item.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl border text-xs mb-2">
+    <div>
+      <h4 className="font-bold text-slate-800">{item.nombre}</h4>
+      <p className="text-slate-400">{item.tamano} · RD$ {item.precio}</p>
+    </div>
+    
+    <div className="flex items-center gap-3">
+      <span className="font-black text-slate-900 text-sm">x{item.cantidad}</span>
+      
+      {/* Botón para eliminar */}
+      <button 
+        type="button"
+        onClick={() => removerDelCarrito(item.id)} 
+        className="text-red-500 hover:text-red-700 p-1 transition"
+        title="Eliminar producto"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      </button>
+    </div>
+  </div>
+))}
 
                   {carrito.length > 0 && (
                     <form onSubmit={enviarPedidoAlPanel} className="space-y-4 border-t pt-4">
