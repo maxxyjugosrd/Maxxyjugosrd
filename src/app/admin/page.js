@@ -180,22 +180,22 @@ const cambiarEstadoPedido = async (idPedidoDoc, nuevoEstado) => {
                     </span>
                     
                     {/* Selector interactivo para cambiar el estado */}
-                    <div className="relative">
-                      <select
-                        value={estadoActual}
-                        disabled={actualizandoId === idDoc}
-                        onChange={(e) => cambiarEstadoPedido(idDoc, e.target.value)}
-                        className={`text-xs font-semibold px-2.5 py-1 rounded-lg border outline-none cursor-pointer capitalize transition ${obtenerEstiloEstado(estadoActual)}`}
-                      >
-                        <option value="pendiente">Pendiente</option>
-                        <option value="en proceso">En Proceso</option>
-                        <option value="completado">Completado</option>
-                        <option value="cancelado">Cancelado</option>
-                      </select>
-                      {actualizandoId === idDoc && (
-                        <Loader2 className="w-3 h-3 animate-spin absolute right-1 top-2 text-slate-500" />
-                      )}
-                    </div>
+            <div className="relative">
+              <select
+                value={pedido.estado || "Pendiente"}
+                disabled={actualizandoId === pedido.id}
+                onChange={(e) => cambiarEstadoPedido(pedido.id, e.target.value)}
+                className={`text-xs font-semibold px-2.5 py-1 rounded-lg border outline-none cursor-pointer capitalize transition-colors ${obtenerEstiloEstado(pedido.estado)}`}
+              >
+                <option value="Pendiente">Pendiente</option>
+                <option value="En proceso">En proceso</option>
+                <option value="Completado">Completado</option>
+                <option value="Cancelado">Cancelado</option>
+              </select>
+              {actualizandoId === pedido.id && (
+                <Loader2 className="w-3 h-3 animate-spin absolute right-1 top-2 text-slate-500" />
+              )}
+            </div>
                   </div>
                 </div>
               );
