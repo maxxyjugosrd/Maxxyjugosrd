@@ -14,6 +14,7 @@ export default function PersonalPage() {
     sueldoFijo: "",
   });
   const [reciboSeleccionado, setReciboSeleccionado] = useState(null);
+  const [metodoPagoRecibo, setMetodoPagoRecibo] = useState("Efectivo");
 
   const agregarEmpleado = (e) => {
     e.preventDefault();
@@ -38,8 +39,8 @@ export default function PersonalPage() {
         rol: nuevoEmpleado.rol,
         tipoPago: tipoPago,
         valorConfigurado: valorAsignado,
-        comisionAcumulada: 0, // Se irá acumulando con las ventas/envíos reales
-        estado: "Pendiente",
+        comisionAcumulada: 0, 
+        historialDetalle: [], // Aquí guardaremos los registros de ventas o envíos más adelante
       },
     ]);
 
@@ -57,6 +58,27 @@ export default function PersonalPage() {
 
   return (
     <div className="space-y-6">
+      {/* Estilos CSS globales para impresión limpia */}
+      <style jsx global>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #seccion-recibo-impresion, #seccion-recibo-impresion * {
+            visibility: visible;
+          }
+          #seccion-recibo-impresion {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            margin: 0;
+            padding: 20px;
+            background: white !important;
+          }
+        }
+      `}</style>
+
       {/* Encabezado */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -124,45 +146,128 @@ export default function PersonalPage() {
         </div>
       )}
 
-      {/* Modal / Vista de Recibo Imprimible */}
+      {/* Modal / Comprobante de Pago Profesional */}
       {reciboSeleccionado && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full space-y-6 shadow-2xl border border-slate-200">
-            <div className="text-center border-b pb-4">
-              <span className="text-4xl">🥤</span>
-              <h2 className="text-2xl font-black text-amber-600">MAXI JUGOS</h2>
-              <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">Comprobante Oficial de Pago</p>
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-8 max-w-xl w-full space-y-6 shadow-2xl border border-slate-200 my-8">
+            
+            {/* Este contenedor es el que se imprime exactamente */}
+            <div id="seccion-recibo-impresion" className="space-y-6 bg-white p-2">
+              
+              {/* Encabezado con Logo y Datos de la Empresa */}
+              <div className="flex justify-between items-center border-b pb-4">
+                <div className="flex items-center gap-3">
+                  <img src="/logo.JPG" alt="Maxi Jugos Logo" className="w-14 h-14 object-cover rounded-2xl border" />
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900">MAXI JUGOS</h2>
+                    <p className="text-xs text-slate-500">Comprobante de Pago de Personal</p>
+                  </div>
+                </div>
+                <div className="text-right text-xs text-slate-500">
+                  <p><span className="font-bold">Fecha:</span> {new Date().toLocaleDateString()}</p>
+                  <p><span className="font-bold">Hora:</span> {new Date().toLocaleTimeString()}</p>
+                </div>
+              </div>
+
+              {/* Información del Colaborador */}
+              <div className="bg-slate-50 p-4 rounded-2xl grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-slate-400 text-xs block">Colaborador:</span>
+                  <span className="font-bold text-slate-800">{reciboSeleccionado.nombre}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-xs block">Rol / Cargo:</span>
+                  <span className="font-bold text-slate-800">{reciboSeleccionado.rol}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-xs block">Modalidad de Pago:</span>
+                  <span className="font-bold text-slate-800">{reciboSeleccionado.tipoPago}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-xs block">Método de Liquidación:</span>
+                  <span className="font-bold text-amber-600">{metodoPagoRecibo}</span>
+                </div>
+              </div>
+
+              {/* Selector de Método de Pago (Visible en pantalla, oculto al imprimir) */}
+              <div className="flex items-center justify-between bg-amber-50 border border-amber-200 p-3 rounded-xl print:hidden">
+                <span className="text-xs font-bold text-amber-800">Seleccionar Método de Pago:</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMetodoPagoRecibo("Efectivo")}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition ${metodoPagoRecibo === "Efectivo" ? "bg-amber-600 text-white" : "bg-white text-slate-700 border"}`}
+                  >
+                    Efectivo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMetodoPagoRecibo("Transferencia")}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition ${metodoPagoRecibo === "Transferencia" ? "bg-amber-600 text-white" : "bg-white text-slate-700 border"}`}
+                  >
+                    Transferencia
+                  </button>
+                </div>
+              </div>
+
+              {/* Desglose de Operaciones (Ventas / Envíos) */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Desglose de Actividad</h4>
+                <div className="border rounded-2xl overflow-hidden text-xs">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-600 border-b">
+                        <th className="p-3">Detalle / Concepto</th>
+                        <th className="p-3 text-right">Monto / Comisión</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reciboSeleccionado.historialDetalle && reciboSeleccionado.historialDetalle.length > 0 ? (
+                        reciboSeleccionado.historialDetalle.map((item, index) => (
+                          <tr key={index} className="border-b">
+                            <td className="p-3 text-slate-700">{item.concepto}</td>
+                            <td className="p-3 text-right font-bold text-slate-900">RD$ {item.monto}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="2" className="p-4 text-center text-slate-400 italic">
+                            Acumulado general correspondiente al período actual.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Total Liquidado */}
+              <div className="bg-slate-900 text-white p-4 rounded-2xl flex justify-between items-center">
+                <span className="font-medium text-sm">Total Neto a Pagar:</span>
+                <span className="text-xl font-black text-amber-400">RD$ {reciboSeleccionado.comisionAcumulada}</span>
+              </div>
+
+              {/* Firmas Oficiales */}
+              <div className="grid grid-cols-2 gap-8 pt-8 text-center text-xs text-slate-600">
+                <div className="space-y-6">
+                  <div className="border-b border-slate-400 pb-1"></div>
+                  <p className="font-bold">Firma del Administrador</p>
+                </div>
+                <div className="space-y-6">
+                  <div className="border-b border-slate-400 pb-1"></div>
+                  <p className="font-bold">Recibido Conforme (Colaborador)</p>
+                </div>
+              </div>
+
             </div>
 
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Fecha:</span>
-                <span className="font-bold text-slate-800">{new Date().toLocaleDateString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Colaborador:</span>
-                <span className="font-bold text-slate-800">{reciboSeleccionado.nombre}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Cargo / Rol:</span>
-                <span className="font-bold text-slate-800">{reciboSeleccionado.rol}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Modalidad:</span>
-                <span className="font-bold text-slate-800">{reciboSeleccionado.tipoPago}</span>
-              </div>
-              <div className="border-t pt-3 flex justify-between text-lg font-black text-slate-900">
-                <span>Total Liquidado:</span>
-                <span className="text-emerald-600">RD$ {reciboSeleccionado.comisionAcumulada}</span>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t flex gap-3">
+            {/* Botones de Acción del Modal (No se imprimen) */}
+            <div className="pt-4 border-t flex gap-3 print:hidden">
               <button
                 onClick={imprimirRecibo}
                 className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm transition"
               >
-                <Download className="w-4 h-4" /> Imprimir / PDF
+                <Download className="w-4 h-4" /> Imprimir Recibo Oficial
               </button>
               <button
                 onClick={() => setReciboSeleccionado(null)}
@@ -171,6 +276,7 @@ export default function PersonalPage() {
                 Cerrar
               </button>
             </div>
+
           </div>
         </div>
       )}
@@ -200,7 +306,6 @@ export default function PersonalPage() {
               <option value="Colaborador / Empleado">Colaborador / Empleado</option>
             </select>
 
-            {/* Campo dinámico según el rol seleccionado */}
             {nuevoEmpleado.rol === "Vendedor" && (
               <div className="space-y-1">
                 <label className="text-xs text-slate-500 font-semibold">Porcentaje de Comisión por Venta (%)</label>
