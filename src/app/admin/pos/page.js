@@ -1,22 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Minus, Trash2, ShoppingBag, CheckCircle2, Loader2 } from "lucide-react";
-import { crearPedido } from "../../../services/pedidosService";
+import { crearPedido } from "@/services/pedidosService";
+import { obtenerProductosEnVivo } from "@/services/catalogoService";
 
 export default function PosPage() {
-  const menuJugos = [
-    { id: 1, nombre: "Jugo de Chinola (Maracuyá)", precio: 150 },
-    { id: 2, nombre: "Jugo de Fresa Natural", precio: 180 },
-    { id: 3, nombre: "Jugo de Zapote", precio: 160 },
-    { id: 4, nombre: "Jugo de Mango", precio: 140 },
-    { id: 5, nombre: "Morir Soñando", precio: 200 },
-  ];
+  const [menuJugos, setMenuJugos] = useState([]);
+  const [cargandoProductos, setCargandoProductos] = useState(true);
 
   const [carrito, setCarrito] = useState([]);
   const [cliente, setCliente] = useState({ nombre: "Cliente Mostrador", telefono: "", direccion: "Local / Mostrador" });
   const [procesando, setProcesando] = useState(false);
   const [mensajeExito, setMensajeExito] = useState(false);
+
+  // Escuchar productos de Firestore en tiempo real
+  useEffect(() => {
+    const desuscribir = obtenerProductosEnVivo((datos) => {
+      setMenuJugos(datos);
+      setCargandoProductos(false);
+    });
+
+    return () => desuscribir();
+  }, []);
 
   const agregarAlCarrito = (jugo) => {
     const existe = carrito.find((item) => item.id === jugo.id);
@@ -92,21 +98,34 @@ export default function PosPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Catálogo de productos rapidos */}
-        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {menuJugos.map((jugo) => (
-            <button
-              key={jugo.id}
-              onClick={() => agregarAlCarrito(jugo)}
-              className="bg-white p-5 rounded-2xl border border-slate-200 text-left hover:border-amber-500 hover:shadow-md transition group"
-            >
-              <h3 className="font-bold text-slate-800 group-hover:text-amber-600">{jugo.nombre}</h3>
-              <p className="text-amber-600 font-extrabold text-lg mt-1">RD$ {jugo.precio}</p>
-              <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400 mt-3 group-hover:text-slate-700">
-                <Plus className="w-3.5 h-3.5" /> Agregar a la orden
-              </span>
-            </button>
-          ))}
+        {/* Catálogo de productos rápidos */}
+        <div className="lg:col-span-2">
+          {cargandoProductos ? (
+            <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2 bg-white rounded-2xl border border-slate-200">
+              <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
+              <span>Cargando productos en tiempo real...</span>
+            </div>
+          ) : menuJugos.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-200">
+              No hay productos registrados en el catálogo aún.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {menuJugos.map((jugo) => (
+                <button
+                  key={jugo.id}
+                  onClick={() => agregarAlCarrito(jugo)}
+                  className="bg-white p-5 rounded-2xl border border-slate-200 text-left hover:border-amber-500 hover:shadow-md transition group"
+                >
+                  <h3 className="font-bold text-slate-800 group-hover:text-amber-600">{jugo.nombre}</h3>
+                  <p className="text-amber-600 font-extrabold text-lg mt-1">RD$ {jugo.precio}</p>
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400 mt-3 group-hover:text-slate-700">
+                    <Plus className="w-3.5 h-3.5" /> Agregar a la orden
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Resumen y cobro */}
