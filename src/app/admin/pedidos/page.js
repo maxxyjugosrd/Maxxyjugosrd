@@ -1,18 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ShoppingCart, Plus, Trash2, Send, User, Phone, MapPin, Bike, Loader2 } from "lucide-react";
 import { crearPedido } from "../../../services/pedidosService";
+import { obtenerProductosEnVivo } from "../../../services/pedidosService"; // O la ruta correspondiente de tu servicio
 
 export default function PedidosManuales() {
-  // Lista de productos (Jugos de Frutas Naturales)
-  const productosDisponibles = [
-    { id: 1, nombre: "Jugo de Chinola (Maracuyá)", precio: 150 },
-    { id: 2, nombre: "Jugo de Fresa Natural", precio: 180 },
-    { id: 3, nombre: "Jugo de Zapote", precio: 160 },
-    { id: 4, nombre: "Jugo de Mango", precio: 140 },
-    { id: 5, nombre: "Morir Soñando (Naranja con Leche)", precio: 200 },
-  ];
+  // Estado para guardar los productos trayéndolos desde Firestore en tiempo real
+  const [productosDisponibles, setProductosDisponibles] = useState([]);
+  const [cargandoProductos, setCargandoProductos] = useState(true);
 
   // Datos del cliente y pedido
   const [cliente, setCliente] = useState({ nombre: "", telefono: "", direccion: "" });
@@ -20,6 +16,16 @@ export default function PedidosManuales() {
   const [deliveryAsignado, setDeliveryAsignado] = useState("Delivery 1");
   const [metodoPago, setMetodoPago] = useState("Efectivo");
   const [guardando, setGuardando] = useState(false);
+
+  // Cargar catálogo en tiempo real
+  useEffect(() => {
+    const desuscribir = obtenerProductosEnVivo((datos) => {
+      setProductosDisponibles(datos);
+      setCargandoProductos(false);
+    });
+
+    return () => desuscribir();
+  }, []);
 
   // Agregar jugo al carrito
   const agregarAlCarrito = (producto) => {
@@ -66,6 +72,7 @@ export default function PedidosManuales() {
       metodoPago,
       origen: "WhatsApp / Manual",
       estado: "pendiente",
+      fecha: new Date().toISOString()
     };
 
     const resultado = await crearPedido(objetoPedido);
@@ -93,25 +100,37 @@ export default function PedidosManuales() {
         {/* Columna 1 y 2: Catálogo de Jugos */}
         <div className="lg:col-span-2 space-y-4">
           <h2 className="text-lg font-semibold text-slate-700">Seleccionar Jugos de Frutas</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {productosDisponibles.map((jugo) => (
-              <div
-                key={jugo.id}
-                className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center hover:border-amber-400 transition"
-              >
-                <div>
-                  <h3 className="font-semibold text-slate-800">{jugo.nombre}</h3>
-                  <p className="text-amber-600 font-bold text-sm">RD$ {jugo.precio}</p>
-                </div>
-                <button
-                  onClick={() => agregarAlCarrito(jugo)}
-                  className="bg-amber-100 hover:bg-amber-200 text-amber-700 p-2 rounded-lg flex items-center gap-1 font-medium text-sm transition"
+
+          {cargandoProductos ? (
+            <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2 bg-white rounded-xl border border-slate-200">
+              <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
+              <span>Cargando productos en tiempo real...</span>
+            </div>
+          ) : productosDisponibles.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+              No hay productos agregados en el catálogo aún.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {productosDisponibles.map((jugo) => (
+                <div
+                  key={jugo.id}
+                  className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center hover:border-amber-400 transition"
                 >
-                  <Plus className="w-4 h-4" /> Agregar
-                </button>
-              </div>
-            ))}
-          </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-800">{jugo.nombre}</h3>
+                    <p className="text-amber-600 font-bold text-sm">RD$ {jugo.precio}</p>
+                  </div>
+                  <button
+                    onClick={() => agregarAlCarrito(jugo)}
+                    className="bg-amber-100 hover:bg-amber-200 text-amber-700 p-2 rounded-lg flex items-center gap-1 font-medium text-sm transition"
+                  >
+                    <Plus className="w-4 h-4" /> Agregar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Columna 3: Datos del Cliente y Resumen de Orden */}
