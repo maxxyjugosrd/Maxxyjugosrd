@@ -24,6 +24,10 @@ import {
   actualizarPedido,
   eliminarPedido,
 } from "../../services/pedidosService";
+import {
+  obtenerGastosEnVivo,
+  obtenerRecibosEnVivo,
+} from "../../services/gastosService";
 
 // Importación de Firestore para actualizar documentos
 import { db } from "@/lib/firebase";
@@ -31,23 +35,35 @@ import { doc, updateDoc } from "firebase/firestore";
 
 export default function AdminDashboard() {
   const [pedidos, setPedidos] = useState([]);
+  const [gastosLista, setGastosLista] = useState([]);
+  const [recibosLista, setRecibosLista] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [actualizandoId, setActualizandoId] = useState(null);
   const [pedidoAEditar, setPedidoAEditar] = useState(null);
   const [pedidoVerDetalles, setPedidoVerDetalles] = useState(null);
 
-  // Gastos y comisiones fijados/estimados temporalmente
-  const [gastosHoy] = useState(3200); // Compras de frutas e insumos
-  const [comisionesHoy] = useState(1500); // Vendedores + Deliveries
-
   useEffect(() => {
     // Escuchar pedidos en tiempo real desde Firestore
-    const desuscribir = obtenerPedidosEnVivo((datos) => {
+    const desuscribirPedidos = obtenerPedidosEnVivo((datos) => {
       setPedidos(datos);
       setCargando(false);
     });
 
-    return () => desuscribir();
+    // Escuchar gastos de Contabilidad en tiempo real
+    const desuscribirGastos = obtenerGastosEnVivo((datos) => {
+      setGastosLista(datos);
+    });
+
+    // Escuchar recibos/pagos de Personal en tiempo real
+    const desuscribirRecibos = obtenerRecibosEnVivo((datos) => {
+      setRecibosLista(datos);
+    });
+
+    return () => {
+      desuscribirPedidos && desuscribirPedidos();
+      desuscribirGastos && desuscribirGastos();
+      desuscribirRecibos && desuscribirRecibos();
+    };
   }, []);
 
   // Función para actualizar el estado del pedido en Firestore
@@ -109,19 +125,31 @@ export default function AdminDashboard() {
     }
     if (typeof fechaRaw === "string") {
       const fecha = new Date(fechaRaw);
-      return isNaN(fecha.getTime()) ? fechaRaw : fecha.toLocaleString("es-DO", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
+      return isNaN(fecha.getTime())
+        ? fechaRaw
+        : fecha.toLocaleString("es-DO", {
+            dateStyle: "medium",
+            timeStyle: "short",
+          });
     }
     return String(fechaRaw);
   };
 
-  // Calcular las ventas totales acumuladas desde los pedidos registrados
+  // CÁLCULOS EN TIEMPO REAL DESDE FIRESTORE:
   const ventasHoy = pedidos.reduce((total, p) => total + (p.total || 0), 0);
 
-  // Ganancia Neta Limpia = Ventas totales - (Gastos + Comisiones)
-  const gananciaNeta = ventasHoy - (gastosHoy + comisionesHoy);
+  const totalGastosContabilidad = gastosLista.reduce(
+    (acc, g) => acc + Number(g.monto || g.costo || g.total || 0),
+    0
+  );
+
+  const totalPagosPersonal = recibosLista.reduce(
+    (acc, r) => acc + Number(r.monto || r.pago || r.total || 0),
+    0
+  );
+
+  const totalGastosYPagos = totalGastosContabilidad + totalPagosPersonal;
+  const gananciaNeta = ventasHoy - totalGastosYPagos;
 
   // Helper de estilos por estado
   const obtenerEstiloEstado = (estado = "") => {
@@ -181,7 +209,7 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        {/* Gastos y Comisiones */}
+        {/* Gastos y Pagos (Dato Dinámico desde Firestore) */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-2">
           <div className="flex justify-between items-center text-slate-500">
             <span className="text-sm font-medium">Gastos & Pagos</span>
@@ -190,14 +218,15 @@ export default function AdminDashboard() {
             </div>
           </div>
           <div className="text-3xl font-extrabold text-slate-800">
-            RD$ {(gastosHoy + comisionesHoy).toLocaleString()}
+            RD$ {totalGastosYPagos.toLocaleString()}
           </div>
           <p className="text-xs text-slate-400">
-            Frutas: RD$ {gastosHoy} | Comisiones: RD$ {comisionesHoy}
+            Gastos: RD$ {totalGastosContabilidad.toLocaleString()} | Personal:
+            RD$ {totalPagosPersonal.toLocaleString()}
           </p>
         </div>
 
-        {/* Ganancia Neta Limpia */}
+        {/* Ganancia Neta Limpia Real */}
         <div className="bg-gradient-to-br from-amber-500 to-orange-500 text-white p-5 rounded-2xl shadow-md space-y-2">
           <div className="flex justify-between items-center opacity-90">
             <span className="text-sm font-medium">Ganancia Neta Limpia</span>
@@ -373,7 +402,9 @@ export default function AdminDashboard() {
               {pedidoVerDetalles.datosEnvio?.fechaEntrega && (
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-emerald-500" />
-                  <span className="font-semibold">Fecha Programada de Entrega:</span>{" "}
+                  <span className="font-semibold">
+                    Fecha Programada de Entrega:
+                  </span>{" "}
                   {pedidoVerDetalles.datosEnvio.fechaEntrega}
                 </div>
               )}
@@ -415,7 +446,9 @@ export default function AdminDashboard() {
                   </p>
                   {pedidoVerDetalles.zonaActual && (
                     <p className="text-[11px] text-amber-700 font-medium mt-0.5">
-                      Zona: {pedidoVerDetalles.zonaActual.nombre || pedidoVerDetalles.zonaActual}
+                      Zona:{" "}
+                      {pedidoVerDetalles.zonaActual.nombre ||
+                        pedidoVerDetalles.zonaActual}
                     </p>
                   )}
                 </div>
@@ -466,13 +499,17 @@ export default function AdminDashboard() {
               {pedidoVerDetalles.subtotal && (
                 <div className="flex justify-between">
                   <span>Subtotal:</span>
-                  <span>RD$ {Number(pedidoVerDetalles.subtotal).toLocaleString()}</span>
+                  <span>
+                    RD$ {Number(pedidoVerDetalles.subtotal).toLocaleString()}
+                  </span>
                 </div>
               )}
               {pedidoVerDetalles.envio !== undefined && (
                 <div className="flex justify-between">
                   <span>Costo de Envío:</span>
-                  <span>RD$ {Number(pedidoVerDetalles.envio).toLocaleString()}</span>
+                  <span>
+                    RD$ {Number(pedidoVerDetalles.envio).toLocaleString()}
+                  </span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-slate-800 text-sm pt-1 border-t">
