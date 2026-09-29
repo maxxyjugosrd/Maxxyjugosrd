@@ -1,20 +1,22 @@
 import { collection, query, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-// Escuchar gastos de la colección 'gastos' (Contabilidad)
+// Escuchar gastos de la colección de Contabilidad
 export const obtenerGastosEnVivo = (callback) => {
-  const q = query(collection(db, "gastos"));
+  // Probar con "gastos", "movimientos" o "contabilidad"
+  const q = query(collection(db, "gastos")); 
   return onSnapshot(q, (snapshot) => {
     const gastos = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    console.log("Gastos traídos de Firestore:", gastos); // Inspección en Consola (F12)
     callback(gastos);
   });
 };
 
-// Escuchar pagos/recibos de la colección 'recibos' o 'personal'
 export const obtenerRecibosEnVivo = (callback) => {
-  const q = query(collection(db, "recibos")); // O "personal" según tu colección
+  const q = query(collection(db, "recibos"));
   return onSnapshot(q, (snapshot) => {
     const recibos = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    console.log("Recibos traídos de Firestore:", recibos);
     callback(recibos);
   });
 };
