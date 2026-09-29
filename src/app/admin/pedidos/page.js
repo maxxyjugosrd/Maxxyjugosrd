@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ShoppingCart, Plus, Minus, Trash2, Send, User, Phone, MapPin, Bike, Loader2, Sparkles, Check } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, Send, User, Phone, MapPin, Bike, Loader2, Sparkles, Check, Zap } from "lucide-react";
 import { crearPedido } from "@/services/pedidosService";
 import { obtenerProductosEnVivo } from "@/services/catalogoService";
 
@@ -18,12 +18,17 @@ export default function PedidosManuales() {
 
   // Estado para el Modal de Personalización de Jugo Verde
   const [modalVerdeAbierto, setModalVerdeAbierto] = useState(false);
-  const [ingredientesSeleccionados, setIngredientesSeleccionados] = useState([]);
+  const [ingredientesVerdes, setIngredientesVerdes] = useState([]);
   const [tamanoJugoVerde, setTamanoJugoVerde] = useState("12 oz");
-  const [precioJugoVerde, setPrecioJugoVerde] = useState(150); // Precio base orientativo
+  const [precioJugoVerde, setPrecioJugoVerde] = useState(180);
 
-  // Lista de ingredientes disponibles para el Jugo Verde
-  const ingredientesDisponibles = [
+  // Estado para el Modal de Personalización de Shots
+  const [modalShotAbierto, setModalShotAbierto] = useState(false);
+  const [ingredientesShot, setIngredientesShot] = useState([]);
+  const [precioShot] = useState(100); // Precio fijo o base para el shot personalizado
+
+  // Listas completas de ingredientes
+  const listaIngredientesVerdes = [
     { id: "epinaca", nombre: "Espinaca Fresca" },
     { id: "apio", nombre: "Apio Orgánico" },
     { id: "pepino", nombre: "Pepino Verde" },
@@ -32,6 +37,16 @@ export default function PedidosManuales() {
     { id: "limon", nombre: "Jugo de Limón" },
     { id: "piña", nombre: "Piña Dulce" },
     { id: "perejil", nombre: "Perejil Fresco" }
+  ];
+
+  const listaIngredientesShots = [
+    { id: "jengibre_puro", nombre: "Jengibre Puro" },
+    { id: "cucurma", nombre: "Cúrcuma Fresca" },
+    { id: "limon_con_cayena", nombre: "Limón con Pimienta Cayena" },
+    { id: "miel_abeja", nombre: "Miel de Abeja Pura" },
+    { id: "ajo_macerado", nombre: "Ajo Macerado" },
+    { id: "spirulina", nombre: "Spirulina en Polvo" },
+    { id: "menta", nombre: "Extracto de Menta" }
   ];
 
   // Cargar catálogo en tiempo real desde catalogoService
@@ -44,45 +59,74 @@ export default function PedidosManuales() {
     return () => desuscribir();
   }, []);
 
-  // Manejar selección de ingredientes para el Jugo Verde personalizado
-  const toggleIngrediente = (ing) => {
-    if (ingredientesSeleccionados.includes(ing.nombre)) {
-      setIngredientesSeleccionados(ingredientesSeleccionados.filter((i) => i !== ing.nombre));
+  // Manejar selección de ingredientes para Jugo Verde
+  const toggleIngredienteVerde = (ing) => {
+    if (ingredientesVerdes.includes(ing.nombre)) {
+      setIngredientesVerdes(ingredientesVerdes.filter((i) => i !== ing.nombre));
     } else {
-      setIngredientesSeleccionados([...ingredientesSeleccionados, ing.nombre]);
+      setIngredientesVerdes([...ingredientesVerdes, ing.nombre]);
+    }
+  };
+
+  // Manejar selección de ingredientes para Shots
+  const toggleIngredienteShot = (ing) => {
+    if (ingredientesShot.includes(ing.nombre)) {
+      setIngredientesShot(ingredientesShot.filter((i) => i !== ing.nombre));
+    } else {
+      setIngredientesShot([...ingredientesShot, ing.nombre]);
     }
   };
 
   // Agregar el Jugo Verde personalizado al carrito (mínimo 4 ingredientes)
   const agregarJugoVerdePersonalizado = () => {
-    if (ingredientesSeleccionados.length < 4) {
-      alert("Debes seleccionar al menos 4 ingredientes para personalizar tu jugo verde.");
+    if (ingredientesVerdes.length < 4) {
+      alert("Debes seleccionar al menos 4 ingredientes para el jugo verde.");
       return;
     }
 
     const itemPersonalizado = {
-      id: "jugo-verde-personalizado-" + Date.now(),
+      id: "jugo-verde-" + Date.now(),
       nombre: `Jugo Verde Personalizado (${tamanoJugoVerde})`,
-      precio: tamanoJugoVerde === "Galón" ? 600 : 180, // Ajusta los precios según tu negocio
+      precio: tamanoJugoVerde === "Galón" ? 600 : 180,
       cantidad: 1,
       tamano: tamanoJugoVerde,
       categoria: "Jugo Verde Personalizado",
-      detallesPersonalizacion: ingredientesSeleccionados.join(", ")
+      detallesPersonalizacion: ingredientesVerdes.join(", ")
     };
 
     setCarrito([...carrito, itemPersonalizado]);
-    setIngredientesSeleccionados([]);
+    setIngredientesVerdes([]);
     setModalVerdeAbierto(false);
   };
 
-  // Agregar producto normal (jugos, shots, etc.) al carrito
+  // Agregar el Shot personalizado al carrito (mínimo 1 ingrediente)
+  const agregarShotPersonalizado = () => {
+    if (ingredientesShot.length === 0) {
+      alert("Selecciona al menos un ingrediente para armar el Shot.");
+      return;
+    }
+
+    const itemShot = {
+      id: "shot-" + Date.now(),
+      nombre: `Shot Funcional Personalizado`,
+      precio: precioShot,
+      cantidad: 1,
+      categoria: "Shot Personalizado",
+      detallesPersonalizacion: ingredientesShot.join(", ")
+    };
+
+    setCarrito([...carrito, itemShot]);
+    setIngredientesShot([]);
+    setModalShotAbierto(false);
+  };
+
+  // Agregar producto normal del catálogo
   const agregarAlCarrito = (producto) => {
-    const idUnico = producto.id;
-    const existe = carrito.find((item) => item.id === idUnico);
+    const existe = carrito.find((item) => item.id === producto.id);
     if (existe) {
       setCarrito(
         carrito.map((item) =>
-          item.id === idUnico ? { ...item, cantidad: item.cantidad + 1 } : item
+          item.id === producto.id ? { ...item, cantidad: item.cantidad + 1 } : item
         )
       );
     } else {
@@ -90,7 +134,6 @@ export default function PedidosManuales() {
     }
   };
 
-  // Cambiar cantidad en el carrito
   const cambiarCantidad = (id, delta) => {
     setCarrito(
       carrito
@@ -105,15 +148,12 @@ export default function PedidosManuales() {
     );
   };
 
-  // Quitar elemento del carrito
   const eliminarDelCarrito = (id) => {
     setCarrito(carrito.filter((item) => item.id !== id));
   };
 
-  // Cálculos del pedido
   const totalPedido = carrito.reduce((sum, item) => sum + Number(item.precio || 0) * item.cantidad, 0);
 
-  // Enviar pedido a Firestore
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (carrito.length === 0) {
@@ -161,34 +201,52 @@ export default function PedidosManuales() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-800">Registrar Pedido (WhatsApp / Teléfono) 🥤</h1>
-        <p className="text-slate-500 text-sm">Ingresa las ventas manuales con opciones de personalización, shots y tamaños.</p>
+        <p className="text-slate-500 text-sm">Ingresa ventas manuales permitiendo personalizar jugos verdes y shots a medida.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Columna 1 y 2: Catálogo y Botón de Personalización */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Columna 1 y 2: Botones de Personalización + Catálogo */}
+        <div className="lg:col-span-2 space-y-5">
           
-          {/* Botón especial para armar Jugo Verde Personalizado */}
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 p-5 rounded-2xl text-white shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h3 className="font-bold text-lg flex items-center gap-2">
-                <Sparkles className="w-5 h-5" /> Armar Jugo Verde Personalizado
-              </h3>
-              <p className="text-xs text-emerald-100 mt-0.5">
-                Selecciona tus ingredientes favoritos (Mínimo 4) y el tamaño ideal.
-              </p>
+          {/* Botones de Acceso Rápido para Personalizar */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Banner Jugo Verde */}
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 p-4 rounded-2xl text-white shadow-sm flex flex-col justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-base flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4" /> Jugo Verde Personalizado
+                </h3>
+                <p className="text-[11px] text-emerald-100 mt-0.5">Mínimo 4 ingredientes + tamaño.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalVerdeAbierto(true)}
+                className="bg-white text-emerald-700 hover:bg-emerald-50 font-bold px-3 py-2 rounded-xl text-xs transition shadow-sm w-full text-center"
+              >
+                Armar Jugo Verde
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setModalVerdeAbierto(true)}
-              className="bg-white text-emerald-700 hover:bg-emerald-50 font-bold px-4 py-2.5 rounded-xl text-sm transition shadow-sm shrink-0"
-            >
-              Personalizar Verde
-            </button>
+
+            {/* Banner Shots */}
+            <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-4 rounded-2xl text-white shadow-sm flex flex-col justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-base flex items-center gap-1.5">
+                  <Zap className="w-4 h-4" /> Shot Funcional Personalizado
+                </h3>
+                <p className="text-[11px] text-amber-100 mt-0.5">Mezcla extractos y raíces naturales.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalShotAbierto(true)}
+                className="bg-white text-amber-800 hover:bg-amber-50 font-bold px-3 py-2 rounded-xl text-xs transition shadow-sm w-full text-center"
+              >
+                Armar Shot
+              </button>
+            </div>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-slate-700 mb-3">Catálogo de Jugos y Shots (Firestore)</h2>
+            <h2 className="text-lg font-semibold text-slate-700 mb-3">Catálogo Fijo (Firestore)</h2>
 
             {cargandoProductos ? (
               <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2 bg-white rounded-2xl border border-slate-200">
@@ -210,7 +268,7 @@ export default function PedidosManuales() {
                     >
                       <div>
                         <div className="flex justify-between items-start gap-2">
-                          <h3 className="font-semibold text-slate-800 text-base">{jugo.nombre}</h3>
+                          <h3 className="font-semibold text-slate-800 text-sm">{jugo.nombre}</h3>
                           <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full shrink-0">
                             {caracteristica}
                           </span>
@@ -221,7 +279,7 @@ export default function PedidosManuales() {
                       </div>
                       
                       <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-50">
-                        <span className="text-amber-600 font-bold text-base">
+                        <span className="text-amber-600 font-bold text-sm">
                           RD$ {Number(jugo.precio || 0).toLocaleString()}
                         </span>
                         <button
@@ -240,13 +298,12 @@ export default function PedidosManuales() {
           </div>
         </div>
 
-        {/* Columna 3: Datos del Cliente y Resumen de Orden */}
+        {/* Columna 3: Resumen de la Orden y Datos del Cliente */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5 h-fit">
           <h2 className="text-lg font-bold text-slate-800 border-b pb-3 flex items-center gap-2">
             <ShoppingCart className="w-5 h-5 text-amber-500" /> Resumen de la Orden
           </h2>
 
-          {/* Formulario de Cliente */}
           <div className="space-y-3">
             <div>
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
@@ -287,8 +344,7 @@ export default function PedidosManuales() {
             </div>
           </div>
 
-          {/* Lista de Jugos Seleccionados en el Carrito */}
-          <div className="space-y-3 border-t pt-3 max-h-56 overflow-y-auto pr-1">
+          <div className="space-y-2 border-t pt-3 max-h-52 overflow-y-auto pr-1">
             <p className="text-xs font-semibold text-slate-600">Detalle del Pedido:</p>
             {carrito.length === 0 ? (
               <p className="text-sm text-slate-400 italic text-center py-4">No has agregado productos aún.</p>
@@ -326,7 +382,6 @@ export default function PedidosManuales() {
             )}
           </div>
 
-          {/* Asignación y Métodos de Pago */}
           <div className="space-y-3 border-t pt-3">
             <div>
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
@@ -354,7 +409,6 @@ export default function PedidosManuales() {
             </div>
           </div>
 
-          {/* Total y Botón de Enviar */}
           <div className="border-t pt-3 space-y-3">
             <div className="flex justify-between items-center text-lg font-extrabold text-slate-800">
               <span>Total:</span>
@@ -385,25 +439,24 @@ export default function PedidosManuales() {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl p-6 max-w-lg w-full space-y-5 shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+              <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
                 <Sparkles className="text-emerald-500 w-5 h-5" /> Armar Jugo Verde Personalizado
               </h3>
               <button
                 onClick={() => setModalVerdeAbierto(false)}
-                className="text-slate-400 hover:text-slate-600 text-xl font-bold"
+                className="text-slate-400 hover:text-slate-600 text-lg font-bold"
               >
                 ✕
               </button>
             </div>
 
-            {/* Selección de Tamaño */}
             <div>
               <label className="text-xs font-semibold text-slate-600 block mb-2">Selecciona el Tamaño:</label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => { setTamanoJugoVerde("12 oz"); setPrecioJugoVerde(180); }}
-                  className={`py-2 px-4 rounded-xl border text-sm font-semibold transition ${
+                  onClick={() => setTamanoJugoVerde("12 oz")}
+                  className={`py-2 px-4 rounded-xl border text-xs font-semibold transition ${
                     tamanoJugoVerde === "12 oz"
                       ? "bg-emerald-500 text-white border-emerald-500 shadow-sm"
                       : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
@@ -413,8 +466,8 @@ export default function PedidosManuales() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setTamanoJugoVerde("Galón"); setPrecioJugoVerde(600); }}
-                  className={`py-2 px-4 rounded-xl border text-sm font-semibold transition ${
+                  onClick={() => setTamanoJugoVerde("Galón")}
+                  className={`py-2 px-4 rounded-xl border text-xs font-semibold transition ${
                     tamanoJugoVerde === "Galón"
                       ? "bg-emerald-500 text-white border-emerald-500 shadow-sm"
                       : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
@@ -425,62 +478,124 @@ export default function PedidosManuales() {
               </div>
             </div>
 
-            {/* Selección de Ingredientes (Mínimo 4) */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <label className="text-xs font-semibold text-slate-600">
                   Selecciona los Ingredientes (Mínimo 4):
                 </label>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                  ingredientesSeleccionados.length >= 4 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                  ingredientesVerdes.length >= 4 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
                 }`}>
-                  {ingredientesSeleccionados.length} / 4 seleccionados
+                  {ingredientesVerdes.length} / 4
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                {ingredientesDisponibles.map((ing) => {
-                  const seleccionado = ingredientesSeleccionados.includes(ing.nombre);
+                {listaIngredientesVerdes.map((ing) => {
+                  const seleccionado = ingredientesVerdes.includes(ing.nombre);
                   return (
                     <button
                       type="button"
                       key={ing.id}
-                      onClick={() => toggleIngrediente(ing)}
-                      className={`p-3 rounded-xl border text-left text-xs font-medium flex items-center justify-between transition ${
+                      onClick={() => toggleIngredienteVerde(ing)}
+                      className={`p-2.5 rounded-xl border text-left text-xs font-medium flex items-center justify-between transition ${
                         seleccionado
                           ? "bg-emerald-50 border-emerald-500 text-emerald-900 shadow-sm"
                           : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                       }`}
                     >
                       <span>{ing.nombre}</span>
-                      {seleccionado && <Check className="w-4 h-4 text-emerald-600 shrink-0" />}
+                      {seleccionado && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
                     </button>
                   );
                 })}
               </div>
-              {ingredientesSeleccionados.length < 4 && (
-                <p className="text-[11px] text-amber-600 italic mt-1">
-                  * Faltan {4 - ingredientesSeleccionados.length} ingredientes para cumplir con el mínimo requerido.
-                </p>
-              )}
             </div>
 
-            {/* Botón Guardar Personalización */}
             <div className="pt-3 border-t flex gap-2">
               <button
                 type="button"
                 onClick={() => setModalVerdeAbierto(false)}
-                className="flex-1 py-2.5 rounded-xl text-slate-600 bg-slate-100 hover:bg-slate-200 font-medium text-sm"
+                className="flex-1 py-2 rounded-xl text-slate-600 bg-slate-100 hover:bg-slate-200 font-medium text-xs"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={agregarJugoVerdePersonalizado}
-                disabled={ingredientesSeleccionados.length < 4}
-                className="flex-1 py-2.5 rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 font-medium text-sm shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={ingredientesVerdes.length < 4}
+                className="flex-1 py-2 rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 font-medium text-xs shadow-sm transition disabled:opacity-40"
               >
-                Agregar al Pedido (RD$ {precioJugoVerde})
+                Agregar al Pedido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Personalizar Shots */}
+      {modalShotAbierto && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-lg w-full space-y-5 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
+                <Zap className="text-amber-500 w-5 h-5" /> Armar Shot Funcional Personalizado
+              </h3>
+              <button
+                onClick={() => setModalShotAbierto(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-semibold text-slate-600">
+                  Selecciona los Componentes (Shot a la medida):
+                </label>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                  {ingredientesShot.length} seleccionados
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {listaIngredientesShots.map((ing) => {
+                  const seleccionado = ingredientesShot.includes(ing.nombre);
+                  return (
+                    <button
+                      type="button"
+                      key={ing.id}
+                      onClick={() => toggleIngredienteShot(ing)}
+                      className={`p-2.5 rounded-xl border text-left text-xs font-medium flex items-center justify-between transition ${
+                        seleccionado
+                          ? "bg-amber-50 border-amber-500 text-amber-900 shadow-sm"
+                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                      }`}
+                    >
+                      <span>{ing.nombre}</span>
+                      {seleccionado && <Check className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="pt-3 border-t flex gap-2">
+              <button
+                type="button"
+                onClick={() => setModalShotAbierto(false)}
+                className="flex-1 py-2 rounded-xl text-slate-600 bg-slate-100 hover:bg-slate-200 font-medium text-xs"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={agregarShotPersonalizado}
+                disabled={ingredientesShot.length === 0}
+                className="flex-1 py-2 rounded-xl text-white bg-amber-500 hover:bg-amber-600 font-medium text-xs shadow-sm transition disabled:opacity-40"
+              >
+                Agregar Shot (RD$ {precioShot})
               </button>
             </div>
           </div>
