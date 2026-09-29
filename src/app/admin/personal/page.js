@@ -1,10 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Users, Plus, FileText, DollarSign, Bike, UserCheck, Download, Trash2, Edit } from "lucide-react";
 
 export default function PersonalPage() {
   const [equipo, setEquipo] = useState([]);
+
+  // Cargar personal guardado al iniciar desde localStorage
+  useEffect(() => {
+    const personalGuardado = localStorage.getItem("maxi_personal");
+    if (personalGuardado) {
+      setEquipo(JSON.parse(personalGuardado));
+    }
+  }, []);
+
+  // Función auxiliar para actualizar el estado y guardarlo automáticamente
+  const actualizarYGuardarEquipo = (nuevoEquipo) => {
+    setEquipo(nuevoEquipo);
+    localStorage.setItem("maxi_personal", JSON.stringify(nuevoEquipo));
+  };
 
   const [mostrarModal, setMostrarModal] = useState(false);
   const [modoEdicion, setModoEdicion] = useState(false);
@@ -31,7 +45,6 @@ export default function PersonalPage() {
     setModoEdicion(true);
     setIdEditando(colaborador.id);
     
-    // Extraer valores según su tipo de pago guardado
     let porcentaje = "";
     let sueldo = "";
     if (colaborador.rol === "Vendedor") {
@@ -65,23 +78,20 @@ export default function PersonalPage() {
     }
 
     if (modoEdicion) {
-      // Actualizar colaborador existente
-      setEquipo(
-        equipo.map((item) =>
-          item.id === idEditando
-            ? {
-                ...item,
-                nombre: nuevoEmpleado.nombre,
-                rol: nuevoEmpleado.rol,
-                tipoPago: tipoPago,
-                valorConfigurado: valorAsignado,
-              }
-            : item
-        )
+      const equipoActualizado = equipo.map((item) =>
+        item.id === idEditando
+          ? {
+              ...item,
+              nombre: nuevoEmpleado.nombre,
+              rol: nuevoEmpleado.rol,
+              tipoPago: tipoPago,
+              valorConfigurado: valorAsignado,
+            }
+          : item
       );
+      actualizarYGuardarEquipo(equipoActualizado);
     } else {
-      // Agregar nuevo colaborador
-      setEquipo([
+      const equipoActualizado = [
         ...equipo,
         {
           id: Date.now(),
@@ -92,7 +102,8 @@ export default function PersonalPage() {
           comisionAcumulada: 0, 
           historialDetalle: [],
         },
-      ]);
+      ];
+      actualizarYGuardarEquipo(equipoActualizado);
     }
 
     setNuevoEmpleado({ nombre: "", rol: "Delivery", comisionPorcentaje: "", sueldoFijo: "" });
@@ -101,7 +112,8 @@ export default function PersonalPage() {
 
   const eliminarEmpleado = (id) => {
     if (confirm("¿Estás seguro de que deseas eliminar este colaborador?")) {
-      setEquipo(equipo.filter((item) => item.id !== id));
+      const equipoActualizado = equipo.filter((item) => item.id !== id);
+      actualizarYGuardarEquipo(equipoActualizado);
     }
   };
 
@@ -115,7 +127,6 @@ export default function PersonalPage() {
 
   return (
     <div className="space-y-6">
-      {/* Estilos CSS globales para impresión limpia */}
       <style jsx global>{`
         @media print {
           body * {
@@ -183,7 +194,6 @@ export default function PersonalPage() {
                     </div>
                   </div>
 
-                  {/* Botones de Editar y Eliminar */}
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => abrirModalEditar(colaborador)}
