@@ -29,19 +29,20 @@ export default function AdminDashboard() {
   }, []);
 
   // Función para actualizar el estado del pedido en Firestore
-  const cambiarEstadoPedido = async (idPedidoDoc, nuevoEstado) => {
-    if (!idPedidoDoc) return;
-    setActualizandoId(idPedidoDoc);
-    try {
-     const pedidoRef = doc(db, "pedidos", pedido.id); 
-     await updateDoc(pedidoRef, { estado: nuevoEstado });
-    } catch (error) {
-      console.error("Error al actualizar estado del pedido:", error);
-      alert("No se pudo actualizar el estado. Inténtalo nuevamente.");
-    } finally {
-      setActualizandoId(null);
-    }
-  };
+const cambiarEstadoPedido = async (idPedidoDoc, nuevoEstado) => {
+  if (!idPedidoDoc) return;
+  setActualizandoId(idPedidoDoc);
+  try {
+    // ✅ Se utiliza idPedidoDoc en lugar de pedido.id
+    const pedidoRef = doc(db, "pedidos", idPedidoDoc);
+    await updateDoc(pedidoRef, { estado: nuevoEstado });
+  } catch (error) {
+    console.error("Error al actualizar estado del pedido:", error);
+    alert("No se pudo actualizar el estado. Inténtalo nuevamente.");
+  } finally {
+    setActualizandoId(null);
+  }
+};
 
   // Calcular las ventas totales acumuladas desde los pedidos registrados
   const ventasHoy = pedidos.reduce((total, p) => total + (p.total || 0), 0);
