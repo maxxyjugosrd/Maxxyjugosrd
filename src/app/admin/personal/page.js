@@ -157,7 +157,7 @@ export default function PersonalPage() {
               {/* Encabezado con Logo y Datos de la Empresa */}
               <div className="flex justify-between items-center border-b pb-4">
                 <div className="flex items-center gap-3">
-                  <img src="/logo.JPG" alt="Maxi Jugos Logo" className="w-14 h-14 object-cover rounded-2xl border" />
+                  <img src="/logo.JPG" alt="Maxxy Jugos Logo" className="w-14 h-14 object-cover rounded-2xl border" />
                   <div>
                     <h2 className="text-xl font-black text-slate-900">MAXI JUGOS</h2>
                     <p className="text-xs text-slate-500">Comprobante de Pago de Personal</p>
