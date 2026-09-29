@@ -298,7 +298,6 @@ export default function Home() {
       metodoPago: "Pendiente / Transferencia",
       estado: "pendiente",
       origen: "Tienda Web",
-      fecha: serverTimestamp(),
       fechaCreacion: new Date().toISOString()
     };
 
