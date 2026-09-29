@@ -13,8 +13,7 @@ import {
   PackageCheck
 } from "lucide-react";
 
-// --- IMPORTACIÓN DE FIREBASE ---
-import { db } from "@/lib/firebase"; 
+import { obtenerProductosEnVivo } from "@/services/catalogoService";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export default function Home() {
@@ -40,26 +39,18 @@ export default function Home() {
 
   const ingredientesSaludables = ["Espinaca", "Manzana Verde", "Pepino", "Apio", "Jengibre", "Limón", "Piña", "Perejil", "Cúrcuma", "Remolacha", "Naranja"];
 
-  // CATÁLOGOS QUE SE HALAN DEL PANEL EN VIVO
+// CATÁLOGOS QUE SE HALAN DEL PANEL EN VIVO EN FIRESTORE
   const [catalogoPanel, setCatalogoPanel] = useState([]);
+  const [cargandoCatalogo, setCargandoCatalogo] = useState(true);
 
   useEffect(() => {
-    const cargarCatalogo = () => {
-      if (typeof window !== "undefined") {
-        const guardado = localStorage.getItem("maxxy_catalogo");
-        if (guardado) {
-          try {
-            setCatalogoPanel(JSON.parse(guardado));
-          } catch (e) {
-            console.error("Error al parsear el catálogo", e);
-          }
-        }
-      }
-    };
+    // Escucha Firestore en tiempo real
+    const desuscribir = obtenerProductosEnVivo((datos) => {
+      setCatalogoPanel(datos);
+      setCargandoCatalogo(false);
+    });
 
-    cargarCatalogo();
-    window.addEventListener("storage", cargarCatalogo);
-    return () => window.removeEventListener("storage", cargarCatalogo);
+    return () => desuscribir();
   }, []);
 
   // Filtrar categorías del catálogo
