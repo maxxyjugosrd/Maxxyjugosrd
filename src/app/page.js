@@ -63,6 +63,54 @@ export default function Home() {
 
   // Personalización de Media Docena
   const [mediaDocena, setMediaDocena] = useState({});
+  // Maneja la cantidad elegida por cada sabor en el paquete saludable
+  const manejarCantidadSaludable = (productoId, cambio) => {
+    setMediaDocena((prev) => {
+      const actual = prev[productoId] || 0;
+      const nuevaCantidad = Math.max(0, actual + cambio);
+      return { ...prev, [productoId]: nuevaCantidad };
+    });
+  };
+
+  // Cuenta el total de botellas de jugos verdes seleccionadas
+  const totalSaludablesSeleccionados = Object.values(mediaDocena).reduce(
+    (sum, cant) => sum + cant,
+    0
+  );
+  
+  // Agrega al carrito solo si cumple con el mínimo de 7
+  const agregarSaludablesAlCarrito = () => {
+    if (totalSaludablesSeleccionados < 7) {
+      alert(`El pedido mínimo para jugos verdes es de 7 unidades. Actualmente llevas ${totalSaludablesSeleccionados}.`);
+      return;
+    }
+
+    // Filtra los jugos seleccionados con cantidad mayor a 0
+    const itemsParaCarrito = saludablesPanel
+      .filter((jugo) => (mediaDocena[jugo.id] || 0) > 0)
+      .map((jugo) => ({
+        ...jugo,
+        cantidad: mediaDocena[jugo.id],
+      }));
+
+    // Agrega o acumula en el carrito
+    setCarrito((prevCarrito) => {
+      let nuevoCarrito = [...prevCarrito];
+      itemsParaCarrito.forEach((itemNuevo) => {
+        const indice = nuevoCarrito.findIndex((i) => i.id === itemNuevo.id);
+        if (indice >= 0) {
+          nuevoCarrito[indice].cantidad += itemNuevo.cantidad;
+        } else {
+          nuevoCarrito.push(itemNuevo);
+        }
+      });
+      return nuevoCarrito;
+    });
+
+    // Resetea el contador del paquete
+    setMediaDocena({});
+    alert("¡Paquete de jugos verdes agregado al carrito!");
+  };
 
   // Carrito y Notificaciones
   const [carrito, setCarrito] = useState([]);
