@@ -1,13 +1,15 @@
-import { db } from "@/lib/firebase";
-import { 
-  collection, 
-  addDoc, 
-  onSnapshot, 
-  query, 
-  orderBy, 
-  serverTimestamp 
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  orderBy,
+  onSnapshot,
+  doc,
+  deleteDoc,
+  updateDoc
 } from "firebase/firestore";
-import { db } from "@/lib/firebase"; // Asegúrate de tener db importado
+import { db } from "@/lib/firebase";
 
 // Nombre de la colección en Firestore
 const COLECCION_PEDIDOS = "pedidos";
@@ -19,7 +21,7 @@ export const crearPedido = async (datosPedido) => {
   try {
     const docRef = await addDoc(collection(db, COLECCION_PEDIDOS), {
       ...datosPedido,
-      estado: datosPedido.estado || "pendiente", // pendiente, en_preparacion, en_camino, entregado
+      estado: datosPedido.estado || "Pendiente",
       fecha: serverTimestamp(),
     });
     return { exito: true, id: docRef.id };
@@ -34,21 +36,23 @@ export const crearPedido = async (datosPedido) => {
  */
 export const obtenerPedidosEnVivo = (callback) => {
   const q = query(
-    collection(db, COLECCION_PEDIDOS), 
+    collection(db, COLECCION_PEDIDOS),
     orderBy("fecha", "desc")
   );
 
   return onSnapshot(q, (snapshot) => {
     const pedidos = snapshot.docs.map((doc) => ({
-      ...doc.data(), // 1. Ponemos primero los datos guardados
-    idDoc: doc.id, // 2. Guardamos una copia clara del ID de Firestore
-    id: doc.id,    // 3. Forzamos que 'id' sea el ID real de Firestore (sobreescribe cualquier 'id' dentro de data)
-  }));
+      ...doc.data(),
+      idDoc: doc.id,
+      id: doc.id,
+    }));
     callback(pedidos);
   });
 };
 
-// Eliminar pedido por su ID de Firestore
+/**
+ * Elimina un pedido por su ID de Firestore
+ */
 export const eliminarPedido = async (idDoc) => {
   try {
     const pedidoRef = doc(db, COLECCION_PEDIDOS, idDoc);
@@ -60,7 +64,9 @@ export const eliminarPedido = async (idDoc) => {
   }
 };
 
-// Actualizar campos de un pedido
+/**
+ * Actualiza los datos de un pedido existente
+ */
 export const actualizarPedido = async (idDoc, datosActualizados) => {
   try {
     const pedidoRef = doc(db, COLECCION_PEDIDOS, idDoc);
