@@ -12,6 +12,11 @@ import {
   X,
 } from "lucide-react";
 import { obtenerPedidosEnVivo } from "@/services/pedidosService";
+import {
+  obtenerGastosEnVivo,
+  crearGasto,
+  eliminarGasto,
+} from "@/services/gastosService";
 
 export default function ContabilidadPage() {
   // 1. Calcular ventas desde pedidos con estatus 'completado'
