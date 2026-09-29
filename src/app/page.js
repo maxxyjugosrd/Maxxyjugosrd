@@ -389,8 +389,7 @@ try {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 space-y-3">
           <div className="flex justify-between items-center gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-md">
-                MJ
+              <img src="/logo.JPG" alt="Maxxy Jugos Logo" className="w-14 h-14 object-cover rounded-2xl border" />
               </div>
               <div>
                 <h1 className="text-xl font-extrabold tracking-tight text-slate-900 leading-none">MAXXY JUGOS</h1>
