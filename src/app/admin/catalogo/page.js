@@ -7,7 +7,7 @@ import {
   crearProducto, 
   actualizarProducto, 
   eliminarProductoBD 
-} from "../../services/catalogoService";
+} from "@/services/catalogoService";
 
 export default function CatalogoPage() {
   const [categoriaActiva, setCategoriaActiva] = useState("Botella 12 oz");
