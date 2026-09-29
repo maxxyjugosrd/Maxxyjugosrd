@@ -39,9 +39,10 @@ export const obtenerPedidosEnVivo = (callback) => {
 
   return onSnapshot(q, (snapshot) => {
     const pedidos = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+      ...doc.data(), // 1. Ponemos primero los datos guardados
+    idDoc: doc.id, // 2. Guardamos una copia clara del ID de Firestore
+    id: doc.id,    // 3. Forzamos que 'id' sea el ID real de Firestore (sobreescribe cualquier 'id' dentro de data)
+  }));
     callback(pedidos);
   });
 };
