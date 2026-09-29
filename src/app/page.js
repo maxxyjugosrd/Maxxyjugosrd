@@ -761,10 +761,17 @@ export default function Home() {
                         className="text-amber-600 font-bold text-xs hover:underline"
                       >
                          Volver a ver productos
-                      </button>
-                    </div>
-                  ) : (
-                 {carrito.map((item) => (
+                      <button
+              type="button"
+              onClick={() => setMostrarCarrito(false)}
+              className="text-amber-600 font-bold text-xs hover:underline"
+            >
+              Volver a ver productos
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {carrito.map((item) => (
               <div key={item.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl border text-xs mb-2">
                 <div>
                   <h4 className="font-bold text-slate-800">{item.nombre}</h4>
@@ -786,7 +793,9 @@ export default function Home() {
                   </button>
                 </div>
               </div>
-            )}
+            ))}
+          </div>
+        )}
 
                   {carrito.length > 0 && (
                     <form onSubmit={enviarPedidoAlPanel} className="space-y-4 border-t pt-4">
