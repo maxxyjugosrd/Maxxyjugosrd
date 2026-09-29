@@ -5,9 +5,14 @@ import { DollarSign, TrendingUp, ShoppingBag, PlusCircle, ArrowUpRight, Loader2 
 import Link from "next/link";
 import { obtenerPedidosEnVivo } from "../../services/pedidosService";
 
+// Importación de Firestore para actualizar documentos
+import { db } from "@/lib/firebase";
+import { doc, updateDoc } from "firebase/firestore";
+
 export default function AdminDashboard() {
   const [pedidos, setPedidos] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [actualizandoId, setActualizandoId] = useState(null);
   
   // Gastos y comisiones fijados/estimados temporalmente
   const [gastosHoy] = useState(3200);   // Compras de frutas e insumos
@@ -23,11 +28,40 @@ export default function AdminDashboard() {
     return () => desuscribir();
   }, []);
 
+  // Función para actualizar el estado del pedido en Firestore
+  const cambiarEstadoPedido = async (idPedidoDoc, nuevoEstado) => {
+    if (!idPedidoDoc) return;
+    setActualizandoId(idPedidoDoc);
+    try {
+      const pedidoRef = doc(db, "pedidos", idPedidoDoc);
+      await updateDoc(pedidoRef, { estado: nuevoEstado });
+    } catch (error) {
+      console.error("Error al actualizar estado del pedido:", error);
+      alert("No se pudo actualizar el estado. Inténtalo nuevamente.");
+    } finally {
+      setActualizandoId(null);
+    }
+  };
+
   // Calcular las ventas totales acumuladas desde los pedidos registrados
   const ventasHoy = pedidos.reduce((total, p) => total + (p.total || 0), 0);
 
   // Ganancia Neta Limpia = Ventas totales - (Gastos + Comisiones)
   const gananciaNeta = ventasHoy - (gastosHoy + comisionesHoy);
+
+  // Helper de estilos por estado
+  const obtenerEstiloEstado = (estado = "") => {
+    switch (estado.toLowerCase()) {
+      case "completado":
+        return "bg-emerald-100 text-emerald-800 border-emerald-300";
+      case "en proceso":
+        return "bg-blue-100 text-blue-800 border-blue-300";
+      case "cancelado":
+        return "bg-rose-100 text-rose-800 border-rose-300";
+      default: // pendiente
+        return "bg-amber-100 text-amber-800 border-amber-300";
+    }
+  };
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -114,15 +148,16 @@ export default function AdminDashboard() {
         ) : (
           <div className="divide-y divide-slate-100">
             {pedidos.map((pedido) => {
-              // Manejo flexible para soportar tanto objetos de cliente como strings simples
+              const idDoc = pedido.idDoc || pedido.id; // Sostiene el id del documento de Firestore
               const nombreCliente = typeof pedido.cliente === 'string' 
                 ? pedido.cliente 
                 : (pedido.cliente?.nombre || "Cliente sin nombre");
                 
               const telefonoCliente = pedido.telefono || pedido.cliente?.telefono || "Sin teléfono";
+              const estadoActual = pedido.estado || "pendiente";
 
               return (
-                <div key={pedido.id} className="p-4 flex justify-between items-center hover:bg-slate-50 transition">
+                <div key={idDoc} className="p-4 flex justify-between items-center hover:bg-slate-50 transition">
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-slate-800 text-sm">
@@ -138,13 +173,28 @@ export default function AdminDashboard() {
                       {telefonoCliente} • {pedido.metodoPago || "Pendiente"} {pedido.origen ? `• ${pedido.origen}` : ""}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex flex-col items-end gap-1">
                     <span className="font-bold text-slate-800 block text-sm">
                       RD$ {(pedido.total || 0).toLocaleString()}
                     </span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 capitalize font-medium inline-block mt-0.5">
-                      {pedido.estado || "Pendiente"}
-                    </span>
+                    
+                    {/* Selector interactivo para cambiar el estado */}
+                    <div className="relative">
+                      <select
+                        value={estadoActual}
+                        disabled={actualizandoId === idDoc}
+                        onChange={(e) => cambiarEstadoPedido(idDoc, e.target.value)}
+                        className={`text-xs font-semibold px-2.5 py-1 rounded-lg border outline-none cursor-pointer capitalize transition ${obtenerEstiloEstado(estadoActual)}`}
+                      >
+                        <option value="pendiente">Pendiente</option>
+                        <option value="en proceso">En Proceso</option>
+                        <option value="completado">Completado</option>
+                        <option value="cancelado">Cancelado</option>
+                      </select>
+                      {actualizandoId === idDoc && (
+                        <Loader2 className="w-3 h-3 animate-spin absolute right-1 top-2 text-slate-500" />
+                      )}
+                    </div>
                   </div>
                 </div>
               );
