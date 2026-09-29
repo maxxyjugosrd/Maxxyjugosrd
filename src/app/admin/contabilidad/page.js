@@ -41,7 +41,7 @@ export default function ContabilidadPage() {
         const totalVentasCompletadas = listaPedidos
           .filter((p) => {
             const estado = (p.estado || p.status || "").toLowerCase();
-            return estado === "completado" || estado === "entregado";
+            return estado === "Completado" || estado === "entregado";
           })
           .reduce((sum, p) => sum + Number(p.total || 0), 0);
 
