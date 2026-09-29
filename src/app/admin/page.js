@@ -68,7 +68,7 @@ export default function AdminDashboard() {
       {/* Encabezado */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Panel de Control - Maxi Jugos 🥤</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Panel de Control - Maxxy Jugos 🥤</h1>
           <p className="text-slate-500 text-sm">Resumen financiero y operativo en tiempo real.</p>
         </div>
         <Link
