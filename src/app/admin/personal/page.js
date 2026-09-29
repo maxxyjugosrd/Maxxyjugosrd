@@ -159,7 +159,7 @@ export default function PersonalPage() {
                 <div className="flex items-center gap-3">
                   <img src="/logo.JPG" alt="Maxxy Jugos Logo" className="w-14 h-14 object-cover rounded-2xl border" />
                   <div>
-                    <h2 className="text-xl font-black text-slate-900">MAXI JUGOS</h2>
+                    <h2 className="text-xl font-black text-slate-900">MAXXY JUGOS</h2>
                     <p className="text-xs text-slate-500">Comprobante de Pago de Personal</p>
                   </div>
                 </div>
