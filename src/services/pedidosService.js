@@ -7,6 +7,7 @@ import {
   orderBy, 
   serverTimestamp 
 } from "firebase/firestore";
+import { db } from "@/lib/firebase"; // Asegúrate de tener db importado
 
 // Nombre de la colección en Firestore
 const COLECCION_PEDIDOS = "pedidos";
@@ -45,4 +46,28 @@ export const obtenerPedidosEnVivo = (callback) => {
   }));
     callback(pedidos);
   });
+};
+
+// Eliminar pedido por su ID de Firestore
+export const eliminarPedido = async (idDoc) => {
+  try {
+    const pedidoRef = doc(db, COLECCION_PEDIDOS, idDoc);
+    await deleteDoc(pedidoRef);
+    return { exito: true };
+  } catch (error) {
+    console.error("Error al eliminar el pedido:", error);
+    return { exito: false, error };
+  }
+};
+
+// Actualizar campos de un pedido
+export const actualizarPedido = async (idDoc, datosActualizados) => {
+  try {
+    const pedidoRef = doc(db, COLECCION_PEDIDOS, idDoc);
+    await updateDoc(pedidoRef, datosActualizados);
+    return { exito: true };
+  } catch (error) {
+    console.error("Error al actualizar el pedido:", error);
+    return { exito: false, error };
+  }
 };
