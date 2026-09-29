@@ -22,7 +22,7 @@ export default function ContabilidadPage() {
   // 1. Calcular ventas desde pedidos con estatus 'completado'
   const [ingresosTotales, setIngresosTotales] = useState(0);
 
-  // 2. Gastos registrados manualmente
+  // 2. Gastos registrados en tiempo real desde Firestore
   const [gastos, setGastos] = useState([]);
 
   // Estado del formulario
@@ -39,7 +39,7 @@ export default function ContabilidadPage() {
   // Cargar datos al montar el componente
   useEffect(() => {
     // 1. Escuchar pedidos en tiempo real desde Firestore
-    const unsubscribe = obtenerPedidosEnVivo((listaPedidos) => {
+    const unsubscribePedidos = obtenerPedidosEnVivo((listaPedidos) => {
       const totalVentasCompletadas = listaPedidos
         .filter((p) => {
           const estado = String(p.estado || p.status || "").toLowerCase();
@@ -50,48 +50,35 @@ export default function ContabilidadPage() {
       setIngresosTotales(totalVentasCompletadas);
     });
 
-    // 2. Cargar Gastos guardados de localStorage
-    const gastosGuardados = localStorage.getItem("gastos_contabilidad");
-    if (gastosGuardados) {
-      try {
-        setGastos(JSON.parse(gastosGuardados));
-      } catch (error) {
-        console.error("Error al leer gastos:", error);
-      }
-    }
+    // 2. Escuchar gastos en tiempo real desde Firestore (se elimina localStorage)
+    const unsubscribeGastos = obtenerGastosEnVivo((listaGastos) => {
+      setGastos(listaGastos);
+    });
 
-    return () => unsubscribe && unsubscribe();
+    return () => {
+      unsubscribePedidos && unsubscribePedidos();
+      unsubscribeGastos && unsubscribeGastos();
+    };
   }, []);
 
-  // Guardar gastos en localStorage cada vez que cambien
-  useEffect(() => {
-    localStorage.setItem("gastos_contabilidad", JSON.stringify(gastos));
-  }, [gastos]);
-
-  // Manejadores para el formulario de gastos
-  const handleAgregarOGuardarGasto = (e) => {
+  // Manejadores para el formulario de gastos (Guardado directo en Firestore)
+  const handleAgregarOGuardarGasto = async (e) => {
     e.preventDefault();
     if (!gastoForm.concepto || !gastoForm.monto) return;
 
-    if (editando) {
-      setGastos((prev) =>
-        prev.map((g) =>
-          g.id === gastoForm.id
-            ? { ...gastoForm, monto: Number(gastoForm.monto) }
-            : g
-        )
-      );
-    } else {
-      const nuevoGasto = {
-        ...gastoForm,
-        id: Date.now(),
-        monto: Number(gastoForm.monto),
-        fecha: new Date().toLocaleDateString("es-DO"),
-      };
-      setGastos((prev) => [nuevoGasto, ...prev]);
-    }
+    const datosGasto = {
+      concepto: gastoForm.concepto,
+      categoria: gastoForm.categoria || "Frutas/Insumos",
+      monto: Number(gastoForm.monto),
+      fecha: new Date().toLocaleDateString("es-DO"),
+    };
 
-    cerrarModal();
+    const res = await crearGasto(datosGasto);
+    if (res.exito) {
+      cerrarModal();
+    } else {
+      alert("Error al guardar el gasto en Firebase.");
+    }
   };
 
   const handleEditar = (gasto) => {
@@ -100,8 +87,10 @@ export default function ContabilidadPage() {
     setMostrarModal(true);
   };
 
-  const handleEliminar = (id) => {
-    setGastos((prev) => prev.filter((g) => g.id !== id));
+  const handleEliminar = async (id) => {
+    if (confirm("¿Deseas eliminar este registro de gasto?")) {
+      await eliminarGasto(id);
+    }
   };
 
   const cerrarModal = () => {
@@ -116,7 +105,10 @@ export default function ContabilidadPage() {
   };
 
   // Cálculos financieros
-  const totalGastos = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0);
+  const totalGastos = gastos.reduce(
+    (sum, g) => sum + Number(g.monto || 0),
+    0
+  );
   const gananciaNeta = ingresosTotales - totalGastos;
 
   return (
@@ -214,38 +206,46 @@ export default function ContabilidadPage() {
               {gastos.length === 0 ? (
                 <tr>
                   <td colSpan="5" className="p-8 text-center text-slate-400">
-                    No hay gastos registrados.
+                    No hay gastos registrados en Firestore.
                   </td>
                 </tr>
               ) : (
-                gastos.map((g) => (
-                  <tr key={g.id} className="border-b border-slate-50 hover:bg-slate-50">
-                    <td className="p-4 text-xs text-slate-400">{g.fecha}</td>
-                    <td className="p-4 font-medium text-slate-800">{g.concepto}</td>
-                    <td className="p-4">
-                      <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs">
-                        {g.categoria}
-                      </span>
-                    </td>
-                    <td className="p-4 font-semibold text-rose-500">
-                      RD$ {Number(g.monto).toLocaleString()}
-                    </td>
-                    <td className="p-4 text-right flex justify-end gap-2">
-                      <button
-                        onClick={() => handleEditar(g)}
-                        className="p-1.5 hover:bg-slate-100 text-slate-500 rounded-lg"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleEliminar(g.id)}
-                        className="p-1.5 hover:bg-rose-50 text-rose-500 rounded-lg"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                gastos.map((g) => {
+                  const idDoc = g.idDoc || g.id;
+                  return (
+                    <tr
+                      key={idDoc}
+                      className="border-b border-slate-50 hover:bg-slate-50"
+                    >
+                      <td className="p-4 text-xs text-slate-400">{g.fecha}</td>
+                      <td className="p-4 font-medium text-slate-800">
+                        {g.concepto}
+                      </td>
+                      <td className="p-4">
+                        <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs">
+                          {g.categoria}
+                        </span>
+                      </td>
+                      <td className="p-4 font-semibold text-rose-500">
+                        RD$ {Number(g.monto || 0).toLocaleString()}
+                      </td>
+                      <td className="p-4 text-right flex justify-end gap-2">
+                        <button
+                          onClick={() => handleEditar(g)}
+                          className="p-1.5 hover:bg-slate-100 text-slate-500 rounded-lg"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEliminar(idDoc)}
+                          className="p-1.5 hover:bg-rose-50 text-rose-500 rounded-lg"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
