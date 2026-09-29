@@ -1,9 +1,29 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ShoppingCart, Plus, Minus, Trash2, Send, User, Phone, MapPin, Bike, Loader2, Sparkles, Check, Zap, Users } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, Send, User, Phone, MapPin, Bike, Loader2, Sparkles, Check, Zap, Users, Truck } from "lucide-react";
 import { crearPedido } from "@/services/pedidosService";
 import { obtenerProductosEnVivo, obtenerIngredientesEnVivo } from "@/services/catalogoService";
+
+// Listas de Zonas de Envío configuradas
+const ZONAS_ENVIO = [
+  // Camiones / Provincias
+  { id: "santiago", nombre: "Santiago de los Caballeros", tipo: "camion", costoNormal: 4000, costoFrio: 5000 },
+  { id: "lavega", nombre: "La Vega", tipo: "camion", costoNormal: 3500, costoFrio: 4500 },
+  { id: "bonao", nombre: "Bonao", tipo: "camion", costoNormal: 2500, costoFrio: 3500 },
+  { id: "villaaltagracia", nombre: "Villa Altagracia", tipo: "camion", costoNormal: 2000, costoFrio: 3000 },
+  { id: "laromana", nombre: "La Romana", tipo: "camion", costoNormal: 3000, costoFrio: 4000 },
+  { id: "sanpedro", nombre: "San Pedro de Macorís", tipo: "camion", costoNormal: 2000, costoFrio: 3000 },
+  { id: "sanjuan", nombre: "San Juan de la Maguana", tipo: "camion", costoNormal: 4500, costoFrio: 5500 },
+  { id: "bani", nombre: "Baní", tipo: "camion", costoNormal: 2500, costoFrio: 3500 },
+  { id: "sancristobal", nombre: "San Cristóbal", tipo: "camion", costoNormal: 2000, costoFrio: 3000 },
+  { id: "azua", nombre: "Azua", tipo: "camion", costoNormal: 3500, costoFrio: 4500 },
+  // Locales / Santo Domingo
+  { id: "sdo-herrera", nombre: "Santo Domingo Oeste (Herrera)", tipo: "local", costo: 200 },
+  { id: "sdo-otro", nombre: "Santo Domingo Oeste (General)", tipo: "local", costo: 250 },
+  { id: "sde", nombre: "Santo Domingo Este", tipo: "local", costo: 350 },
+  { id: "sdn", nombre: "Santo Domingo Norte", tipo: "local", costo: 400 },
+];
 
 export default function PedidosManuales() {
   const [productosDisponibles, setProductosDisponibles] = useState([]);
@@ -19,7 +39,6 @@ export default function PedidosManuales() {
 
   // Cargar catálogo, ingredientes y personal al iniciar
   useEffect(() => {
-    // 1. Cargar catálogo e ingredientes desde Firestore
     const desuscribirProductos = obtenerProductosEnVivo((datos) => {
       setProductosDisponibles(datos);
       setCargandoProductos(false);
@@ -34,7 +53,6 @@ export default function PedidosManuales() {
       );
     });
 
-    // 2. Cargar personal guardado en localStorage (Módulo de Personal)
     const personalGuardado = localStorage.getItem("maxi_personal");
     if (personalGuardado) {
       try {
@@ -52,12 +70,16 @@ export default function PedidosManuales() {
     };
   }, []);
 
-  // Datos del cliente y pedido
+  // Datos del cliente, envío y pedido
   const [cliente, setCliente] = useState({ nombre: "", telefono: "", direccion: "" });
   const [carrito, setCarrito] = useState([]);
   const [deliveryAsignado, setDeliveryAsignado] = useState("");
   const [vendedorAsignado, setVendedorAsignado] = useState("");
   const [metodoPago, setMetodoPago] = useState("Efectivo");
+  
+  // Estados de Envío
+  const [zonaSeleccionadaId, setZonaSeleccionadaId] = useState("");
+  const [tipoCostoCamion, setTipoCostoCamion] = useState("costoNormal"); // "costoNormal" o "costoFrio"
   const [guardando, setGuardando] = useState(false);
 
   // Estado para el Modal de Personalización de Jugo Verde
@@ -70,7 +92,6 @@ export default function PedidosManuales() {
   const [ingredientesShot, setIngredientesShot] = useState([]);
   const [precioShot] = useState(100);
 
-  // Manejar selección de ingredientes para Jugo Verde
   const toggleIngredienteVerde = (nombreIng) => {
     if (ingredientesVerdes.includes(nombreIng)) {
       setIngredientesVerdes(ingredientesVerdes.filter((i) => i !== nombreIng));
@@ -79,7 +100,6 @@ export default function PedidosManuales() {
     }
   };
 
-  // Manejar selección de ingredientes para Shots
   const toggleIngredienteShot = (nombreIng) => {
     if (ingredientesShot.includes(nombreIng)) {
       setIngredientesShot(ingredientesShot.filter((i) => i !== nombreIng));
@@ -88,7 +108,6 @@ export default function PedidosManuales() {
     }
   };
 
-  // Agregar el Jugo Verde personalizado al carrito
   const agregarJugoVerdePersonalizado = () => {
     if (ingredientesVerdes.length < 4) {
       alert("Debes seleccionar al menos 4 ingredientes para el jugo verde.");
@@ -110,7 +129,6 @@ export default function PedidosManuales() {
     setModalVerdeAbierto(false);
   };
 
-  // Agregar el Shot personalizado al carrito
   const agregarShotPersonalizado = () => {
     if (ingredientesShot.length === 0) {
       alert("Selecciona al menos un ingrediente para armar el Shot.");
@@ -131,7 +149,6 @@ export default function PedidosManuales() {
     setModalShotAbierto(false);
   };
 
-  // Agregar producto normal del catálogo
   const agregarAlCarrito = (producto) => {
     const existe = carrito.find((item) => item.id === producto.id);
     if (existe) {
@@ -163,7 +180,19 @@ export default function PedidosManuales() {
     setCarrito(carrito.filter((item) => item.id !== id));
   };
 
-  const totalPedido = carrito.reduce((sum, item) => sum + Number(item.precio || 0) * item.cantidad, 0);
+  // Calcular Costo de Envío
+  const zonaActual = ZONAS_ENVIO.find((z) => z.id === zonaSeleccionadaId);
+  let costoEnvio = 0;
+  if (zonaActual) {
+    if (zonaActual.tipo === "camion") {
+      costoEnvio = tipoCostoCamion === "costoFrio" ? zonaActual.costoFrio : zonaActual.costoNormal;
+    } else {
+      costoEnvio = zonaActual.costo;
+    }
+  }
+
+  const subtotalProductos = carrito.reduce((sum, item) => sum + Number(item.precio || 0) * item.cantidad, 0);
+  const totalPedido = subtotalProductos + costoEnvio;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -186,7 +215,10 @@ export default function PedidosManuales() {
       },
       telefono: cliente.telefono.trim(),
       direccion: cliente.direccion.trim() || "Local / Mostrador",
+      zonaEnvio: zonaActual ? { nombre: zonaActual.nombre, tipo: zonaActual.tipo, costo: costoEnvio } : null,
       productos: carrito,
+      subtotal: subtotalProductos,
+      costoEnvio,
       total: totalPedido,
       deliveryAsignado: deliveryAsignado || "Sin asignar",
       vendedorAsignado: vendedorAsignado || "Sin asignar",
@@ -206,6 +238,7 @@ export default function PedidosManuales() {
       setCarrito([]);
       setDeliveryAsignado("");
       setVendedorAsignado("");
+      setZonaSeleccionadaId("");
     } else {
       alert("Ocurrió un error al guardar el pedido en la base de datos.");
     }
@@ -215,11 +248,11 @@ export default function PedidosManuales() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-800">Registrar Pedido (WhatsApp / Teléfono) 🥤</h1>
-        <p className="text-slate-500 text-sm">Ingresa ventas manuales asignando vendedor y personal de entrega en ruta.</p>
+        <p className="text-slate-500 text-sm">Ingresa ventas manuales con zonas de envío, personal y catálogo en vivo.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Columna 1 y 2: Botones de Personalización + Catálogo */}
+        {/* Columna 1 y 2: Personalización + Catálogo */}
         <div className="lg:col-span-2 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-gradient-to-r from-emerald-500 to-teal-600 p-4 rounded-2xl text-white shadow-sm flex flex-col justify-between gap-3">
@@ -342,7 +375,7 @@ export default function PedidosManuales() {
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
-                <MapPin className="w-3.5 h-3.5" /> Dirección de Envío
+                <MapPin className="w-3.5 h-3.5" /> Dirección Detallada
               </label>
               <input
                 type="text"
@@ -354,7 +387,64 @@ export default function PedidosManuales() {
             </div>
           </div>
 
-          <div className="space-y-2 border-t pt-3 max-h-52 overflow-y-auto pr-1">
+          {/* Configuración de Zona de Envío */}
+          <div className="space-y-3 border-t pt-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
+                <Truck className="w-3.5 h-3.5 text-teal-600" /> Zona de Envío / Destino
+              </label>
+              <select
+                value={zonaSeleccionadaId}
+                onChange={(e) => setZonaSeleccionadaId(e.target.value)}
+                className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+              >
+                <option value="">-- Seleccionar Zona de Envío --</option>
+                <optgroup label="Provincias (Camión)">
+                  {ZONAS_ENVIO.filter(z => z.tipo === "camion").map((zona) => (
+                    <option key={zona.id} value={zona.id}>{zona.nombre}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Santo Domingo (Local)">
+                  {ZONAS_ENVIO.filter(z => z.tipo === "local").map((zona) => (
+                    <option key={zona.id} value={zona.id}>{zona.nombre} (RD$ {zona.costo})</option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+
+            {/* Si es camión, mostrar selector de Costo Normal vs Frío */}
+            {zonaActual && zonaActual.tipo === "camion" && (
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                <label className="text-xs font-semibold text-slate-600 block">Tipo de Tarifa Camión:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTipoCostoCamion("costoNormal")}
+                    className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition ${
+                      tipoCostoCamion === "costoNormal"
+                        ? "bg-teal-600 text-white border-teal-600 shadow-sm"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    Normal (RD$ {zonaActual.costoNormal.toLocaleString()})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTipoCostoCamion("costoFrio")}
+                    className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition ${
+                      tipoCostoCamion === "costoFrio"
+                        ? "bg-teal-600 text-white border-teal-600 shadow-sm"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    Frío (RD$ {zonaActual.costoFrio.toLocaleString()})
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2 border-t pt-3 max-h-48 overflow-y-auto pr-1">
             <p className="text-xs font-semibold text-slate-600">Detalle del Pedido:</p>
             {carrito.length === 0 ? (
               <p className="text-sm text-slate-400 italic text-center py-4">No has agregado productos aún.</p>
@@ -446,16 +536,25 @@ export default function PedidosManuales() {
             </div>
           </div>
 
-          <div className="border-t pt-3 space-y-3">
-            <div className="flex justify-between items-center text-lg font-extrabold text-slate-800">
-              <span>Total:</span>
+          <div className="border-t pt-3 space-y-2">
+            <div className="flex justify-between items-center text-xs text-slate-500">
+              <span>Subtotal Productos:</span>
+              <span>RD$ {subtotalProductos.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center text-xs text-slate-500">
+              <span>Costo de Envío:</span>
+              <span>RD$ {costoEnvio.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center text-lg font-extrabold text-slate-800 pt-1 border-t">
+              <span>Total Final:</span>
               <span className="text-amber-600">RD$ {totalPedido.toLocaleString()}</span>
             </div>
+
             <button
               type="button"
               onClick={handleSubmit}
               disabled={guardando}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-sm disabled:opacity-50"
+              className="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-sm disabled:opacity-50 mt-2"
             >
               {guardando ? (
                 <>
@@ -624,7 +723,7 @@ export default function PedidosManuales() {
                 onClick={() => setModalShotAbierto(false)}
                 className="flex-1 py-2 rounded-xl text-slate-600 bg-slate-100 hover:bg-slate-200 font-medium text-xs"
               >
-                Cancelar
+                Cancelar la acción
               </button>
               <button
                 type="button"
