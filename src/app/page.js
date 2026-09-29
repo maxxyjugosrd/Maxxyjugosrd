@@ -15,6 +15,7 @@ import {
 
 import { obtenerProductosEnVivo } from "@/services/catalogoService";
 import { crearPedido } from "@/services/pedidosService"; // <-- IMPORTAMOS EL SERVICIO AQUÍ
+import { obtenerIngredientesEnVivo } from "@/services/catalogoService";
 
 export default function Home() {
   // Lista de Zonas y Tarifas de Envíos
@@ -37,11 +38,23 @@ export default function Home() {
     { id: "azua", nombre: "Azua", tipo: "camion", costoNormal: 3500, costoFrio: 4500 },
   ];
 
-  const ingredientesSaludables = ["Espinaca", "Manzana Verde", "Pepino", "Apio", "Jengibre", "Limón", "Piña", "Perejil", "Cúrcuma", "Remolacha", "Naranja"];
-
 // CATÁLOGOS QUE SE HALAN DEL PANEL EN VIVO EN FIRESTORE
   const [catalogoPanel, setCatalogoPanel] = useState([]);
   const [cargandoCatalogo, setCargandoCatalogo] = useState(true);
+  const [listaIngredientesVerdes, setListaIngredientesVerdes] = useState([]);
+  const [listaIngredientesShots, setListaIngredientesShots] = useState([]);
+
+useEffect(() => {
+  const desuscribir = obtenerIngredientesEnVivo((datos) => {
+    setListaIngredientesVerdes(
+      datos.filter((i) => i.tipo === "verde" && i.disponible !== false)
+    );
+    setListaIngredientesShots(
+      datos.filter((i) => i.tipo === "shot" && i.disponible !== false)
+    );
+  });
+  return () => desuscribir();
+}, []);
 
   useEffect(() => {
     // Escucha Firestore en tiempo real
@@ -673,17 +686,17 @@ try {
               <div className="space-y-3">
                 <p className="text-xs font-bold text-emerald-300">Jugo 8 oz (Máx 4 ingredientes):</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {ingredientesSaludables.map((ing) => (
-                    <button
-                      key={ing}
-                      onClick={() => toggleIngredienteJugo(ing)}
-                      className={`px-2.5 py-1 rounded-xl text-xs font-bold transition ${
-                        ingredientesJugo.includes(ing) ? "bg-amber-400 text-slate-950" : "bg-emerald-800/80 text-emerald-100"
-                      }`}
-                    >
-                      {ing}
-                    </button>
-                  ))}
+                  {listaIngredientesVerdes.map((ing) => (
+  <button
+    key={ing.id}
+    onClick={() => toggleIngredienteJugo(ing.nombre)}
+    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition ${
+      ingredientesJugo.includes(ing.nombre) ? "bg-amber-400 text-slate-950" : "bg-emerald-800/80 text-emerald-100"
+    }`}
+  >
+    {ing.nombre}
+  </button>
+))}
                 </div>
                 <button onClick={agregarJugoSaludableCustom} className="bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs">
                   Agregar Personalizado (RD$ 910)
@@ -693,17 +706,17 @@ try {
               <div className="space-y-3">
                 <p className="text-xs font-bold text-rose-300">Shot 2 oz (Máx 3 ingredientes):</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {ingredientesSaludables.map((ing) => (
-                    <button
-                      key={ing}
-                      onClick={() => toggleIngredienteShot(ing)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                        ingredientesShot.includes(ing) ? "bg-rose-500 text-white" : "bg-emerald-800/80 text-emerald-100"
-                      }`}
-                    >
-                      {ing}
-                    </button>
-                  ))}
+                  {listaIngredientesShots.map((ing) => (
+  <button
+    key={ing.id}
+    onClick={() => toggleIngredienteShot(ing.nombre)}
+    className={`px-3 py-1.5 rounded-xl text-xs transition ${
+      ingredientesShot.includes(ing.nombre) ? "bg-rose-500 text-white" : "bg-emerald-800/80 text-emerald-100"
+    }`}
+  >
+    {ing.nombre}
+  </button>
+))}
                 </div>
                 <button onClick={agregarShotSaludableCustom} className="bg-rose-500 text-white font-bold px-4 py-2 rounded-xl text-xs">
                   Agregar Personalizado (RD$ 595)
