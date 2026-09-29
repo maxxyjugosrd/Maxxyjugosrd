@@ -4,10 +4,26 @@ import { useState, useEffect } from "react";
 import { ShoppingCart, Plus, Minus, Trash2, Send, User, Phone, MapPin, Bike, Loader2, Sparkles, Check, Zap } from "lucide-react";
 import { crearPedido } from "@/services/pedidosService";
 import { obtenerProductosEnVivo } from "@/services/catalogoService";
+import { obtenerIngredientesEnVivo } from "@/services/catalogoService";
 
 export default function PedidosManuales() {
   const [productosDisponibles, setProductosDisponibles] = useState([]);
   const [cargandoProductos, setCargandoProductos] = useState(true);
+  const [listaIngredientesVerdes, setListaIngredientesVerdes] = useState([]);
+const [listaIngredientesShots, setListaIngredientesShots] = useState([]);
+
+useEffect(() => {
+  const desuscribir = obtenerIngredientesEnVivo((datos) => {
+    // Filtramos solo los que están disponibles y según su tipo
+    setListaIngredientesVerdes(
+      datos.filter((i) => i.tipo === "verde" && i.disponible !== false)
+    );
+    setListaIngredientesShots(
+      datos.filter((i) => i.tipo === "shot" && i.disponible !== false)
+    );
+  });
+  return () => desuscribir();
+}, []);
 
   // Datos del cliente y pedido
   const [cliente, setCliente] = useState({ nombre: "", telefono: "", direccion: "" });
