@@ -1,59 +1,70 @@
 import { db } from "@/lib/firebase";
-import { 
-  collection, 
-  onSnapshot, 
-  addDoc, 
-  doc, 
-  updateDoc, 
-  deleteDoc 
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  query,
+  orderBy,
+  serverTimestamp
 } from "firebase/firestore";
 
-const COLECCION_NOMBRE = "productos";
+const COLECCION_PRODUCTOS = "productos";
 
-// Escuchar los productos en tiempo real
+// Escuchar productos en tiempo real (Usado por la WEB y el PANEL DE CONTROL)
 export const obtenerProductosEnVivo = (callback) => {
-  const refColeccion = collection(db, COLECCION_NOMBRE);
-  return onSnapshot(refColeccion, (snapshot) => {
-    const productos = snapshot.docs.map((documento) => ({
-      id: documento.id,
-      ...documento.data(),
+  const q = query(
+    collection(db, COLECCION_PRODUCTOS),
+    orderBy("fechaCreacion", "desc")
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const productos = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
     }));
     callback(productos);
+  }, (error) => {
+    console.error("Error cargando productos en vivo:", error);
   });
 };
 
-// Crear un nuevo producto
-export const crearProducto = async (producto) => {
+// Agregar un producto nuevo
+export const agregarProducto = async (producto) => {
   try {
-    const refColeccion = collection(db, COLECCION_NOMBRE);
-    const docRef = await addDoc(refColeccion, producto);
+    const docRef = await addDoc(collection(db, COLECCION_PRODUCTOS), {
+      ...producto,
+      fechaCreacion: serverTimestamp(),
+    });
     return { exito: true, id: docRef.id };
   } catch (error) {
-    console.error("Error al crear producto:", error);
+    console.error("Error agregando producto:", error);
     return { exito: false, error };
   }
 };
 
-// Actualizar un producto existente
+// Actualizar un producto
 export const actualizarProducto = async (id, datosActualizados) => {
   try {
-    const refDoc = doc(db, COLECCION_NOMBRE, id);
+    const refDoc = doc(db, COLECCION_PRODUCTOS, id);
     await updateDoc(refDoc, datosActualizados);
     return { exito: true };
   } catch (error) {
-    console.error("Error al actualizar producto:", error);
+    console.error("Error actualizando producto:", error);
     return { exito: false, error };
   }
 };
 
 // Eliminar un producto
-export const eliminarProductoBD = async (id) => {
+export const eliminarProducto = async (id) => {
   try {
-    const refDoc = doc(db, COLECCION_NOMBRE, id);
+    const refDoc = doc(db, COLECCION_PRODUCTOS, id);
     await deleteDoc(refDoc);
     return { exito: true };
   } catch (error) {
-    console.error("Error al eliminar producto:", error);
+    console.error("Error eliminando producto:", error);
     return { exito: false, error };
   }
 };
