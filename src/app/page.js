@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 import { obtenerProductosEnVivo } from "@/services/catalogoService";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { crearPedido } from "@/services/pedidosService"; // <-- IMPORTAMOS EL SERVICIO AQUÍ
 
 export default function Home() {
   // Lista de Zonas y Tarifas de Envíos
