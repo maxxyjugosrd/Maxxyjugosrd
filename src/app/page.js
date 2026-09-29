@@ -302,14 +302,15 @@ export default function Home() {
       fechaCreacion: new Date().toISOString()
     };
 
-    // 1. REGISTRAR EN FIREBASE FIRESTORE
-    try {
-      if (db) {
-        await addDoc(collection(db, "pedidos"), nuevoPedido);
-      }
-    } catch (firebaseError) {
-      console.error("Error al guardar en Firebase:", firebaseError);
-    }
+    // ✅ CÓDIGO NUEVO (Reemplazar por esto):
+try {
+  await crearPedido({
+    ...nuevoPedido,
+    estado: "Pendiente" // Mantiene el formato esperado por el Admin y Contabilidad
+  });
+} catch (firebaseError) {
+  console.error("Error al guardar en Firebase:", firebaseError);
+}
 
     // 2. Guardar copia localmente
     if (typeof window !== "undefined") {
