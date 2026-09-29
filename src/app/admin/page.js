@@ -33,8 +33,8 @@ export default function AdminDashboard() {
     if (!idPedidoDoc) return;
     setActualizandoId(idPedidoDoc);
     try {
-      const pedidoRef = doc(db, "pedidos", idPedidoDoc);
-      await updateDoc(pedidoRef, { estado: nuevoEstado });
+     const pedidoRef = doc(db, "pedidos", pedido.id); 
+     await updateDoc(pedidoRef, { estado: nuevoEstado });
     } catch (error) {
       console.error("Error al actualizar estado del pedido:", error);
       alert("No se pudo actualizar el estado. Inténtalo nuevamente.");
