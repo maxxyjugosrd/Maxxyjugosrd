@@ -36,6 +36,7 @@ export const agregarProducto = async (producto) => {
   try {
     const docRef = await addDoc(collection(db, COLECCION_PRODUCTOS), {
       ...producto,
+      disponible: producto.disponible !== undefined ? producto.disponible : true,
       fechaCreacion: serverTimestamp(),
     });
     return { exito: true, id: docRef.id };
@@ -44,6 +45,9 @@ export const agregarProducto = async (producto) => {
     return { exito: false, error };
   }
 };
+
+// Alias por si el panel importa 'crearProducto'
+export const crearProducto = agregarProducto;
 
 // Actualizar un producto
 export const actualizarProducto = async (id, datosActualizados) => {
