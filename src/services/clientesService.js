@@ -8,87 +8,83 @@ import {
   doc,
   serverTimestamp,
   orderBy,
-  onSnapshot
+  onSnapshot,
+  deleteDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 const COLECCION_CLIENTES = "clientes";
 
 /**
- * Registra o actualiza un cliente automáticamente cada vez que se realiza un pedido
+ * Escucha la lista de clientes en tiempo real para la vista de CRM
  */
-export const registrarOActualizarClienteDesdePedido = async (datosPedido, idPedido) => {
+export const obtenerClientesEnVivo = (callback) => {
   try {
-    console.log("--- INICIANDO REGISTRO EN CRM ---");
-    const telefonoCliente = datosPedido.cliente?.telefono || datosPedido.telefono;
-    const nombreCliente = datosPedido.cliente?.nombre;
+    const q = query(
+      collection(db, COLECCION_CLIENTES),
+      orderBy("ultimaCompra", "desc")
+    );
 
-    if (!telefonoCliente || telefonoCliente === "Sin teléfono" || telefonoCliente.trim() === "") {
-      console.warn("⚠️ NO SE REGISTRÓ EN CRM: El teléfono está vacío o es inválido.");
-      return;
-    }
-
-    const clientesRef = collection(db, COLECCION_CLIENTES);
-    const q = query(clientesRef, where("telefono", "==", telefonoCliente.trim()));
-    const querySnapshot = await getDocs(q);
-
-    const nuevoHistorialItem = {
-      idPedido: idPedido,
-      fecha: Date.now(),
-      total: datosPedido.total || 0,
-      productos: datosPedido.productos || [],
-      zonaEnvio: datosPedido.zonaEnvio?.nombre || "Local / Mostrador"
-    };
-
-    if (!querySnapshot.empty) {
-      const docCliente = querySnapshot.docs[0];
-      const clienteData = docCliente.data();
-      const historialActual = clienteData.historialCompras || [];
-
-      await updateDoc(doc(db, COLECCION_CLIENTES, docCliente.id), {
-        nombre: nombreCliente || clienteData.nombre,
-        ultimaCompra: serverTimestamp(),
-        totalGastado: Number(clienteData.totalGastado || 0) + Number(datosPedido.total || 0),
-        cantidadPedidos: (clienteData.cantidadPedidos || 0) + 1,
-        direccionFrecuente: datosPedido.direccion || clienteData.direccionFrecuente || "",
-        historialCompras: [nuevoHistorialItem, ...historialActual]
-      });
-      console.log("✅ Cliente actualizado en CRM exitosamente.");
-    } else {
-      const nuevoClienteData = {
-        nombre: nombreCliente || "Cliente sin nombre",
-        telefono: telefonoCliente.trim(),
-        direccionFrecuente: datosPedido.direccion || "",
-        primeraCompra: serverTimestamp(),
-        ultimaCompra: serverTimestamp(),
-        totalGastado: Number(datosPedido.total || 0),
-        cantidadPedidos: 1,
-        historialCompras: [nuevoHistorialItem]
-      };
-
-      const docRefCliente = await addDoc(clientesRef, nuevoClienteData);
-      console.log("✅ Nuevo cliente creado en CRM con ID:", docRefCliente.id);
-    }
+    return onSnapshot(q, (snapshot) => {
+      const clientes = snapshot.docs.map((doc) => ({
+        ...doc.data(),
+        idDoc: doc.id,
+        id: doc.id,
+      }));
+      callback(clientes);
+    }, (error) => {
+      console.error("Error en el listener de clientes:", error);
+      callback([]);
+    });
   } catch (error) {
-    console.error("❌ ERROR al registrar/actualizar el cliente en CRM:", error);
+    console.error("Error al configurar obtenerClientesEnVivo:", error);
+    callback([]);
   }
 };
 
 /**
- * Escucha la lista de clientes en tiempo real para la vista de CRM
+ * Agrega un cliente manualmente desde el botón "+ Nuevo Cliente"
  */
-export const obtenerClientesEnVivo = (callback) => {
-  const q = query(
-    collection(db, COLECCION_CLIENTES),
-    orderBy("ultimaCompra", "desc")
-  );
+export const crearClienteManual = async (datosCliente) => {
+  try {
+    const clientesRef = collection(db, COLECCION_CLIENTES);
+    
+    // Verificar si ya existe por teléfono
+    if (datosCliente.telefono) {
+      const q = query(clientesRef, where("telefono", "==", datosCliente.telefono.trim()));
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        return { exito: false, error: "Ya existe un cliente registrado con este número de teléfono." };
+      }
+    }
 
-  return onSnapshot(q, (snapshot) => {
-    const clientes = snapshot.docs.map((doc) => ({
-      ...doc.data(),
-      idDoc: doc.id,
-      id: doc.id,
-    }));
-    callback(clientes);
-  });
+    const docRef = await addDoc(clientesRef, {
+      nombre: datosCliente.nombre || "Sin nombre",
+      telefono: datosCliente.telefono || "",
+      direccionFrecuente: datosCliente.direccionFrecuente || "",
+      primeraCompra: serverTimestamp(),
+      ultimaCompra: serverTimestamp(),
+      totalGastado: Number(datosCliente.totalGastado) || 0,
+      cantidadPedidos: Number(datosCliente.cantidadPedidos) || 0,
+      historialCompras: []
+    });
+
+    return { exito: true, id: docRef.id };
+  } catch (error) {
+    console.error("Error al crear cliente manual:", error);
+    return { exito: false, error };
+  }
+};
+
+/**
+ * Elimina un cliente del CRM
+ */
+export const eliminarCliente = async (idDoc) => {
+  try {
+    await deleteDoc(doc(db, COLECCION_CLIENTES, idDoc));
+    return { exito: true };
+  } catch (error) {
+    console.error("Error al eliminar el cliente:", error);
+    return { exito: false, error };
+  }
 };
