@@ -399,6 +399,14 @@ export default function AdminDashboard() {
                   pedidoVerDetalles.fecha || pedidoVerDetalles.fechaCreacion
                 )}
               </div>
+             <div className="flex justify-between text-xs py-1 border-b">
+  <span className="text-slate-500 font-medium">Vendedor:</span>
+  <span className="font-bold text-slate-800">{pedidoVerDetalles.vendedor || pedidoVerDetalles.vendedorAsignado || pedidoVerDetalles.Asignado || "Sin Asignar"}</span>
+</div>
+<div className="flex justify-between text-xs py-1 border-b">
+  <span className="text-slate-500 font-medium">Delivery:</span>
+  <span className="font-bold text-slate-800">{pedidoVerDetalles.deliveryAsignado || "No asignado"}</span>
+</div>
               {pedidoVerDetalles.datosEnvio?.fechaEntrega && (
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-emerald-500" />
