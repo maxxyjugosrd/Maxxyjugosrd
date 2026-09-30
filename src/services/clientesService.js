@@ -2,7 +2,6 @@ import {
   collection,
   addDoc,
   getDocs,
-  getDoc,
   query,
   where,
   updateDoc,
@@ -10,8 +9,7 @@ import {
   serverTimestamp,
   orderBy,
   onSnapshot,
-  deleteDoc,
-  setDoc
+  deleteDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -83,11 +81,12 @@ export const crearClienteManual = async (datosCliente) => {
 
 /**
  * Sincroniza o registra automáticamente un cliente cuando se procesa o actualiza un pedido.
- * FILTRA LOS ESTADOS: Solo suma al total gastado y métricas si el estado es "Completado" o "Entregado".
+ * Recalcula automáticamente el total gastado basándose puramente en los pedidos "Completado" o "Entregado".
  */
 export const sincronizarClientePorPedido = async (datosPedido) => {
   try {
     const {
+      idPedido, // ID único de la orden (opcional pero recomendado para evitar duplicados en el historial)
       nombreCliente,
       telefonoCliente,
       emailCliente,
@@ -95,7 +94,7 @@ export const sincronizarClientePorPedido = async (datosPedido) => {
       zonaEnvio,
       totalPedido,
       productos,
-      estadoPedido, // Ej: "Pendiente", "Completado", "Entregado", "Cancelado"
+      estadoPedido, // "Pendiente", "Completado", "Entregado", "Cancelado"
       vendedorAsignado
     } = datosPedido;
 
@@ -111,9 +110,9 @@ export const sincronizarClientePorPedido = async (datosPedido) => {
     }
 
     const querySnapshot = await getDocs(q);
-    const esCompletado = estadoPedido === "Completado" || estadoPedido === "Entregado";
 
     const nuevoItemHistorial = {
+      idPedido: idPedido || Date.now().toString(),
       fecha: new Date().toISOString(),
       total: Number(totalPedido) || 0,
       productos: productos || [],
@@ -123,7 +122,9 @@ export const sincronizarClientePorPedido = async (datosPedido) => {
     };
 
     if (querySnapshot.empty) {
-      // Si el cliente no existe, lo creamos
+      // Si el cliente no existe, se crea evaluando si el primer pedido está completado
+      const esCompletado = estadoPedido === "Completado" || estadoPedido === "Entregado";
+      
       await addDoc(clientesRef, {
         nombre: nombreCliente || "Cliente Anónimo",
         telefono: telefonoCliente || "",
@@ -138,30 +139,41 @@ export const sincronizarClientePorPedido = async (datosPedido) => {
         historialCompras: [nuevoItemHistorial]
       });
     } else {
-      // Si el cliente ya existe, actualizamos su expediente
+      // Si el cliente ya existe, actualizamos y filtramos el historial existente
       const clienteDoc = querySnapshot.docs[0];
       const clienteData = clienteDoc.data();
       const clienteRef = doc(db, COLECCION_CLIENTES, clienteDoc.id);
 
-      const historialActual = clienteData.historialCompras || [];
-      
-      // Verificamos si este pedido ya estaba registrado para recalcular de forma segura
-      let totalGastadoActual = Number(clienteData.totalGastado) || 0;
-      let cantidadPedidosActual = Number(clienteData.cantidadPedidos) || 0;
+      let historialActual = clienteData.historialCompras || [];
 
-      if (esCompletado) {
-        totalGastadoActual += Number(totalPedido) || 0;
-        cantidadPedidosActual += 1;
+      // Si el pedido ya existía en el historial (actualización de estado), lo reemplazamos
+      const indexExistente = historialActual.findIndex(item => item.idPedido === idPedido);
+      if (indexExistente !== -1) {
+        historialActual[indexExistente] = nuevoItemHistorial;
+      } else {
+        // Si es nuevo, lo añadimos al inicio
+        historialActual = [nuevoItemHistorial, ...historialActual];
       }
+
+      // RECÁLCULO MATEMÁTICO SEGURO: Sumamos únicamente los que estén completados o entregados
+      let nuevoTotalGastado = 0;
+      let nuevaCantidadPedidos = 0;
+
+      historialActual.forEach(item => {
+        if (item.estado === "Completado" || item.estado === "Entregado") {
+          nuevoTotalGastado += Number(item.total) || 0;
+          nuevaCantidadPedidos += 1;
+        }
+      });
 
       await updateDoc(clienteRef, {
         email: emailCliente || clienteData.email || "",
         direccionFrecuente: direccionEnvio || clienteData.direccionFrecuente || "",
         vendedorAsignado: vendedorAsignado || clienteData.vendedorAsignado || "Sin Asignar",
         ultimaCompra: serverTimestamp(),
-        totalGastado: totalGastadoActual,
-        cantidadPedidos: cantidadPedidosActual,
-        historialCompras: [nuevoItemHistorial, ...historialActual] // Añade el nuevo pedido al inicio
+        totalGastado: nuevoTotalGastado,
+        cantidadPedidos: nuevaCantidadPedidos,
+        historialCompras: historialActual
       });
     }
 
