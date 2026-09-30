@@ -7,7 +7,7 @@ import { obtenerPedidosEnVivo } from "@/services/pedidosService";
 export default function CompetenciaVendedores() {
   const [equipo, setEquipo] = useState([]);
   const [pedidos, setPedidos] = useState([]);
-  const [metaMensualDefault, setMetaMensualDefault] = useState(150000); // Meta por defecto en RD$ (configurable)
+  const [metaMensualDefault, setMetaMensualDefault] = useState(15000); // Meta por defecto en RD$ (configurable)
 
   // Mes actual para el análisis
   const fechaActualStr = new Date().toISOString().slice(0, 7);
