@@ -221,11 +221,13 @@ export default function PedidosManuales() {
       costoEnvio,
       total: totalPedido,
       deliveryAsignado: deliveryAsignado || "Sin asignar",
-      vendedorAsignado: vendedorAsignado || "Sin asignar",
+      Asignado: Asignado || "Sin asignar",
+      vendedor: Asignado || "Sin asignar",            // <-- Añadido para compatibilidad con el CRM
+      vendedorAsignado: Asignado || "Sin asignar",   // <-- Añadido para compatibilidad con detalles
       metodoPago,
       origen: "WhatsApp / Manual",
       estado: "pendiente",
-      fechaCreacion: Date.now()
+      fechaCreacion: Date.now(),
     };
 
     const resultado = await crearPedido(objetoPedido);
