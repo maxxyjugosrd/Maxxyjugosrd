@@ -1,17 +1,50 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, Plus, FileText, DollarSign, Bike, UserCheck, Download, Trash2, Edit } from "lucide-react";
+import { Users, Plus, FileText, DollarSign, Bike, UserCheck, Download, Trash2, Edit, CreditCard, Calendar, AlertCircle, CheckCircle2 } from "lucide-react";
 
 export default function PersonalPage() {
   const [equipo, setEquipo] = useState([]);
 
-  // Cargar personal guardado al iniciar desde localStorage
+  // Cargar personal y calcular comisiones automáticas basadas en las ventas guardadas
   useEffect(() => {
     const personalGuardado = localStorage.getItem("maxi_personal");
+    const ventasGuardadas = localStorage.getItem("maxi_ventas") || localStorage.getItem("maxi_pedidos");
+    
+    let listaPersonal = [];
     if (personalGuardado) {
-      setEquipo(JSON.parse(personalGuardado));
+      listaPersonal = JSON.parse(personalGuardado);
     }
+
+    let listaVentas = [];
+    if (ventasGuardadas) {
+      listaVentas = JSON.parse(ventasGuardadas);
+    }
+
+    // Contabilizar comisiones automáticamente si el rol es Vendedor y hay ventas asociadas
+    const equipoConComisionesCalculadas = listaPersonal.map((colaborador) => {
+      if (colaborador.rol === "Vendedor" && colaborador.valorConfigurado > 0) {
+        // Buscamos las ventas asociadas a este vendedor (asumiendo que la venta guarda el nombre o id del vendedor)
+        const ventasDelVendedor = listaVentas.filter(
+          (v) => v.vendedor === colaborador.nombre || v.usuario === colaborador.nombre
+        );
+        
+        // Sumar el total vendido por este colaborador
+        const totalVendido = ventasDelVendedor.reduce((acc, curr) => acc + (Number(curr.total) || Number(curr.monto) || 0), 0);
+        
+        // Calcular la comisión automática (Ej: 5% de las ventas totales)
+        const comisionCalculada = (totalVendido * colaborador.valorConfigurado) / 100;
+
+        return {
+          ...colaborador,
+          comisionAcumulada: comisionCalculada || colaborador.comisionAcumulada || 0,
+          totalVentasPeriodo: totalVendido
+        };
+      }
+      return colaborador;
+    });
+
+    setEquipo(equipoConComisionesCalculadas);
   }, []);
 
   // Función auxiliar para actualizar el estado y guardarlo automáticamente
@@ -27,17 +60,47 @@ export default function PersonalPage() {
   const [nuevoEmpleado, setNuevoEmpleado] = useState({
     nombre: "",
     rol: "Delivery",
+    telefono: "",
+    cedula: "",
+    direccion: "",
+    banco: "",
+    tipoCuenta: "Ahorros",
+    numeroCuenta: "",
     comisionPorcentaje: "",
     sueldoFijo: "",
   });
 
   const [reciboSeleccionado, setReciboSeleccionado] = useState(null);
-  const [metodoPagoRecibo, setMetodoPagoRecibo] = useState("Efectivo");
+
+  // Cálculo de días para la próxima quincena (15 o 30)
+  const obtenerInfoNomina = () => {
+    const hoy = new Date();
+    const dia = hoy.getDate();
+    let proximoCorte = dia <= 15 ? 15 : 30;
+    let mesAnio = hoy.toLocaleDateString('es-DO', { month: 'long', year: 'numeric' });
+    let diasFaltantes = proximoCorte - dia;
+    if (diasFaltantes < 0) diasFaltantes = 0;
+
+    return { proximoCorte, diasFaltantes, mesAnio };
+  };
+
+  const infoNomina = obtenerInfoNomina();
 
   const abrirModalCrear = () => {
     setModoEdicion(false);
     setIdEditando(null);
-    setNuevoEmpleado({ nombre: "", rol: "Delivery", comisionPorcentaje: "", sueldoFijo: "" });
+    setNuevoEmpleado({
+      nombre: "",
+      rol: "Delivery",
+      telefono: "",
+      cedula: "",
+      direccion: "",
+      banco: "",
+      tipoCuenta: "Ahorros",
+      numeroCuenta: "",
+      comisionPorcentaje: "",
+      sueldoFijo: "",
+    });
     setMostrarModal(true);
   };
 
@@ -54,8 +117,14 @@ export default function PersonalPage() {
     }
 
     setNuevoEmpleado({
-      nombre: colaborador.nombre,
-      rol: colaborador.rol,
+      nombre: colaborador.nombre || "",
+      rol: colaborador.rol || "Delivery",
+      telefono: colaborador.telefono || "",
+      cedula: colaborador.cedula || "",
+      direccion: colaborador.direccion || "",
+      banco: colaborador.banco || "",
+      tipoCuenta: colaborador.tipoCuenta || "Ahorros",
+      numeroCuenta: colaborador.numeroCuenta || "",
       comisionPorcentaje: porcentaje,
       sueldoFijo: sueldo,
     });
@@ -73,7 +142,7 @@ export default function PersonalPage() {
       tipoPago = `${nuevoEmpleado.comisionPorcentaje}% sobre Ventas`;
       valorAsignado = Number(nuevoEmpleado.comisionPorcentaje) || 0;
     } else if (nuevoEmpleado.rol === "Colaborador / Empleado") {
-      tipoPago = "Sueldo Fijo";
+      tipoPago = "Sueldo Fijo (Quincenal)";
       valorAsignado = Number(nuevoEmpleado.sueldoFijo) || 0;
     }
 
@@ -84,6 +153,12 @@ export default function PersonalPage() {
               ...item,
               nombre: nuevoEmpleado.nombre,
               rol: nuevoEmpleado.rol,
+              telefono: nuevoEmpleado.telefono,
+              cedula: nuevoEmpleado.cedula,
+              direccion: nuevoEmpleado.direccion,
+              banco: nuevoEmpleado.banco,
+              tipoCuenta: nuevoEmpleado.tipoCuenta,
+              numeroCuenta: nuevoEmpleado.numeroCuenta,
               tipoPago: tipoPago,
               valorConfigurado: valorAsignado,
             }
@@ -97,21 +172,53 @@ export default function PersonalPage() {
           id: Date.now(),
           nombre: nuevoEmpleado.nombre,
           rol: nuevoEmpleado.rol,
+          telefono: nuevoEmpleado.telefono,
+          cedula: nuevoEmpleado.cedula,
+          direccion: nuevoEmpleado.direccion,
+          banco: nuevoEmpleado.banco,
+          tipoCuenta: nuevoEmpleado.tipoCuenta,
+          numeroCuenta: nuevoEmpleado.numeroCuenta,
           tipoPago: tipoPago,
           valorConfigurado: valorAsignado,
-          comisionAcumulada: 0, 
+          comisionAcumulada: valorAsignado > 0 && nuevoEmpleado.rol === "Colaborador / Empleado" ? valorAsignado / 2 : 0, 
           historialDetalle: [],
         },
       ];
       actualizarYGuardarEquipo(equipoActualizado);
     }
 
-    setNuevoEmpleado({ nombre: "", rol: "Delivery", comisionPorcentaje: "", sueldoFijo: "" });
     setMostrarModal(false);
   };
 
+  const registrarPagoNomina = (colaborador) => {
+    const confirmar = confirm(`¿Confirmas que le has pagado la quincena a ${colaborador.nombre}?\n\nEsto registrará el pago y pondrá su balance pendiente en RD$ 0.`);
+    if (!confirmar) return;
+
+    const equipoActualizado = equipo.map((item) => {
+      if (item.id === colaborador.id) {
+        const nuevoHistorial = [
+          {
+            fecha: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString(),
+            concepto: `Pago Quincenal (${infoNomina.proximoCorte} de ${infoNomina.mesAnio})`,
+            monto: item.comisionAcumulada,
+          },
+          ...(item.historialDetalle || [])
+        ];
+        return {
+          ...item,
+          comisionAcumulada: 0,
+          historialDetalle: nuevoHistorial,
+        };
+      }
+      return item;
+    });
+
+    actualizarYGuardarEquipo(equipoActualizado);
+    alert(`¡Pago registrado con éxito! El balance de ${colaborador.nombre} se ha reiniciado a 0.`);
+  };
+
   const eliminarEmpleado = (id) => {
-    if (confirm("¿Estás seguro de que deseas eliminar este colaborador?")) {
+    if (confirm("¿Estás seguro de que deseas eliminar este colaborador del sistema?")) {
       const equipoActualizado = equipo.filter((item) => item.id !== id);
       actualizarYGuardarEquipo(equipoActualizado);
     }
@@ -147,31 +254,49 @@ export default function PersonalPage() {
         }
       `}</style>
 
-      {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      {/* Encabezado y Alerta de Nómina */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Gestión de Personal & Comisiones</h1>
-          <p className="text-slate-500 text-sm">Liquidación de pagos a vendedores, deliveries y colaboradores fijos.</p>
+          <h1 className="text-2xl font-bold text-slate-800">Nómina, Personal & Expedientes</h1>
+          <p className="text-slate-500 text-sm">Control quincenal de pagos (cortes los 15 y 30), datos bancarios y comisiones automáticas.</p>
         </div>
         <button
           onClick={abrirModalCrear}
-          className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition"
+          className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition shadow-sm"
         >
           <Plus className="w-5 h-5" /> Agregar Colaborador
         </button>
       </div>
 
-      {/* Lista de Personal */}
+      {/* Tarjeta de Alerta / Recordatorio de Nómina */}
+      <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-amber-500/20 text-amber-400 rounded-xl">
+            <Calendar className="w-7 h-7" />
+          </div>
+          <div>
+            <span className="text-xs text-amber-400 font-bold uppercase tracking-wider">Próximo Corte de Nómina</span>
+            <h3 className="text-lg font-black">Día {infoNomina.proximoCorte} de {infoNomina.mesAnio}</h3>
+            <p className="text-xs text-slate-300">Faltan aprox. <span className="font-bold text-white">{infoNomina.diasFaltantes} días</span> para realizar los cálculos y desembolsos.</p>
+          </div>
+        </div>
+        <div className="bg-white/10 px-4 py-2 rounded-xl text-xs backdrop-blur-sm border border-white/10 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-400" />
+          <span>Cálculo automático de comisiones por ventas activo</span>
+        </div>
+      </div>
+
+      {/* Lista de Personal / Tarjetas de Nómina */}
       {equipo.length === 0 ? (
         <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-3 shadow-sm">
           <Users className="w-12 h-12 text-slate-300 mx-auto" />
-          <h3 className="font-bold text-slate-700 text-lg">No hay personal registrado</h3>
+          <h3 className="font-bold text-slate-700 text-lg">No hay personal registrado en nómina</h3>
           <p className="text-slate-400 text-sm max-w-sm mx-auto">
-            Agrega tu primer vendedor, delivery o colaborador fijo para comenzar a registrar comisiones y pagos.
+            Agrega tu primer empleado para gestionar sus datos bancarios, teléfonos, direcciones y montos a pagar.
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {equipo.map((colaborador) => (
             <div key={colaborador.id} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
               <div className="space-y-4">
@@ -198,7 +323,7 @@ export default function PersonalPage() {
                     <button
                       onClick={() => abrirModalEditar(colaborador)}
                       className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
-                      title="Editar Colaborador"
+                      title="Editar Expediente"
                     >
                       <Edit className="w-4 h-4" />
                     </button>
@@ -212,28 +337,50 @@ export default function PersonalPage() {
                   </div>
                 </div>
 
-                <div className="text-xs text-slate-500 bg-slate-50 p-2 rounded-lg">
-                  Modalidad: <span className="font-bold text-slate-700">{colaborador.tipoPago}</span>
+                {/* Datos de contacto y banco resumidos */}
+                <div className="text-xs space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <p><span className="font-semibold text-slate-600">Tel:</span> {colaborador.telefono || "No especificado"}</p>
+                  <p><span className="font-semibold text-slate-600">Cédula:</span> {colaborador.cedula || "No especificada"}</p>
+                  <p><span className="font-semibold text-slate-600">Banco:</span> {colaborador.banco ? `${colaborador.banco} (${colaborador.tipoCuenta}) - ${colaborador.numeroCuenta}` : "Sin cuenta registrada"}</p>
+                  <div className="pt-1 border-t mt-1 flex justify-between">
+                    <span className="text-slate-400">Modalidad: </span>
+                    <span className="font-bold text-slate-700">{colaborador.tipoPago}</span>
+                  </div>
+                  {colaborador.rol === "Vendedor" && (
+                    <p className="text-[11px] text-emerald-600 font-medium pt-1">
+                      Ventas del período: RD$ {colaborador.totalVentasPeriodo || 0}
+                    </p>
+                  )}
                 </div>
 
+                {/* Monto Acumulado */}
                 <div className="border-t border-b py-3 flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Acumulado a Pagar:</span>
-                  <span className="font-extrabold text-slate-800 text-base">RD$ {colaborador.comisionAcumulada}</span>
+                  <span className="text-slate-500 font-medium">Pendiente de Pago:</span>
+                  <span className="font-extrabold text-slate-900 text-lg">RD$ {colaborador.comisionAcumulada}</span>
                 </div>
               </div>
 
-              <button
-                onClick={() => generarRecibo(colaborador)}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 transition mt-2"
-              >
-                <FileText className="w-4 h-4 text-amber-400" /> Generar Recibo de Pago
-              </button>
+              {/* Botones de Acción */}
+              <div className="space-y-2 pt-2">
+                <button
+                  onClick={() => registrarPagoNomina(colaborador)}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 transition shadow-sm"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Registrar Pago (Poner en 0)
+                </button>
+                <button
+                  onClick={() => generarRecibo(colaborador)}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 transition"
+                >
+                  <FileText className="w-4 h-4 text-amber-400" /> Ver Recibo / Historial
+                </button>
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Modal / Comprobante de Pago Profesional */}
+      {/* Modal / Comprobante de Pago Oficial */}
       {reciboSeleccionado && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-3xl p-8 max-w-xl w-full space-y-6 shadow-2xl border border-slate-200 my-8">
@@ -241,79 +388,63 @@ export default function PersonalPage() {
             <div id="seccion-recibo-impresion" className="space-y-6 bg-white p-2">
               <div className="flex justify-between items-center border-b pb-4">
                 <div className="flex items-center gap-3">
-                  <img src="/logo.JPG" alt="Maxi Jugos Logo" className="w-14 h-14 object-cover rounded-2xl border" />
+                  <img src="/logo.JPG" alt="Maxxy Jugos Logo" className="w-14 h-14 object-cover rounded-2xl border" />
                   <div>
-                    <h2 className="text-xl font-black text-slate-900">MAXI JUGOS</h2>
-                    <p className="text-xs text-slate-500">Comprobante de Pago de Personal</p>
+                    <h2 className="text-xl font-black text-slate-900">MAXXY JUGOS</h2>
+                    <p className="text-xs text-slate-500">Comprobante de Nómina y Pagos</p>
                   </div>
                 </div>
                 <div className="text-right text-xs text-slate-500">
                   <p><span className="font-bold">Fecha:</span> {new Date().toLocaleDateString()}</p>
-                  <p><span className="font-bold">Hora:</span> {new Date().toLocaleTimeString()}</p>
+                  <p><span className="font-bold">Corte:</span> Quincenal ({infoNomina.proximoCorte})</p>
                 </div>
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-2xl grid grid-cols-2 gap-4 text-sm">
+              <div className="bg-slate-50 p-4 rounded-2xl grid grid-cols-2 gap-4 text-xs">
                 <div>
-                  <span className="text-slate-400 text-xs block">Colaborador:</span>
-                  <span className="font-bold text-slate-800">{reciboSeleccionado.nombre}</span>
+                  <span className="text-slate-400 block">Colaborador:</span>
+                  <span className="font-bold text-slate-800 text-sm">{reciboSeleccionado.nombre}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 text-xs block">Rol / Cargo:</span>
-                  <span className="font-bold text-slate-800">{reciboSeleccionado.rol}</span>
+                  <span className="text-slate-400 block">Cargo / Rol:</span>
+                  <span className="font-bold text-slate-800 text-sm">{reciboSeleccionado.rol}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 text-xs block">Modalidad de Pago:</span>
-                  <span className="font-bold text-slate-800">{reciboSeleccionado.tipoPago}</span>
+                  <span className="text-slate-400 block">Cédula:</span>
+                  <span className="font-bold text-slate-800">{reciboSeleccionado.cedula || "No registrada"}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 text-xs block">Método de Liquidación:</span>
-                  <span className="font-bold text-amber-600">{metodoPagoRecibo}</span>
+                  <span className="text-slate-400 block">Teléfono:</span>
+                  <span className="font-bold text-slate-800">{reciboSeleccionado.telefono || "No registrado"}</span>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between bg-amber-50 border border-amber-200 p-3 rounded-xl print:hidden">
-                <span className="text-xs font-bold text-amber-800">Seleccionar Método de Pago:</span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMetodoPagoRecibo("Efectivo")}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition ${metodoPagoRecibo === "Efectivo" ? "bg-amber-600 text-white" : "bg-white text-slate-700 border"}`}
-                  >
-                    Efectivo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMetodoPagoRecibo("Transferencia")}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition ${metodoPagoRecibo === "Transferencia" ? "bg-amber-600 text-white" : "bg-white text-slate-700 border"}`}
-                  >
-                    Transferencia
-                  </button>
+                <div className="col-span-2 border-t pt-2">
+                  <span className="text-slate-400 block">Datos Bancarios para Transferencia / Depósito:</span>
+                  <span className="font-bold text-slate-800">{reciboSeleccionado.banco ? `${reciboSeleccionado.banco} - Cuenta de ${reciboSeleccionado.tipoCuenta}: ${reciboSeleccionado.numeroCuenta}` : "Pago en efectivo (Sin cuenta bancaria)"}</span>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Desglose de Actividad</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Historial de Pagos Recientes</h4>
                 <div className="border rounded-2xl overflow-hidden text-xs">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-100 text-slate-600 border-b">
-                        <th className="p-3">Detalle / Concepto</th>
-                        <th className="p-3 text-right">Monto / Comisión</th>
+                        <th className="p-3">Concepto / Fecha</th>
+                        <th className="p-3 text-right">Monto Pagado</th>
                       </tr>
                     </thead>
                     <tbody>
                       {reciboSeleccionado.historialDetalle && reciboSeleccionado.historialDetalle.length > 0 ? (
                         reciboSeleccionado.historialDetalle.map((item, index) => (
                           <tr key={index} className="border-b">
-                            <td className="p-3 text-slate-700">{item.concepto}</td>
+                            <td className="p-3 text-slate-700">{item.concepto} <br/><span className="text-[10px] text-slate-400">{item.fecha}</span></td>
                             <td className="p-3 text-right font-bold text-slate-900">RD$ {item.monto}</td>
                           </tr>
                         ))
                       ) : (
                         <tr>
                           <td colSpan="2" className="p-4 text-center text-slate-400 italic">
-                            Acumulado general correspondiente al período actual.
+                            No hay pagos registrados previamente en este período.
                           </td>
                         </tr>
                       )}
@@ -323,18 +454,18 @@ export default function PersonalPage() {
               </div>
 
               <div className="bg-slate-900 text-white p-4 rounded-2xl flex justify-between items-center">
-                <span className="font-medium text-sm">Total Neto a Pagar:</span>
+                <span className="font-medium text-sm">Balance Actual Pendiente:</span>
                 <span className="text-xl font-black text-amber-400">RD$ {reciboSeleccionado.comisionAcumulada}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-8 pt-8 text-center text-xs text-slate-600">
                 <div className="space-y-6">
                   <div className="border-b border-slate-400 pb-1"></div>
-                  <p className="font-bold">Firma del Administrador</p>
+                  <p className="font-bold">Firma de la Empresa</p>
                 </div>
                 <div className="space-y-6">
                   <div className="border-b border-slate-400 pb-1"></div>
-                  <p className="font-bold">Recibido Conforme (Colaborador)</p>
+                  <p className="font-bold">Recibido Conforme (Empleado)</p>
                 </div>
               </div>
             </div>
@@ -344,7 +475,7 @@ export default function PersonalPage() {
                 onClick={imprimirRecibo}
                 className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm transition"
               >
-                <Download className="w-4 h-4" /> Imprimir Recibo Oficial
+                <Download className="w-4 h-4" /> Imprimir Comprobante
               </button>
               <button
                 onClick={() => setReciboSeleccionado(null)}
@@ -357,69 +488,153 @@ export default function PersonalPage() {
         </div>
       )}
 
-      {/* Modal Agregar / Editar Empleado */}
+      {/* Modal Crear / Editar Expediente Completo */}
       {mostrarModal && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
-          <form onSubmit={guardarEmpleado} className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4">
-            <h2 className="text-lg font-bold text-slate-800">
-              {modoEdicion ? "Editar Colaborador" : "Agregar Colaborador"}
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <form onSubmit={guardarEmpleado} className="bg-white rounded-3xl p-8 max-w-lg w-full space-y-4 my-8 shadow-2xl border">
+            <h2 className="text-xl font-bold text-slate-900">
+              {modoEdicion ? "Editar Expediente de Colaborador" : "Nuevo Colaborador en Nómina"}
             </h2>
             
-            <input
-              type="text"
-              placeholder="Nombre completo"
-              value={nuevoEmpleado.nombre}
-              onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, nombre: e.target.value })}
-              className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-              required
-            />
-
-            <select
-              value={nuevoEmpleado.rol}
-              onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, rol: e.target.value })}
-              className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-            >
-              <option value="Delivery">Delivery</option>
-              <option value="Vendedor">Vendedor</option>
-              <option value="Colaborador / Empleado">Colaborador / Empleado</option>
-            </select>
-
-            {nuevoEmpleado.rol === "Vendedor" && (
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500 font-semibold">Porcentaje de Comisión por Venta (%)</label>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-slate-500 font-semibold">Nombre Completo</label>
                 <input
-                  type="number"
-                  placeholder="Ej: 5 (para 5%)"
-                  value={nuevoEmpleado.comisionPorcentaje}
-                  onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, comisionPorcentaje: e.target.value })}
+                  type="text"
+                  placeholder="Ej: Juan Pérez"
+                  value={nuevoEmpleado.nombre}
+                  onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, nombre: e.target.value })}
                   className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                   required
                 />
               </div>
-            )}
 
-            {nuevoEmpleado.rol === "Colaborador / Empleado" && (
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500 font-semibold">Sueldo Fijo (RD$)</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-500 font-semibold">Teléfono</label>
+                  <input
+                    type="text"
+                    placeholder="809-000-0000"
+                    value={nuevoEmpleado.telefono}
+                    onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, telefono: e.target.value })}
+                    className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 font-semibold">Cédula</label>
+                  <input
+                    type="text"
+                    placeholder="001-0000000-0"
+                    value={nuevoEmpleado.cedula}
+                    onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, cedula: e.target.value })}
+                    className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-500 font-semibold">Dirección</label>
                 <input
-                  type="number"
-                  placeholder="Ej: 5000"
-                  value={nuevoEmpleado.sueldoFijo}
-                  onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, sueldoFijo: e.target.value })}
+                  type="text"
+                  placeholder="Calle, Sector, Ciudad"
+                  value={nuevoEmpleado.direccion}
+                  onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, direccion: e.target.value })}
                   className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  required
                 />
               </div>
-            )}
 
-            <div className="flex gap-2 pt-2">
-              <button type="submit" className="flex-1 bg-amber-500 font-bold py-2.5 rounded-xl text-sm">
-                {modoEdicion ? "Guardar Cambios" : "Guardar"}
+              <div>
+                <label className="text-xs text-slate-500 font-semibold">Rol / Cargo</label>
+                <select
+                  value={nuevoEmpleado.rol}
+                  onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, rol: e.target.value })}
+                  className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="Delivery">Delivery</option>
+                  <option value="Vendedor">Vendedor</option>
+                  <option value="Colaborador / Empleado">Colaborador / Empleado Fijo</option>
+                </select>
+              </div>
+
+              {nuevoEmpleado.rol === "Vendedor" && (
+                <div className="space-y-1">
+                  <label className="text-xs text-slate-500 font-semibold">Porcentaje de Comisión por Venta (%)</label>
+                  <input
+                    type="number"
+                    placeholder="Ej: 5 (para 5%)"
+                    value={nuevoEmpleado.comisionPorcentaje}
+                    onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, comisionPorcentaje: e.target.value })}
+                    className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    required
+                  />
+                </div>
+              )}
+
+              {nuevoEmpleado.rol === "Colaborador / Empleado" && (
+                <div className="space-y-1">
+                  <label className="text-xs text-slate-500 font-semibold">Sueldo Fijo Mensual (RD$)</label>
+                  <input
+                    type="number"
+                    placeholder="Ej: 15000"
+                    value={nuevoEmpleado.sueldoFijo}
+                    onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, sueldoFijo: e.target.value })}
+                    className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    required
+                  />
+                  <p className="text-[11px] text-amber-600 font-medium">El sistema calculará automáticamente la mitad (quincenal) para cada corte.</p>
+                </div>
+              )}
+
+              <div className="border-t pt-3 space-y-3">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                  <CreditCard className="w-4 h-4 text-amber-600" /> Información Bancaria (Para Transferencias o Depósitos)
+                </h4>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-500 font-semibold">Banco</label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Banreservas / BHD"
+                      value={nuevoEmpleado.banco}
+                      onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, banco: e.target.value })}
+                      className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 font-semibold">Tipo de Cuenta</label>
+                    <select
+                      value={nuevoEmpleado.tipoCuenta}
+                      onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, tipoCuenta: e.target.value })}
+                      className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="Ahorros">Ahorros</option>
+                      <option value="Corriente">Corriente</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-500 font-semibold">Número de Cuenta Bancaria</label>
+                  <input
+                    type="text"
+                    placeholder="Número de cuenta del empleado"
+                    value={nuevoEmpleado.numeroCuenta}
+                    onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, numeroCuenta: e.target.value })}
+                    className="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button type="submit" className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl text-sm transition">
+                {modoEdicion ? "Guardar Cambios" : "Guardar Empleado"}
               </button>
               <button
                 type="button"
                 onClick={() => setMostrarModal(false)}
-                className="bg-slate-100 font-bold px-4 py-2.5 rounded-xl text-sm"
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-3 rounded-xl text-sm transition"
               >
                 Cancelar
               </button>
