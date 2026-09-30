@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, DollarSign, Bike, Calendar, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Download, Search, Filter, Users, Wallet } from "lucide-react";
+import { FileText, DollarSign, Bike, Calendar, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Download, Search, Filter, Users, Wallet, Trophy, TrendingUp, TrendingDown, Target, Flame, X } from "lucide-react";
 import { obtenerPedidosEnVivo } from "@/services/pedidosService";
 
 export default function NominaPage() {
@@ -9,6 +9,10 @@ export default function NominaPage() {
   const [pedidos, setPedidos] = useState([]);
   const [mostrarDetalleId, setMostrarDetalleId] = useState(null);
   const [reciboSeleccionado, setReciboSeleccionado] = useState(null);
+  
+  // Estado para abrir/cerrar el panel de competencias
+  const [mostrarCompetencia, setMostrarCompetencia] = useState(false);
+  const [metaMensualDefault] = useState(150000); // Meta por defecto en RD$
 
   // Estados para filtros
   const [busqueda, setBusqueda] = useState("");
@@ -41,27 +45,26 @@ export default function NominaPage() {
     return () => unsubscribe();
   }, []);
 
+  // Función auxiliar para verificar si una fecha de pedido coincide con un mes (YYYY-MM)
+  const coincideMesEspecifico = (fechaPedido, mesTarget) => {
+    if (!fechaPedido) return true;
+    let fechaStr = "";
+    if (typeof fechaPedido.toDate === "function") {
+      fechaStr = fechaPedido.toDate().toISOString().slice(0, 7);
+    } else if (typeof fechaPedido === "string") {
+      fechaStr = fechaPedido.slice(0, 7);
+    } else if (fechaPedido instanceof Date) {
+      fechaStr = fechaPedido.toISOString().slice(0, 7);
+    }
+    if (!fechaStr) return true;
+    return fechaStr === mesTarget;
+  };
+
   useEffect(() => {
     if (equipo.length === 0) return;
 
     const equipoConComisionesCalculadas = equipo.map((colaborador) => {
       const nombreColaborador = (colaborador.nombre || "").trim().toLowerCase();
-
-      // Función auxiliar para verificar si una fecha de pedido coincide con el mesSeleccionado (YYYY-MM)
-      const coincideMesSeleccionado = (fechaPedido) => {
-        if (!fechaPedido) return true; // Si no tiene fecha estricta, lo tomamos por defecto
-        let fechaStr = "";
-        if (typeof fechaPedido.toDate === "function") {
-          // Es un Timestamp de Firebase
-          fechaStr = fechaPedido.toDate().toISOString().slice(0, 7);
-        } else if (typeof fechaPedido === "string") {
-          fechaStr = fechaPedido.slice(0, 7);
-        } else if (fechaPedido instanceof Date) {
-          fechaStr = fechaPedido.toISOString().slice(0, 7);
-        }
-        if (!fechaStr) return true;
-        return fechaStr === mesSeleccionado;
-      };
 
       if (colaborador.rol === "Vendedor" && Number(colaborador.valorConfigurado) > 0) {
         const ventasDelVendedor = pedidos.filter((v) => {
@@ -71,7 +74,7 @@ export default function NominaPage() {
 
           return vendedorPedido.includes(nombreColaborador) && 
                  estadoPedido === "completado" && 
-                 coincideMesSeleccionado(fechaPedido);
+                 coincideMesEspecifico(fechaPedido, mesSeleccionado);
         });
         
         const ventasPorCliente = {};
@@ -110,7 +113,7 @@ export default function NominaPage() {
 
           return deliveryPedido.includes(nombreColaborador) && 
                  estadoPedido === "completado" &&
-                 coincideMesSeleccionado(fechaPedido);
+                 coincideMesEspecifico(fechaPedido, mesSeleccionado);
         });
 
         const totalEntregas = entregasDelDelivery.length;
@@ -184,7 +187,62 @@ export default function NominaPage() {
     return String(valor);
   };
 
-  // Filtrado de empleados por Posición, Nombre o Cédula
+  // Lógica para calcular ventas de un vendedor en cualquier mes dado (para las comparativas)
+  const calcularVentasMesEspecifico = (nombreVendedor, mesAnio) => {
+    const nombreClean = (nombreVendedor || "").trim().toLowerCase();
+    const ventasFiltradas = pedidos.filter((v) => {
+      const vendedorPedido = (v.vendedor || v.vendedorAsignado || v.usuario || "").toString().trim().toLowerCase();
+      const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
+      const fechaPedido = v.fecha || v.creadoEn || v.createdAt;
+
+      return vendedorPedido.includes(nombreClean) && 
+             estadoPedido === "completado" && 
+             coincideMesEspecifico(fechaPedido, mesAnio);
+    });
+
+    let totalVendido = 0;
+    ventasFiltradas.forEach((pedido) => {
+      const monto = Number(pedido.subtotal) || Number(pedido.total) || Number(pedido.monto) || 0;
+      totalVendido += monto;
+    });
+
+    return { totalVendido, cantidadPedidos: ventasFiltradas.length };
+  };
+
+  const obtenerMesAnterior = (mesStr) => {
+    const [anio, mes] = mesStr.split("-").map(Number);
+    let d = new Date(anio, mes - 2, 1);
+    return d.toISOString().slice(0, 7);
+  };
+
+  const mesAnteriorStr = obtenerMesAnterior(mesSeleccionado);
+
+  // Generar ranking de vendedores para el panel de competencias
+  const vendedoresList = equipo.filter(c => c.rol === "Vendedor");
+  const rankingVendedores = vendedoresList.map((vendedor) => {
+    const datosActuales = calcularVentasMesEspecifico(vendedor.nombre, mesSeleccionado);
+    const datosAnteriores = calcularVentasMesEspecifico(vendedor.nombre, mesAnteriorStr);
+
+    const diferenciaMonto = datosActuales.totalVendido - datosAnteriores.totalVendido;
+    const porcentajeCrecimiento = datosAnteriores.totalVendido > 0 
+      ? ((diferenciaMonto / datosAnteriores.totalVendido) * 100).toFixed(1) 
+      : datosActuales.totalVendido > 0 ? 100 : 0;
+
+    const metaVendedor = Number(vendedor.metaMensual) || metaMensualDefault;
+    const porcentajeCumplimientoMeta = metaVendedor > 0 ? Math.min(Math.round((datosActuales.totalVendido / metaVendedor) * 100), 100) : 0;
+
+    return {
+      ...vendedor,
+      ventasActuales: datosActuales.totalVendido,
+      pedidosActuales: datosActuales.cantidadPedidos,
+      ventasAnteriores: datosAnteriores.totalVendido,
+      porcentajeCrecimiento: Number(porcentajeCrecimiento),
+      metaVendedor,
+      porcentajeCumplimientoMeta
+    };
+  }).sort((a, b) => b.ventasActuales - a.ventasActuales);
+
+  // Filtrado de empleados para la lista principal
   const equipoFiltrado = equipo.filter((colaborador) => {
     const nombreMatch = (colaborador.nombre || "").toLowerCase().includes(busqueda.toLowerCase());
     const cedulaMatch = (colaborador.cedula || "").toLowerCase().includes(busqueda.toLowerCase());
@@ -206,10 +264,118 @@ export default function NominaPage() {
         }
       `}</style>
 
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">Control de Nómina & Pagos</h1>
-        <p className="text-slate-500 text-sm">Cortes automáticos quincenales, auditoría de comisiones por pedidos y recibos oficiales.</p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Control de Nómina & Pagos</h1>
+          <p className="text-slate-500 text-sm">Cortes automáticos quincenales, auditoría de comisiones por pedidos y recibos oficiales.</p>
+        </div>
+
+        {/* Botón para abrir Competencia y Ranking */}
+        <button
+          onClick={() => setMostrarCompetencia(!mostrarCompetencia)}
+          className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black px-5 py-3 rounded-2xl shadow-lg shadow-amber-500/20 flex items-center gap-2.5 transition text-xs uppercase tracking-wider"
+        >
+          <Trophy className="w-4 h-4 text-slate-950" />
+          <span>{mostrarCompetencia ? "Ocultar Competencia" : "🏆 Ver Competencia y Ranking"}</span>
+        </button>
       </div>
+
+      {/* Panel Desplegable de Competencia y KPIs de Vendedores */}
+      {mostrarCompetencia && (
+        <div className="bg-slate-900 text-white p-6 rounded-3xl border border-slate-800 space-y-6 shadow-xl animate-fadeIn">
+          <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+            <div>
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                <Flame className="w-4 h-4" /> Competencia Comercial Interna
+              </div>
+              <h2 className="text-lg font-black text-white">Ranking y KPIs de Vendedores ({mesSeleccionado})</h2>
+            </div>
+            <button 
+              onClick={() => setMostrarCompetencia(false)}
+              className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {vendedoresList.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-xs">
+              No hay vendedores registrados en el sistema. Asegúrate de registrar personal con el rol "Vendedor".
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {rankingVendedores.map((vendedor, index) => {
+                const esPrimero = index === 0 && vendedor.ventasActuales > 0;
+                return (
+                  <div 
+                    key={vendedor.id || index}
+                    className={`p-5 rounded-2xl border relative flex flex-col justify-between space-y-4 transition-all ${
+                      esPrimero ? "bg-slate-800/90 border-amber-500/50 shadow-lg shadow-amber-500/10" : "bg-slate-800/40 border-slate-800"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs ${
+                          index === 0 ? "bg-amber-500 text-slate-950 shadow-md" :
+                          index === 1 ? "bg-slate-300 text-slate-900" :
+                          index === 2 ? "bg-amber-700/50 text-amber-200" : "bg-slate-700 text-slate-300"
+                        }`}>
+                          #{index + 1}
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-white text-sm">{vendedor.nombre}</h3>
+                          <span className="text-[10px] text-slate-400">Comisión: {vendedor.valorConfigurado}%</span>
+                        </div>
+                      </div>
+                      {esPrimero && (
+                        <span className="bg-amber-500/20 text-amber-400 text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Flame className="w-3 h-3 text-amber-400" /> Líder
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400">Ventas en el mes:</span>
+                          <span className="font-black text-white text-sm">RD$ {vendedor.ventasActuales.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-[11px] text-slate-500">
+                          <span>Pedidos completados:</span>
+                          <span className="font-bold text-slate-300">{vendedor.pedidosActuales} colmados</span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center text-xs px-1">
+                        <span className="text-slate-400">Vs Mes Anterior ({mesAnteriorStr}):</span>
+                        <div className={`flex items-center gap-1 font-bold ${vendedor.porcentajeCrecimiento >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                          {vendedor.porcentajeCrecimiento >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                          <span>{vendedor.porcentajeCrecimiento >= 0 ? `+${vendedor.porcentajeCrecimiento}%` : `${vendedor.porcentajeCrecimiento}%`}</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1 pt-2 border-t border-slate-800">
+                        <div className="flex justify-between text-[11px] font-bold">
+                          <span className="text-slate-400 flex items-center gap-1">
+                            <Target className="w-3 h-3 text-amber-400" /> Meta Mensual:
+                          </span>
+                          <span className="text-white">{vendedor.porcentajeCumplimientoMeta}% <span className="text-[10px] text-slate-500 font-normal">(RD$ {vendedor.metaVendedor.toLocaleString()})</span></span>
+                        </div>
+                        <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-500 ${vendedor.porcentajeCumplimientoMeta >= 100 ? "bg-emerald-500" : "bg-amber-500"}`} 
+                            style={{ width: `${vendedor.porcentajeCumplimientoMeta}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Bloque de Resumen e Info de Nómina */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
