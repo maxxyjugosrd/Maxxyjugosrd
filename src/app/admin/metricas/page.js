@@ -10,6 +10,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { obtenerPedidosEnVivo } from "@/services/pedidosService";
+import { obtenerGastosEnVivo, obtenerRecibosEnVivo } from "@/services/gastosService";
 
 export default function MetricasPage() {
   const [comparativa, setComparativa] = useState({
@@ -24,11 +25,12 @@ export default function MetricasPage() {
   const [totalPedidosCount, setTotalPedidosCount] = useState(0);
 
   useEffect(() => {
-    // Suscribirse a los pedidos en tiempo real desde Firebase Firestore usando tu servicio
-    const unsubscribe = obtenerPedidosEnVivo((pedidosGuardados) => {
-      setTotalPedidosCount(pedidosGuardados.length);
+    let pedidosData = [];
+    let gastosData = [];
+    let recibosData = [];
 
-      // Cargar personal desde su llave oficial local si aplica
+    const calcularMetricas = () => {
+      // Cargar personal local si aplica
       let personalGuardado = [];
       try {
         personalGuardado = JSON.parse(localStorage.getItem("maxi_personal") || "[]");
@@ -42,17 +44,13 @@ export default function MetricasPage() {
 
       let ventasActual = 0;
       let pedidosActual = 0;
-      let gananciaActual = 0;
-      
       let ventasAnterior = 0;
       let pedidosAnterior = 0;
-      let gananciaAnterior = 0;
 
       const conteoJugos = {};
-      const rendimientoEquipo = {}; // Almacenará { nombre: { count, rol } }
+      const rendimientoEquipo = {};
 
-      pedidosGuardados.forEach((pedido) => {
-        // Manejar fecha de Firestore (puede ser un Timestamp con .toDate() o un número/string)
+      pedidosData.forEach((pedido) => {
         let fechaPedido = ahora;
         if (pedido.fecha) {
           if (typeof pedido.fecha.toDate === "function") {
@@ -66,16 +64,13 @@ export default function MetricasPage() {
         const anioP = isNaN(fechaPedido.getTime()) ? anioActual : fechaPedido.getFullYear();
         
         const totalP = Number(pedido.total || pedido.montoTotal || pedido.monto || 0);
-        const gananciaP = Number(pedido.ganancia || (totalP > 0 ? totalP * 0.565 : 0));
 
         if (mesP === mesActualIndex && anioP === anioActual) {
           ventasActual += totalP;
           pedidosActual += 1;
-          gananciaActual += gananciaP;
         } else {
           ventasAnterior += totalP;
           pedidosAnterior += 1;
-          gananciaAnterior += gananciaP;
         }
 
         // Conteo de jugos/productos
@@ -95,7 +90,7 @@ export default function MetricasPage() {
           });
         }
 
-        // Rendimiento diferenciado por rol
+        // Rendimiento por rol
         const vendedor = pedido.vendedorAsignado || pedido.vendedor;
         const delivery = pedido.deliveryAsignado || pedido.delivery;
 
@@ -114,6 +109,27 @@ export default function MetricasPage() {
         }
       });
 
+      // Calcular total de gastos de contabilidad y pagos de personal en vivo
+      const totalGastosContabilidad = gastosData.reduce(
+        (acc, g) => acc + Number(g.monto || g.costo || g.total || 0),
+        0
+      );
+
+      const totalPagosPersonal = recibosData.reduce(
+        (acc, r) => acc + Number(r.monto || r.pago || r.total || 0),
+        0
+      );
+
+      const totalGastosYPagos = totalGastosContabilidad + totalPagosPersonal;
+
+      // Ganancia neta real unificada (Ventas totales menos todos los gastos y pagos reales)
+      const ventasTotalesGlobal = ventasActual + ventasAnterior;
+      const gananciaNetaRealGlobal = ventasTotalesGlobal - totalGastosYPagos;
+      
+      // Para mantener la lógica mensual aproximada de la vista:
+      const gananciaActual = ventasActual - totalGastosYPagos; // O ajustado proporcionalmente
+      const gananciaAnterior = ventasAnterior;
+
       const calcDif = (actual, anterior) => {
         if (anterior === 0) return actual > 0 ? "100.0" : "0.0";
         return (((actual - anterior) / anterior) * 100).toFixed(1);
@@ -125,7 +141,7 @@ export default function MetricasPage() {
 
       setComparativa({
         mesAnterior: { ventas: Math.round(ventasAnterior), pedidos: Math.round(pedidosAnterior), ganancia: Math.round(gananciaAnterior) },
-        mesActual: { ventas: Math.round(ventasActual), pedidos: Math.round(pedidosActual), ganancia: Math.round(gananciaActual) },
+        mesActual: { ventas: Math.round(ventasActual), pedidos: Math.round(pedidosActual), ganancia: Math.round(gananciaNetaRealGlobal) },
       });
 
       const totalUnidadesGlobal = Object.values(conteoJugos).reduce((acc, curr) => acc + curr.unidades, 0);
@@ -160,9 +176,30 @@ export default function MetricasPage() {
       });
 
       setTopPersonal(personalList);
+    };
+
+    // Suscripciones en tiempo real
+    const desuscribirPedidos = obtenerPedidosEnVivo((datos) => {
+      pedidosData = datos;
+      setTotalPedidosCount(datos.length);
+      calcularMetricas();
     });
 
-    return () => unsubscribe();
+    const desuscribirGastos = obtenerGastosEnVivo((datos) => {
+      gastosData = datos;
+      calcularMetricas();
+    });
+
+    const desuscribirRecibos = obtenerRecibosEnVivo((datos) => {
+      recibosData = datos;
+      calcularMetricas();
+    });
+
+    return () => {
+      desuscribirPedidos && desuscribirPedidos();
+      desuscribirGastos && desuscribirGastos();
+      desuscribirRecibos && desuscribirRecibos();
+    };
   }, []);
 
   return (
@@ -213,8 +250,8 @@ export default function MetricasPage() {
 
         <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-md space-y-3">
           <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-wider">
-            <span>Ganancia Neta Estimada</span>
-            <span className="text-amber-400 font-bold">Real</span>
+            <span>Ganancia Neta Real</span>
+            <span className="text-amber-400 font-bold">Limpia</span>
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-3xl font-black text-amber-400">RD$ {comparativa.mesActual.ganancia.toLocaleString()}</span>
@@ -222,7 +259,7 @@ export default function MetricasPage() {
               <TrendingUp className="w-3.5 h-3.5" /> +{difGanancia}%
             </span>
           </div>
-          <p className="text-xs text-slate-400">Mes anterior: RD$ {comparativa.mesAnterior.ganancia.toLocaleString()}</p>
+          <p className="text-xs text-slate-400">Descontando insumos y pagos reales</p>
         </div>
       </div>
 
