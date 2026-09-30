@@ -29,7 +29,7 @@ export default function AdminLayout({ children }) {
     { nombre: "Dashboard", ruta: "/admin", icono: LayoutDashboard },
     { nombre: "Punto de Venta (POS)", ruta: "/admin/pos", icono: ShoppingCart },
     { nombre: "Contabilidad Full", ruta: "/admin/contabilidad", icono: BookOpen },
-    { nombre: "Personal & Recibos", ruta: "/admin/personal", icono: Users },
+    { nombre: "Recursos Humanos / Gestión de Personal", ruta: "/admin/personal", icono: Users },
     { nombre: "Catálogo & Menú", ruta: "/admin/catalogo", icono: UtensilsCrossed },
     { nombre: "Métricas & Analítica", ruta: "/admin/metricas", icono: BarChart3 },
     { nombre: "Clientes (CRM)", ruta: "/admin/clientes", icono: UserCheck },
