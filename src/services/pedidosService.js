@@ -23,6 +23,8 @@ const COLECCION_CLIENTES = "clientes";
  */
 export const crearPedido = async (datosPedido) => {
   try {
+    console.log("📥 Datos completos recibidos al crear pedido:", datosPedido);
+
     // 1. Guardar el pedido en la colección 'pedidos'
     const docRef = await addDoc(collection(db, COLECCION_PEDIDOS), {
       ...datosPedido,
@@ -30,21 +32,35 @@ export const crearPedido = async (datosPedido) => {
       fecha: serverTimestamp(),
     });
 
-    // 2. Gestionar automáticamente el cliente en la colección 'clientes'
-    const telefonoCliente = datosPedido.cliente?.telefono || datosPedido.telefono;
-    const nombreCliente = datosPedido.cliente?.nombre;
+    console.log("✅ Pedido guardado en 'pedidos' con ID:", docRef.id);
 
-    if (telefonoCliente && telefonoCliente !== "Sin teléfono" && telefonoCliente.trim() !== "") {
+    // 2. Gestionar automáticamente el cliente en la colección 'clientes' (Blindado para cualquier estructura)
+    const telefonoCliente = 
+      datosPedido.cliente?.telefono || 
+      datosPedido.telefono || 
+      datosPedido.celular || 
+      datosPedido.telefonoCliente || "";
+
+    const nombreCliente = 
+      datosPedido.cliente?.nombre || 
+      datosPedido.nombre || 
+      datosPedido.nombreCliente || 
+      "Cliente sin nombre";
+
+    console.log("📞 Teléfono detectado para el CRM:", telefonoCliente);
+    console.log("👤 Nombre detectado para el CRM:", nombreCliente);
+
+    if (telefonoCliente && telefonoCliente !== "Sin teléfono" && String(telefonoCliente).trim() !== "") {
       const clientesRef = collection(db, COLECCION_CLIENTES);
-      const q = query(clientesRef, where("telefono", "==", telefonoCliente.trim()));
+      const q = query(clientesRef, where("telefono", "==", String(telefonoCliente).trim()));
       const querySnapshot = await getDocs(q);
 
       const nuevoHistorialItem = {
         idPedido: docRef.id,
         fecha: Date.now(),
-        total: datosPedido.total || 0,
+        total: Number(datosPedido.total) || 0,
         productos: datosPedido.productos || [],
-        zonaEnvio: datosPedido.zonaEnvio?.nombre || "Local / Mostrador"
+        zonaEnvio: datosPedido.zonaEnvio?.nombre || datosPedido.zonaEnvio || "Local / Mostrador"
       };
 
       if (!querySnapshot.empty) {
@@ -54,18 +70,19 @@ export const crearPedido = async (datosPedido) => {
         const historialActual = clienteData.historialCompras || [];
 
         await updateDoc(doc(db, COLECCION_CLIENTES, docCliente.id), {
-          nombre: nombreCliente || clienteData.nombre,
+          nombre: nombreCliente !== "Cliente sin nombre" ? nombreCliente : clienteData.nombre,
           ultimaCompra: serverTimestamp(),
           totalGastado: Number(clienteData.totalGastado || 0) + Number(datosPedido.total || 0),
           cantidadPedidos: (clienteData.cantidadPedidos || 0) + 1,
           direccionFrecuente: datosPedido.direccion || clienteData.direccionFrecuente || "",
           historialCompras: [nuevoHistorialItem, ...historialActual]
         });
+        console.log("🔄 Cliente existente actualizado en CRM.");
       } else {
         // El cliente es nuevo -> Creamos su ficha automáticamente
         await addDoc(clientesRef, {
-          nombre: nombreCliente || "Cliente sin nombre",
-          telefono: telefonoCliente.trim(),
+          nombre: nombreCliente,
+          telefono: String(telefonoCliente).trim(),
           direccionFrecuente: datosPedido.direccion || "",
           primeraCompra: serverTimestamp(),
           ultimaCompra: serverTimestamp(),
@@ -73,12 +90,15 @@ export const crearPedido = async (datosPedido) => {
           cantidadPedidos: 1,
           historialCompras: [nuevoHistorialItem]
         });
+        console.log("✨ Nuevo cliente creado en CRM con éxito.");
       }
+    } else {
+      console.warn("⚠️ No se pudo registrar en CRM porque no se encontró un teléfono válido en el pedido.");
     }
 
     return { exito: true, id: docRef.id };
   } catch (error) {
-    console.error("Error al guardar el pedido y actualizar el cliente:", error);
+    console.error("❌ Error al guardar el pedido y actualizar el cliente:", error);
     return { exito: false, error };
   }
 };
