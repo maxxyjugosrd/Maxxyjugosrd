@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FileText, DollarSign, Bike, Calendar, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Download, Search, Filter, Users, Wallet, Trophy, TrendingUp, TrendingDown, Target, Flame, X } from "lucide-react";
 import { obtenerPedidosEnVivo } from "@/services/pedidosService";
 
@@ -21,6 +21,8 @@ export default function NominaPage() {
   // Filtro por mes (por defecto el mes actual en formato YYYY-MM)
   const fechaActualStr = new Date().toISOString().slice(0, 7);
   const [mesSeleccionado, setMesSeleccionado] = useState(fechaActualStr);
+
+  const yaCalculoInicial = useRef(false);
 
   useEffect(() => {
     const personalGuardado = localStorage.getItem("maxi_personal");
@@ -61,88 +63,79 @@ export default function NominaPage() {
   };
 
   useEffect(() => {
-    if (equipo.length === 0) return;
+    if (equipo.length === 0 || pedidos.length === 0) return;
 
-    const equipoConComisionesCalculadas = equipo.map((colaborador) => {
-      const nombreColaborador = (colaborador.nombre || "").trim().toLowerCase();
+    setEquipo((equipoActual) => 
+      equipoActual.map((colaborador) => {
+        const nombreColaborador = (colaborador.nombre || "").trim().toLowerCase();
 
-      if (colaborador.rol === "Vendedor" && Number(colaborador.valorConfigurado) > 0) {
-        const ventasDelVendedor = pedidos.filter((v) => {
-          const vendedorPedido = (v.vendedor || v.vendedorAsignado || v.usuario || "").toString().trim().toLowerCase();
-          const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
-          const fechaPedido = v.fecha || v.creadoEn || v.createdAt;
+        if (colaborador.rol === "Vendedor" && Number(colaborador.valorConfigurado) > 0) {
+          const ventasDelVendedor = pedidos.filter((v) => {
+            const vendedorPedido = (v.vendedor || v.vendedorAsignado || v.usuario || "").toString().trim().toLowerCase();
+            const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
+            const fechaPedido = v.fecha || v.creadoEn || v.createdAt;
 
-          return vendedorPedido.includes(nombreColaborador) && 
-                 estadoPedido === "completado" && 
-                 coincideMesEspecifico(fechaPedido, mesSeleccionado);
-        });
-        
-        const ventasPorCliente = {};
-        ventasDelVendedor.forEach((pedido) => {
-          let clienteBruto = pedido.cliente || pedido.nombreCliente || pedido.telefonoCliente || "cliente_general";
-          if (typeof clienteBruto === "object" && clienteBruto !== null) {
-            clienteBruto = clienteBruto.nombre || clienteBruto.nombreCliente || clienteBruto.telefono || "cliente_general";
-          }
-          const clienteKey = clienteBruto.toString().trim().toLowerCase();
-          const montoPedido = Number(pedido.subtotal) || Number(pedido.total) || Number(pedido.monto) || 0;
+            return vendedorPedido.includes(nombreColaborador) && 
+                   estadoPedido === "completado" && 
+                   coincideMesEspecifico(fechaPedido, mesSeleccionado);
+          });
+          
+          const ventasPorCliente = {};
+          ventasDelVendedor.forEach((pedido) => {
+            let clienteBruto = pedido.cliente || pedido.nombreCliente || pedido.telefonoCliente || "cliente_general";
+            if (typeof clienteBruto === "object" && clienteBruto !== null) {
+              clienteBruto = clienteBruto.nombre || clienteBruto.nombreCliente || clienteBruto.telefono || "cliente_general";
+            }
+            const clienteKey = clienteBruto.toString().trim().toLowerCase();
+            const montoPedido = Number(pedido.subtotal) || Number(pedido.total) || Number(pedido.monto) || 0;
 
-          if (!ventasPorCliente[clienteKey]) ventasPorCliente[clienteKey] = 0;
-          ventasPorCliente[clienteKey] += montoPedido;
-        });
+            if (!ventasPorCliente[clienteKey]) ventasPorCliente[clienteKey] = 0;
+            ventasPorCliente[clienteKey] += montoPedido;
+          });
 
-        const totalVendido = Object.values(ventasPorCliente).reduce((acc, curr) => acc + curr, 0);
-        const comisionCalculada = (totalVendido * Number(colaborador.valorConfigurado)) / 100;
+          const totalVendido = Object.values(ventasPorCliente).reduce((acc, curr) => acc + curr, 0);
+          const comisionCalculada = (totalVendido * Number(colaborador.valorConfigurado)) / 100;
 
-        return {
-          ...colaborador,
-          comisionAcumulada: comisionCalculada || 0,
-          totalVentasPeriodo: totalVendido,
-          registrosAsociados: ventasDelVendedor
-        };
-      }
+          return {
+            ...colaborador,
+            comisionAcumulada: colaborador.comisionAcumulada !== undefined && colaborador.comisionAcumulada !== 0 ? colaborador.comisionAcumulada : (comisionCalculada || 0),
+            totalVentasPeriodo: totalVendido,
+            registrosAsociados: ventasDelVendedor
+          };
+        }
 
-      if (colaborador.rol === "Delivery") {
-        const entregasDelDelivery = pedidos.filter((v) => {
-          let deliveryBruto = v.deliveryAsignado || v.delivery || "";
-          if (typeof deliveryBruto === "object" && deliveryBruto !== null) {
-            deliveryBruto = deliveryBruto.nombre || "";
-          }
-          const deliveryPedido = deliveryBruto.toString().trim().toLowerCase();
-          const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
-          const fechaPedido = v.fecha || v.creadoEn || v.createdAt;
+        if (colaborador.rol === "Delivery") {
+          const entregasDelDelivery = pedidos.filter((v) => {
+            let deliveryBruto = v.deliveryAsignado || v.delivery || "";
+            if (typeof deliveryBruto === "object" && deliveryBruto !== null) {
+              deliveryBruto = deliveryBruto.nombre || "";
+            }
+            const deliveryPedido = deliveryBruto.toString().trim().toLowerCase();
+            const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
+            const fechaPedido = v.fecha || v.creadoEn || v.createdAt;
 
-          return deliveryPedido.includes(nombreColaborador) && 
-                 estadoPedido === "completado" &&
-                 coincideMesEspecifico(fechaPedido, mesSeleccionado);
-        });
+            return deliveryPedido.includes(nombreColaborador) && 
+                   estadoPedido === "completado" &&
+                   coincideMesEspecifico(fechaPedido, mesSeleccionado);
+          });
 
-        const totalEntregas = entregasDelDelivery.length;
+          const totalEntregas = entregasDelDelivery.length;
+          const totalComisionEnvios = entregasDelDelivery.reduce((acc, ped) => {
+            const costoEnvioReal = Number(ped.costoEnvio) || (ped.zonaEnvio && Number(ped.zonaEnvio.costo)) || 100;
+            return acc + costoEnvioReal;
+          }, 0);
 
-        // Sumar el costo real de envío de cada pedido asignado al delivery (en lugar de 100 fijo)
-        const totalComisionEnvios = entregasDelDelivery.reduce((acc, ped) => {
-          const costoEnvioReal = Number(ped.costoEnvio) || (ped.zonaEnvio && Number(ped.zonaEnvio.costo)) || 100;
-          return acc + costoEnvioReal;
-        }, 0);
+          return {
+            ...colaborador,
+            entregasRealizadas: totalEntregas,
+            comisionAcumulada: colaborador.comisionAcumulada !== undefined && colaborador.comisionAcumulada !== 0 ? colaborador.comisionAcumulada : (totalComisionEnvios || 0),
+            registrosAsociados: entregasDelDelivery
+          };
+        }
 
-        return {
-          ...colaborador,
-          entregasRealizadas: totalEntregas,
-          comisionAcumulada: totalComisionEnvios,
-          registrosAsociados: entregasDelDelivery
-        };
-      }
-
-      if (colaborador.rol === "Colaborador / Empleado") {
-        return {
-          ...colaborador,
-          comisionAcumulada: colaborador.comisionAcumulada !== undefined ? colaborador.comisionAcumulada : (Number(colaborador.valorConfigurado) || 0)
-        };
-      }
-
-      return colaborador;
-    });
-
-    setEquipo(equipoConComisionesCalculadas);
+        return colaborador;
+      })
+    );
   }, [pedidos, mesSeleccionado]);
 
   const actualizarYGuardarEquipo = (nuevoEquipo) => {
