@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, Plus, Bike, DollarSign, UserCheck, Trash2, Edit, CreditCard } from "lucide-react";
+import { Users, Plus, Bike, DollarSign, UserCheck, Trash2, Edit, CreditCard, FileSpreadsheet } from "lucide-react";
+import Link from "next/link";
 
 export default function PersonalPage() {
   const [equipo, setEquipo] = useState([]);
@@ -27,7 +28,10 @@ export default function PersonalPage() {
     const personalGuardado = localStorage.getItem("maxi_personal");
     if (personalGuardado) {
       try {
-        setEquipo(JSON.parse(personalGuardado));
+        const parsed = JSON.parse(personalGuardado);
+        if (Array.isArray(parsed)) {
+          setEquipo(parsed);
+        }
       } catch (e) {
         setEquipo([]);
       }
@@ -113,6 +117,14 @@ export default function PersonalPage() {
     }
   };
 
+  const formatearTextoSeguro = (valor) => {
+    if (!valor) return "N/D";
+    if (typeof valor === "object") {
+      return valor.nombre || valor.telefono || JSON.stringify(valor);
+    }
+    return String(valor);
+  };
+
   const equipoFiltrado = equipo.filter((colaborador) => {
     if (filtroRol === "Todos") return true;
     if (filtroRol === "Delivery") return colaborador.rol === "Delivery";
@@ -128,12 +140,23 @@ export default function PersonalPage() {
           <h1 className="text-2xl font-bold text-slate-800">Directorio de Personal & Expedientes</h1>
           <p className="text-slate-500 text-sm">Gestiona la información de contacto, cédulas y cuentas bancarias del equipo.</p>
         </div>
-        <button
-          onClick={abrirModalCrear}
-          className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition shadow-sm"
-        >
-          <Plus className="w-5 h-5" /> Nuevo Colaborador
-        </button>
+        
+        <div className="flex items-center gap-3">
+          {/* BOTÓN PARA IR A NÓMINA */}
+          <Link
+            href="/admin/nomina"
+            className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition shadow-sm text-sm"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-amber-400" /> Ir a Módulo de Nómina
+          </Link>
+
+          <button
+            onClick={abrirModalCrear}
+            className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition shadow-sm text-sm"
+          >
+            <Plus className="w-5 h-5" /> Nuevo Colaborador
+          </button>
+        </div>
       </div>
 
       {/* Pestañas de filtrado */}
@@ -160,8 +183,8 @@ export default function PersonalPage() {
                     {colaborador.rol === "Delivery" ? <Bike className="w-6 h-6 text-amber-600" /> : colaborador.rol === "Vendedor" ? <DollarSign className="w-6 h-6 text-emerald-600" /> : <UserCheck className="w-6 h-6 text-slate-700" />}
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-800">{colaborador.nombre}</h3>
-                    <span className="text-xs bg-slate-100 px-2 py-0.5 rounded-md font-semibold text-slate-600">{colaborador.rol}</span>
+                    <h3 className="font-bold text-slate-800">{formatearTextoSeguro(colaborador.nombre)}</h3>
+                    <span className="text-xs bg-slate-100 px-2 py-0.5 rounded-md font-semibold text-slate-600">{formatearTextoSeguro(colaborador.rol)}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -171,13 +194,13 @@ export default function PersonalPage() {
               </div>
 
               <div className="text-xs space-y-1.5 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                <p><span className="font-semibold text-slate-600">Teléfono:</span> {colaborador.telefono || "No especificado"}</p>
-                <p><span className="font-semibold text-slate-600">Cédula:</span> {colaborador.cedula || "No especificada"}</p>
-                <p><span className="font-semibold text-slate-600">Dirección:</span> {colaborador.direccion || "No especificada"}</p>
-                <p><span className="font-semibold text-slate-600">Banco:</span> {colaborador.banco ? `${colaborador.banco} (${colaborador.tipoCuenta}) - ${colaborador.numeroCuenta}` : "Sin cuenta registrada"}</p>
+                <p><span className="font-semibold text-slate-600">Teléfono:</span> {formatearTextoSeguro(colaborador.telefono)}</p>
+                <p><span className="font-semibold text-slate-600">Cédula:</span> {formatearTextoSeguro(colaborador.cedula)}</p>
+                <p><span className="font-semibold text-slate-600">Dirección:</span> {formatearTextoSeguro(colaborador.direccion)}</p>
+                <p><span className="font-semibold text-slate-600">Banco:</span> {colaborador.banco ? `${formatearTextoSeguro(colaborador.banco)} (${formatearTextoSeguro(colaborador.tipoCuenta)}) - ${formatearTextoSeguro(colaborador.numeroCuenta)}` : "Sin cuenta registrada"}</p>
                 <div className="pt-2 border-t mt-2 flex justify-between">
                   <span className="text-slate-400">Modalidad:</span>
-                  <span className="font-bold text-slate-700">{colaborador.tipoPago}</span>
+                  <span className="font-bold text-slate-700">{formatearTextoSeguro(colaborador.tipoPago)}</span>
                 </div>
               </div>
             </div>
