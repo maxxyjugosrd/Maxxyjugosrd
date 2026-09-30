@@ -20,16 +20,11 @@ const COLECCION_CLIENTES = "clientes";
 export const registrarOActualizarClienteDesdePedido = async (datosPedido, idPedido) => {
   try {
     console.log("--- INICIANDO REGISTRO EN CRM ---");
-    console.log("Datos del pedido recibidos en CRM:", datosPedido);
-
     const telefonoCliente = datosPedido.cliente?.telefono || datosPedido.telefono;
     const nombreCliente = datosPedido.cliente?.nombre;
 
-    console.log("Teléfono extraído:", telefonoCliente);
-    console.log("Nombre extraído:", nombreCliente);
-
     if (!telefonoCliente || telefonoCliente === "Sin teléfono" || telefonoCliente.trim() === "") {
-      console.warn("⚠️ NO SE REGISTRÓ EN CRM: El teléfono está vacío, es 'Sin teléfono' o no es válido.");
+      console.warn("⚠️ NO SE REGISTRÓ EN CRM: El teléfono está vacío o es inválido.");
       return;
     }
 
@@ -46,12 +41,9 @@ export const registrarOActualizarClienteDesdePedido = async (datosPedido, idPedi
     };
 
     if (!querySnapshot.empty) {
-      // El cliente ya existe -> Actualizamos su historial y métricas
       const docCliente = querySnapshot.docs[0];
       const clienteData = docCliente.data();
       const historialActual = clienteData.historialCompras || [];
-
-      console.log("🔄 Cliente existente encontrado en Firestore (ID:", docCliente.id, "). Actualizando...");
 
       await updateDoc(doc(db, COLECCION_CLIENTES, docCliente.id), {
         nombre: nombreCliente || clienteData.nombre,
@@ -63,9 +55,6 @@ export const registrarOActualizarClienteDesdePedido = async (datosPedido, idPedi
       });
       console.log("✅ Cliente actualizado en CRM exitosamente.");
     } else {
-      // El cliente es nuevo -> Creamos su ficha en Firestore
-      console.log("✨ Cliente nuevo. Creando ficha en la colección 'clientes'...");
-      
       const nuevoClienteData = {
         nombre: nombreCliente || "Cliente sin nombre",
         telefono: telefonoCliente.trim(),
@@ -78,10 +67,10 @@ export const registrarOActualizarClienteDesdePedido = async (datosPedido, idPedi
       };
 
       const docRefCliente = await addDoc(clientesRef, nuevoClienteData);
-      console.log("✅ Nuevo cliente creado en CRM exitosamente con ID:", docRefCliente.id);
+      console.log("✅ Nuevo cliente creado en CRM con ID:", docRefCliente.id);
     }
   } catch (error) {
-    console.error("❌ ERROR CRÍTICO al registrar/actualizar el cliente en CRM:", error);
+    console.error("❌ ERROR al registrar/actualizar el cliente en CRM:", error);
   }
 };
 
