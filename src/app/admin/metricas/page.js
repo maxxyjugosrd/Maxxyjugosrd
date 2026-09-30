@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 import { 
   TrendingUp, 
-  TrendingDown, 
   Clock, 
   Flame, 
   Award,
   Calendar,
   RefreshCw
 } from "lucide-react";
+import { obtenerPedidosEnVivo } from "@/services/pedidosService";
 
 export default function MetricasPage() {
   const [comparativa, setComparativa] = useState({
@@ -21,32 +21,14 @@ export default function MetricasPage() {
   const [difGanancia, setDifGanancia] = useState("0.0");
   const [rankingJugos, setRankingJugos] = useState([]);
   const [topPersonal, setTopPersonal] = useState([]);
-  const [debugInfo, setDebugInfo] = useState({ totalPedidos: 0, fuente: "" });
+  const [totalPedidosCount, setTotalPedidosCount] = useState(0);
 
-  const cargarMetricas = () => {
-    try {
-      // Buscar en las llaves posibles del localStorage
-      let pedidosGuardados = [];
-      let fuenteUsada = "";
-      const llavesPosibles = ["pedidos_maxxy", "maxxy_pedidos", "pedidos", "maxi_pedidos"];
+  useEffect(() => {
+    // Suscribirse a los pedidos en tiempo real desde Firebase Firestore usando tu servicio
+    const unsubscribe = obtenerPedidosEnVivo((pedidosGuardados) => {
+      setTotalPedidosCount(pedidosGuardados.length);
 
-      for (const llave of llavesPosibles) {
-        const dataBruta = localStorage.getItem(llave);
-        if (dataBruta) {
-          try {
-            const parsed = JSON.parse(dataBruta);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              pedidosGuardados = parsed;
-              fuenteUsada = llave;
-              break;
-            }
-          } catch (e) {}
-        }
-      }
-
-      setDebugInfo({ totalPedidos: pedidosGuardados.length, fuente: fuenteUsada || "Ninguna" });
-
-      // Cargar personal desde su llave oficial
+      // Cargar personal desde su llave oficial local si aplica
       let personalGuardado = [];
       try {
         personalGuardado = JSON.parse(localStorage.getItem("maxi_personal") || "[]");
@@ -70,8 +52,16 @@ export default function MetricasPage() {
       const rendimientoEquipo = {};
 
       pedidosGuardados.forEach((pedido) => {
-        const fechaStr = pedido.fecha || pedido.createdAt || pedido.date || Date.now();
-        const fechaPedido = new Date(fechaStr);
+        // Manejar fecha de Firestore (puede ser un Timestamp con .toDate() o un número/string)
+        let fechaPedido = ahora;
+        if (pedido.fecha) {
+          if (typeof pedido.fecha.toDate === "function") {
+            fechaPedido = pedido.fecha.toDate();
+          } else {
+            fechaPedido = new Date(pedido.fecha);
+          }
+        }
+
         const mesP = isNaN(fechaPedido.getTime()) ? mesActualIndex : fechaPedido.getMonth();
         const anioP = isNaN(fechaPedido.getTime()) ? anioActual : fechaPedido.getFullYear();
         
@@ -88,6 +78,7 @@ export default function MetricasPage() {
           gananciaAnterior += gananciaP;
         }
 
+        // Conteo de jugos/productos
         const items = pedido.items || pedido.productos || [];
         if (Array.isArray(items)) {
           items.forEach((item) => {
@@ -104,10 +95,11 @@ export default function MetricasPage() {
           });
         }
 
-        const vendedor = pedido.vendedor;
+        // Rendimiento de personal
+        const vendedor = pedido.vendedor || pedido.vendedorAsignado;
         const delivery = pedido.delivery;
 
-        if (vendedor) {
+        if (vendedor && vendedor !== "Sin Asignar") {
           rendimientoEquipo[vendedor] = (rendimientoEquipo[vendedor] || 0) + 1;
         }
         if (delivery) {
@@ -155,20 +147,15 @@ export default function MetricasPage() {
           personalList.push({
             nombre: p.nombre,
             actividad: 0,
-            tipoStr: p.rol || "personal"
+          tipoStr: p.rol || "personal"
           });
         }
       });
 
       setTopPersonal(personalList);
+    });
 
-    } catch (e) {
-      console.error("Error al calcular métricas:", e);
-    }
-  };
-
-  useEffect(() => {
-    cargarMetricas();
+    return () => unsubscribe();
   }, []);
 
   return (
@@ -178,18 +165,15 @@ export default function MetricasPage() {
           <h1 className="text-2xl font-bold text-slate-800">Métricas & Analítica Visual</h1>
           <p className="text-slate-500 text-sm">Comparativas del negocio y productos populares calculados desde tus registros.</p>
         </div>
-        <button 
-          onClick={cargarMetricas}
-          className="flex items-center gap-2 bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-slate-800 transition cursor-pointer"
-        >
-          <RefreshCw className="w-3.5 h-3.5" /> Recargar Datos
-        </button>
+        <div className="flex items-center gap-2 bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl">
+          <RefreshCw className="w-3.5 h-3.5 animate-spin" /> En Vivo (Firebase)
+        </div>
       </div>
 
       <div className="bg-slate-100 p-3 rounded-xl text-xs text-slate-600 flex justify-between items-center">
-        <span>📊 <b>Registros sincronizados:</b> {debugInfo.totalPedidos} pedido(s) encontrados en llave: <code className="bg-slate-200 px-1 py-0.5 rounded">{debugInfo.fuente}</code></span>
+    <span>📊 <b>Sincronizado con Firebase Firestore:</b> {totalPedidosCount} pedido(s) cargados</span>
         <span className="text-emerald-600 font-bold">● Conectado correctamente</span>
-      </div>
+    </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
@@ -278,29 +262,29 @@ export default function MetricasPage() {
                 <span>🥤 Reposición Tarde</span>
               </div>
             </div>
-          </div>
+        </div>
 
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2 border-b pb-3 text-sm">
-              <Award className="w-4 h-4 text-amber-500" /> Rendimiento de Personal
-            </h3>
-            <div className="space-y-3">
-              {topPersonal.length === 0 ? (
-                <p className="text-xs text-slate-400 italic py-2">No hay personal registrado.</p>
-              ) : (
-                topPersonal.map((p, i) => (
-                  <div key={i} className="flex justify-between items-center text-xs">
-                    <div>
-                      <p className="font-bold text-slate-800">{p.nombre}</p>
-                      <p className="text-slate-400">{p.tipoStr}</p>
-                    </div>
-                    <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
-                      {p.actividad} pedidos
-                    </span>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2 border-b pb-3 text-sm">
+            <Award className="w-4 h-4 text-amber-500" /> Rendimiento de Personal
+          </h3>
+          <div className="space-y-3">
+            {topPersonal.length === 0 ? (
+              <p className="text-xs text-slate-400 italic py-2">No hay personal registrado.</p>
+            ) : (
+              topPersonal.map((p, i) => (
+                <div key={i} className="flex justify-between items-center text-xs">
+                  <div>
+                    <p className="font-bold text-slate-800">{p.nombre}</p>
+                    <p className="text-slate-400">{p.tipoStr}</p>
                   </div>
-                ))
-              )}
-            </div>
+                  <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
+                    {p.actividad} pedidos
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>
