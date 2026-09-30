@@ -22,6 +22,7 @@ export default function PersonalPage() {
     numeroCuenta: "",
     comisionPorcentaje: "",
     sueldoFijo: "",
+    metaMensual: "",
   });
 
   useEffect(() => {
@@ -48,7 +49,7 @@ export default function PersonalPage() {
     setIdEditando(null);
     setNuevoEmpleado({
       nombre: "", rol: "Delivery", telefono: "", cedula: "", direccion: "",
-      banco: "", tipoCuenta: "Ahorros", numeroCuenta: "", comisionPorcentaje: "", sueldoFijo: "",
+      banco: "", tipoCuenta: "Ahorros", numeroCuenta: "", comisionPorcentaje: "", sueldoFijo: "", metaMensual: "",
     });
     setMostrarModal(true);
   };
@@ -70,6 +71,7 @@ export default function PersonalPage() {
       numeroCuenta: colaborador.numeroCuenta || "",
       comisionPorcentaje: porcentaje,
       sueldoFijo: sueldo,
+      metaMensual: colaborador.metaMensual || "",
     });
     setMostrarModal(true);
   };
@@ -142,7 +144,6 @@ export default function PersonalPage() {
         </div>
         
         <div className="flex items-center gap-3">
-          {/* BOTÓN PARA IR A NÓMINA */}
           <Link
             href="/admin/nomina"
             className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition shadow-sm text-sm"
@@ -197,6 +198,9 @@ export default function PersonalPage() {
                 <p><span className="font-semibold text-slate-600">Teléfono:</span> {formatearTextoSeguro(colaborador.telefono)}</p>
                 <p><span className="font-semibold text-slate-600">Cédula:</span> {formatearTextoSeguro(colaborador.cedula)}</p>
                 <p><span className="font-semibold text-slate-600">Dirección:</span> {formatearTextoSeguro(colaborador.direccion)}</p>
+                {colaborador.rol === "Vendedor" && (
+                  <p><span className="font-semibold text-slate-600">Meta Mensual:</span> RD$ {Number(colaborador.metaMensual || 150000).toLocaleString()}</p>
+                )}
                 <p><span className="font-semibold text-slate-600">Banco:</span> {colaborador.banco ? `${formatearTextoSeguro(colaborador.banco)} (${formatearTextoSeguro(colaborador.tipoCuenta)}) - ${formatearTextoSeguro(colaborador.numeroCuenta)}` : "Sin cuenta registrada"}</p>
                 <div className="pt-2 border-t mt-2 flex justify-between">
                   <span className="text-slate-400">Modalidad:</span>
@@ -241,9 +245,15 @@ export default function PersonalPage() {
                 </select>
               </div>
               {nuevoEmpleado.rol === "Vendedor" && (
-                <div>
-                  <label className="text-xs text-slate-500 font-semibold">Porcentaje de Comisión (%)</label>
-                  <input type="number" placeholder="Ej: 5" value={nuevoEmpleado.comisionPorcentaje} onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, comisionPorcentaje: e.target.value })} className="w-full p-3 border rounded-xl text-sm" required />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-500 font-semibold">Porcentaje de Comisión (%)</label>
+                    <input type="number" placeholder="Ej: 5" value={nuevoEmpleado.comisionPorcentaje} onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, comisionPorcentaje: e.target.value })} className="w-full p-3 border rounded-xl text-sm" required />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 font-semibold">Meta Mensual (RD$)</label>
+                    <input type="number" placeholder="Ej: 150000" value={nuevoEmpleado.metaMensual} onChange={(e) => setNuevoEmpleado({ ...nuevoEmpleado, metaMensual: e.target.value })} className="w-full p-3 border rounded-xl text-sm" />
+                  </div>
                 </div>
               )}
               {nuevoEmpleado.rol === "Colaborador / Empleado" && (
