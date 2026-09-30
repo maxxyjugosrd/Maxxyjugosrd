@@ -118,10 +118,16 @@ export default function NominaPage() {
 
         const totalEntregas = entregasDelDelivery.length;
 
+        // Sumar el costo real de envío de cada pedido asignado al delivery (en lugar de 100 fijo)
+        const totalComisionEnvios = entregasDelDelivery.reduce((acc, ped) => {
+          const costoEnvioReal = Number(ped.costoEnvio) || (ped.zonaEnvio && Number(ped.zonaEnvio.costo)) || 100;
+          return acc + costoEnvioReal;
+        }, 0);
+
         return {
           ...colaborador,
           entregasRealizadas: totalEntregas,
-          comisionAcumulada: totalEntregas * 100,
+          comisionAcumulada: totalComisionEnvios,
           registrosAsociados: entregasDelDelivery
         };
       }
@@ -187,7 +193,6 @@ export default function NominaPage() {
     return String(valor);
   };
 
-  // Lógica para calcular ventas de un vendedor en cualquier mes dado (para las comparativas)
   const calcularVentasMesEspecifico = (nombreVendedor, mesAnio) => {
     const nombreClean = (nombreVendedor || "").trim().toLowerCase();
     const ventasFiltradas = pedidos.filter((v) => {
@@ -217,7 +222,6 @@ export default function NominaPage() {
 
   const mesAnteriorStr = obtenerMesAnterior(mesSeleccionado);
 
-  // Generar ranking de vendedores para el panel de competencias
   const vendedoresList = equipo.filter(c => c.rol === "Vendedor");
   const rankingVendedores = vendedoresList.map((vendedor) => {
     const datosActuales = calcularVentasMesEspecifico(vendedor.nombre, mesSeleccionado);
@@ -242,7 +246,6 @@ export default function NominaPage() {
     };
   }).sort((a, b) => b.ventasActuales - a.ventasActuales);
 
-  // Filtrado de empleados para la lista principal
   const equipoFiltrado = equipo.filter((colaborador) => {
     const nombreMatch = (colaborador.nombre || "").toLowerCase().includes(busqueda.toLowerCase());
     const cedulaMatch = (colaborador.cedula || "").toLowerCase().includes(busqueda.toLowerCase());
@@ -270,17 +273,15 @@ export default function NominaPage() {
           <p className="text-slate-500 text-sm">Cortes automáticos quincenales, auditoría de comisiones por pedidos y recibos oficiales.</p>
         </div>
 
-        {/* Botón para abrir Competencia y Ranking */}
         <button
           onClick={() => setMostrarCompetencia(!mostrarCompetencia)}
           className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black px-5 py-3 rounded-2xl shadow-lg shadow-amber-500/20 flex items-center gap-2.5 transition text-xs uppercase tracking-wider"
         >
           <Trophy className="w-4 h-4 text-slate-950" />
-          <span>{mostrarCompetencia ? "Ocultar Competencia" : "🏆 Ver Competencia y Ranking"}</span>
+          <span>{mostrarCompetencia ? "Ocultar Competencia" : " Ver Competencia y Ranking"}</span>
         </button>
       </div>
 
-      {/* Panel Desplegable de Competencia y KPIs de Vendedores */}
       {mostrarCompetencia && (
         <div className="bg-slate-900 text-white p-6 rounded-3xl border border-slate-800 space-y-6 shadow-xl animate-fadeIn">
           <div className="flex justify-between items-center border-b border-slate-800 pb-4">
@@ -377,7 +378,6 @@ export default function NominaPage() {
         </div>
       )}
 
-      {/* Bloque de Resumen e Info de Nómina */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-2xl flex flex-col justify-between shadow-lg md:col-span-2">
           <div className="flex items-center gap-3">
@@ -403,7 +403,6 @@ export default function NominaPage() {
         </div>
       </div>
 
-      {/* Barra de Búsqueda y Filtros */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
@@ -443,7 +442,6 @@ export default function NominaPage() {
         </div>
       </div>
 
-      {/* Listado de colaboradores filtrados */}
       {equipoFiltrado.length === 0 ? (
         <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center space-y-3">
           <Users className="w-10 h-10 text-slate-300 mx-auto" />
@@ -501,15 +499,20 @@ export default function NominaPage() {
                           {colaborador.registrosAsociados && colaborador.registrosAsociados.length > 0 ? (
                             colaborador.registrosAsociados.map((ped, idx) => {
                               const monto = Number(ped.subtotal) || Number(ped.total) || Number(ped.monto) || 0;
+                              const costoEnvioReal = Number(ped.costoEnvio) || (ped.zonaEnvio && Number(ped.zonaEnvio.costo)) || 100;
                               const clienteStr = formatearTextoSeguro(ped.cliente || ped.nombreCliente || "Cliente");
                               return (
                                 <div key={idx} className="flex justify-between items-center border-b border-slate-800 pb-1.5 pt-1">
                                   <div>
                                     <span className="font-bold text-white block">{clienteStr}</span>
-                                    <span className="text-[10px] text-slate-400">ID: {ped.id ? String(ped.id).slice(-6) : "N/A"}</span>
+                                    <span className="text-[10px] text-slate-400">ID: {ped.id ? String(ped.id).slice(-6) : "N/A"} {ped.zonaEnvio ? `• ${ped.zonaEnvio.nombre}` : ""}</span>
                                   </div>
                                   <div className="text-right">
-                                    {colaborador.rol === "Delivery" ? <span className="font-bold text-amber-400">+ RD$ 100</span> : <span className="font-bold text-emerald-400">RD$ {monto.toLocaleString()}</span>}
+                                    {colaborador.rol === "Delivery" ? (
+                                      <span className="font-bold text-amber-400">+ RD$ {costoEnvioReal.toLocaleString()}</span>
+                                    ) : (
+                                      <span className="font-bold text-emerald-400">RD$ {monto.toLocaleString()}</span>
+                                    )}
                                   </div>
                                 </div>
                               );
@@ -537,7 +540,6 @@ export default function NominaPage() {
         </div>
       )}
 
-      {/* Modal de Comprobante / Recibo de Pago */}
       {reciboSeleccionado && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-3xl p-8 max-w-xl w-full space-y-6 shadow-2xl border my-8">
