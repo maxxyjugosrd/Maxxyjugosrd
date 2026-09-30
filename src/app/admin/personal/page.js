@@ -6,9 +6,10 @@ import { Users, Plus, FileText, DollarSign, Bike, UserCheck, Download, Trash2, E
 export default function PersonalPage() {
   const [equipo, setEquipo] = useState([]);
 
-  // Cargar personal y calcular comisiones automáticas basadas en las ventas guardadas
+ // Cargar personal y calcular comisiones automáticas basadas en las ventas o pedidos guardados
   useEffect(() => {
     const personalGuardado = localStorage.getItem("maxi_personal");
+    // Buscamos tanto en maxi_ventas, maxi_pedidos como en los datos sincronizados del panel
     const ventasGuardadas = localStorage.getItem("maxi_ventas") || localStorage.getItem("maxi_pedidos");
     
     let listaPersonal = [];
@@ -18,21 +19,27 @@ export default function PersonalPage() {
 
     let listaVentas = [];
     if (ventasGuardadas) {
-      listaVentas = JSON.parse(ventasGuardadas);
+      try {
+        listaVentas = JSON.parse(ventasGuardadas);
+      } catch (e) {
+        listaVentas = [];
+      }
     }
 
     // Contabilizar comisiones automáticamente si el rol es Vendedor y hay ventas asociadas
     const equipoConComisionesCalculadas = listaPersonal.map((colaborador) => {
       if (colaborador.rol === "Vendedor" && colaborador.valorConfigurado > 0) {
-        // Buscamos las ventas asociadas a este vendedor (asumiendo que la venta guarda el nombre o id del vendedor)
+        // Filtramos las ventas o pedidos completados del vendedor
         const ventasDelVendedor = listaVentas.filter(
-          (v) => v.vendedor === colaborador.nombre || v.usuario === colaborador.nombre
+          (v) => 
+            (v.vendedor === colaborador.nombre || v.vendedorAsignado === colaborador.nombre || v.usuario === colaborador.nombre) &&
+            (v.estado ? v.estado.toLowerCase() === "completado" : true)
         );
         
         // Sumar el total vendido por este colaborador
-        const totalVendido = ventasDelVendedor.reduce((acc, curr) => acc + (Number(curr.total) || Number(curr.monto) || 0), 0);
+        const totalVendido = ventasDelVendedor.reduce((acc, curr) => acc + (Number(curr.subtotal) || Number(curr.total) || Number(curr.monto) || 0), 0);
         
-        // Calcular la comisión automática (Ej: 5% de las ventas totales)
+        // Calcular la comisión automática basada en el porcentaje configurado
         const comisionCalculada = (totalVendido * colaborador.valorConfigurado) / 100;
 
         return {
