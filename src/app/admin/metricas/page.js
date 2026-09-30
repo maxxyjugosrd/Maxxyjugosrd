@@ -95,14 +95,14 @@ export default function MetricasPage() {
           });
         }
 
-        // Rendimiento de personal
-        const vendedor = pedido.vendedor || pedido.vendedorAsignado;
-        const delivery = pedido.delivery;
+        // Rendimiento de personal (Soporta ambos nombres de campos)
+        const vendedor = pedido.vendedorAsignado || pedido.vendedor;
+        const delivery = pedido.deliveryAsignado || pedido.delivery;
 
         if (vendedor && vendedor !== "Sin Asignar") {
           rendimientoEquipo[vendedor] = (rendimientoEquipo[vendedor] || 0) + 1;
         }
-        if (delivery) {
+        if (delivery && delivery !== "Sin Asignar") {
           rendimientoEquipo[delivery] = (rendimientoEquipo[delivery] || 0) + 1;
         }
       });
@@ -285,7 +285,6 @@ export default function MetricasPage() {
                 ))
               )}
             </div>
-          </div>
         </div>
       </div>
     </div>
