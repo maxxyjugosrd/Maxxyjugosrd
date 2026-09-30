@@ -147,7 +147,7 @@ export default function MetricasPage() {
           personalList.push({
             nombre: p.nombre,
             actividad: 0,
-          tipoStr: p.rol || "personal"
+            tipoStr: p.rol || "personal"
           });
         }
       });
@@ -171,9 +171,9 @@ export default function MetricasPage() {
       </div>
 
       <div className="bg-slate-100 p-3 rounded-xl text-xs text-slate-600 flex justify-between items-center">
-    <span>📊 <b>Sincronizado con Firebase Firestore:</b> {totalPedidosCount} pedido(s) cargados</span>
+        <span>📊 <b>Sincronizado con Firebase Firestore:</b> {totalPedidosCount} pedido(s) cargados</span>
         <span className="text-emerald-600 font-bold">● Conectado correctamente</span>
-    </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
@@ -262,28 +262,29 @@ export default function MetricasPage() {
                 <span>🥤 Reposición Tarde</span>
               </div>
             </div>
-        </div>
+          </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-          <h3 className="font-bold text-slate-800 flex items-center gap-2 border-b pb-3 text-sm">
-            <Award className="w-4 h-4 text-amber-500" /> Rendimiento de Personal
-          </h3>
-          <div className="space-y-3">
-            {topPersonal.length === 0 ? (
-              <p className="text-xs text-slate-400 italic py-2">No hay personal registrado.</p>
-            ) : (
-              topPersonal.map((p, i) => (
-                <div key={i} className="flex justify-between items-center text-xs">
-                  <div>
-                    <p className="font-bold text-slate-800">{p.nombre}</p>
-                    <p className="text-slate-400">{p.tipoStr}</p>
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            <h3 className="font-bold text-slate-800 flex items-center gap-2 border-b pb-3 text-sm">
+              <Award className="w-4 h-4 text-amber-500" /> Rendimiento de Personal
+            </h3>
+            <div className="space-y-3">
+              {topPersonal.length === 0 ? (
+                <p className="text-xs text-slate-400 italic py-2">No hay personal registrado.</p>
+              ) : (
+                topPersonal.map((p, i) => (
+                  <div key={i} className="flex justify-between items-center text-xs">
+                    <div>
+                      <p className="font-bold text-slate-800">{p.nombre}</p>
+                      <p className="text-slate-400">{p.tipoStr}</p>
+                    </div>
+                    <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
+                      {p.actividad} pedidos
+                    </span>
                   </div>
-                  <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
-                    {p.actividad} pedidos
-                  </span>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
         </div>
       </div>
