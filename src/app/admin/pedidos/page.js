@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ShoppingCart, Plus, Minus, Trash2, Send, User, Phone, MapPin, Bike, Loader2, Sparkles, Check, Zap, Users, Truck } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, Send, User, Phone, MapPin, Bike, Loader2, Sparkles, Check, Zap, Users, Truck, UserCheck } from "lucide-react";
 import { crearPedido } from "@/services/pedidosService";
 import { obtenerProductosEnVivo, obtenerIngredientesEnVivo } from "@/services/catalogoService";
+import { obtenerClientesEnVivo } from "@/services/clientesService";
 
 // Listas de Zonas de Envío configuradas
 const ZONAS_ENVIO = [
@@ -29,6 +30,9 @@ export default function PedidosManuales() {
   const [productosDisponibles, setProductosDisponibles] = useState([]);
   const [cargandoProductos, setCargandoProductos] = useState(true);
 
+  // Lista de clientes existentes para autocompletar
+  const [listaClientesCRM, setListaClientesCRM] = useState([]);
+
   // Listas dinámicas de personal (Deliveries y Vendedores)
   const [listaDeliveries, setListaDeliveries] = useState([]);
   const [listaVendedores, setListaVendedores] = useState([]);
@@ -37,11 +41,15 @@ export default function PedidosManuales() {
   const [listaIngredientesVerdes, setListaIngredientesVerdes] = useState([]);
   const [listaIngredientesShots, setListaIngredientesShots] = useState([]);
 
-  // Cargar catálogo, ingredientes y personal al iniciar
+  // Cargar catálogo, ingredientes, clientes y personal al iniciar
   useEffect(() => {
     const desuscribirProductos = obtenerProductosEnVivo((datos) => {
       setProductosDisponibles(datos);
       setCargandoProductos(false);
+    });
+
+    const desuscribirClientes = obtenerClientesEnVivo((datos) => {
+      setListaClientesCRM(datos);
     });
 
     const desuscribirIngredientes = obtenerIngredientesEnVivo((datos) => {
@@ -66,6 +74,7 @@ export default function PedidosManuales() {
 
     return () => {
       desuscribirProductos && desuscribirProductos();
+      desuscribirClientes && desuscribirClientes();
       desuscribirIngredientes && desuscribirIngredientes();
     };
   }, []);
@@ -91,6 +100,29 @@ export default function PedidosManuales() {
   const [modalShotAbierto, setModalShotAbierto] = useState(false);
   const [ingredientesShot, setIngredientesShot] = useState([]);
   const [precioShot] = useState(100);
+
+  // Función para seleccionar un cliente existente del CRM
+  const handleSeleccionarClienteExistente = (e) => {
+    const idClienteSeleccionado = e.target.value;
+    if (!idClienteSeleccionado) {
+      setCliente({ nombre: "", telefono: "", direccion: "" });
+      return;
+    }
+
+    const clienteEncontrado = listaClientesCRM.find((c) => c.idDoc === idClienteSeleccionado || c.id === idClienteSeleccionado);
+    if (clienteEncontrado) {
+      setCliente({
+        nombre: clienteEncontrado.nombre || "",
+        telefono: clienteEncontrado.telefono || "",
+        direccion: clienteEncontrado.direccionFrecuente || ""
+      });
+
+      // Opcional: Si el vendedor asignado está registrado en el CRM, lo autoseleccionamos también
+      if (clienteEncontrado.vendedorAsignado && clienteEncontrado.vendedorAsignado !== "Sin Asignar") {
+        setVendedorAsignado(clienteEncontrado.vendedorAsignado);
+      }
+    }
+  };
 
   const toggleIngredienteVerde = (nombreIng) => {
     if (ingredientesVerdes.includes(nombreIng)) {
@@ -221,7 +253,7 @@ export default function PedidosManuales() {
       costoEnvio,
       total: totalPedido,
       deliveryAsignado: deliveryAsignado || "Sin asignar",
-      vendedorAsignado: vendedorAsignado || "Sin asignar", // <-- Corregido aquí
+      vendedorAsignado: vendedorAsignado || "Sin asignar",
       metodoPago,
       origen: "WhatsApp / Manual",
       estado: "pendiente",
@@ -247,8 +279,8 @@ export default function PedidosManuales() {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Registrar Pedido (WhatsApp / Teléfono) 🥤</h1>
-        <p className="text-slate-500 text-sm">Ingresa ventas manuales con zonas de envío, personal y catálogo en vivo.</p>
+        <h1 className="text-2xl font-bold text-slate-800">Registrar Pedido (WhatsApp / Teléfono) </h1>
+        <p className="text-slate-500 text-sm">Selecciona un cliente del CRM o ingresa uno nuevo con sus zonas y detalles.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -348,6 +380,24 @@ export default function PedidosManuales() {
           </h2>
 
           <div className="space-y-3">
+            {/* Selector de Cliente Existente del CRM */}
+            <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200/60">
+              <label className="text-xs font-semibold text-amber-900 flex items-center gap-1 mb-1">
+                <UserCheck className="w-3.5 h-3.5 text-amber-600" /> Seleccionar Cliente Existente (CRM)
+              </label>
+              <select
+                onChange={handleSeleccionarClienteExistente}
+                className="w-full px-3 py-2 border border-amber-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white text-slate-800"
+              >
+                <option value="">-- O escribir datos manualmente abajo --</option>
+                {listaClientesCRM.map((c) => (
+                  <option key={c.idDoc || c.id} value={c.idDoc || c.id}>
+                    {c.nombre} {c.telefono ? `(${c.telefono})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
                 <User className="w-3.5 h-3.5" /> Nombre del Cliente *
@@ -723,7 +773,7 @@ export default function PedidosManuales() {
                 onClick={() => setModalShotAbierto(false)}
                 className="flex-1 py-2 rounded-xl text-slate-600 bg-slate-100 hover:bg-slate-200 font-medium text-xs"
               >
-                Cancelar la acción
+                Cancelar
               </button>
               <button
                 type="button"
