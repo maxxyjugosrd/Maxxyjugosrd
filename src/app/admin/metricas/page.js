@@ -49,7 +49,7 @@ export default function MetricasPage() {
       let gananciaAnterior = 0;
 
       const conteoJugos = {};
-      const rendimientoEquipo = {};
+      const rendimientoEquipo = {}; // Almacenará { nombre: { count, rol } }
 
       pedidosGuardados.forEach((pedido) => {
         // Manejar fecha de Firestore (puede ser un Timestamp con .toDate() o un número/string)
@@ -95,15 +95,22 @@ export default function MetricasPage() {
           });
         }
 
-        // Rendimiento de personal (Soporta ambos nombres de campos)
+        // Rendimiento diferenciado por rol
         const vendedor = pedido.vendedorAsignado || pedido.vendedor;
         const delivery = pedido.deliveryAsignado || pedido.delivery;
 
         if (vendedor && vendedor !== "Sin Asignar") {
-          rendimientoEquipo[vendedor] = (rendimientoEquipo[vendedor] || 0) + 1;
+          if (!rendimientoEquipo[vendedor]) {
+            rendimientoEquipo[vendedor] = { count: 0, rolStr: "Vendedor(a)" };
+          }
+          rendimientoEquipo[vendedor].count += 1;
         }
+
         if (delivery && delivery !== "Sin Asignar") {
-          rendimientoEquipo[delivery] = (rendimientoEquipo[delivery] || 0) + 1;
+          if (!rendimientoEquipo[delivery]) {
+            rendimientoEquipo[delivery] = { count: 0, rolStr: "Delivery" };
+          }
+          rendimientoEquipo[delivery].count += 1;
         }
       });
 
@@ -137,8 +144,8 @@ export default function MetricasPage() {
         nombresProcesados.add(nombre);
         personalList.push({
           nombre: nombre,
-          actividad: rendimientoEquipo[nombre],
-          tipoStr: "gestiones/pedidos"
+          actividad: rendimientoEquipo[nombre].count,
+          tipoStr: rendimientoEquipo[nombre].rolStr
         });
       });
 
@@ -147,7 +154,7 @@ export default function MetricasPage() {
           personalList.push({
             nombre: p.nombre,
             actividad: 0,
-            tipoStr: p.rol || "personal"
+            tipoStr: p.rol || "Personal"
           });
         }
       });
