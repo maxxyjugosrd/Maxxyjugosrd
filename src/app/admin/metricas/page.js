@@ -21,26 +21,30 @@ export default function MetricasPage() {
   const [difGanancia, setDifGanancia] = useState("0.0");
   const [rankingJugos, setRankingJugos] = useState([]);
   const [topPersonal, setTopPersonal] = useState([]);
-  const [debugInfo, setDebugInfo] = useState({ totalPedidos: 0 });
+  const [debugInfo, setDebugInfo] = useState({ totalPedidos: 0, fuente: "" });
 
   const cargarMetricas = () => {
     try {
-      // 1. Leer directamente de la llave oficial del sistema: "pedidos_maxxy"
+      // Buscar en las llaves posibles del localStorage
       let pedidosGuardados = [];
-      const dataBruta = localStorage.getItem("pedidos_maxxy");
-      
-      if (dataBruta) {
-        try {
-          const parsed = JSON.parse(dataBruta);
-          if (Array.isArray(parsed)) {
-            pedidosGuardados = parsed;
-          }
-        } catch (e) {
-          pedidosGuardados = [];
+      let fuenteUsada = "";
+      const llavesPosibles = ["pedidos_maxxy", "maxxy_pedidos", "pedidos", "maxi_pedidos"];
+
+      for (const llave of llavesPosibles) {
+        const dataBruta = localStorage.getItem(llave);
+        if (dataBruta) {
+          try {
+            const parsed = JSON.parse(dataBruta);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              pedidosGuardados = parsed;
+              fuenteUsada = llave;
+              break;
+            }
+          } catch (e) {}
         }
       }
 
-      setDebugInfo({ totalPedidos: pedidosGuardados.length });
+      setDebugInfo({ totalPedidos: pedidosGuardados.length, fuente: fuenteUsada || "Ninguna" });
 
       // Cargar personal desde su llave oficial
       let personalGuardado = [];
@@ -72,8 +76,7 @@ export default function MetricasPage() {
         const anioP = isNaN(fechaPedido.getTime()) ? anioActual : fechaPedido.getFullYear();
         
         const totalP = Number(pedido.total || pedido.montoTotal || pedido.monto || 0);
-        // Si el pedido tiene ganancia registrada la usamos, sino calculamos la ganancia neta estimada proporcional
-        const gananciaP = Number(pedido.ganancia || (totalP > 0 ? totalP * 0.565 : 0)); // Ajustado al estimado real del dashboard (~1300 de 2300)
+        const gananciaP = Number(pedido.ganancia || (totalP > 0 ? totalP * 0.565 : 0));
 
         if (mesP === mesActualIndex && anioP === anioActual) {
           ventasActual += totalP;
@@ -85,7 +88,6 @@ export default function MetricasPage() {
           gananciaAnterior += gananciaP;
         }
 
-        // Conteo de jugos/productos (leyendo la estructura correcta del POS)
         const items = pedido.items || pedido.productos || [];
         if (Array.isArray(items)) {
           items.forEach((item) => {
@@ -102,7 +104,6 @@ export default function MetricasPage() {
           });
         }
 
-        // Rendimiento de personal por nombres exactos que se registran en el pedido
         const vendedor = pedido.vendedor;
         const delivery = pedido.delivery;
 
@@ -137,11 +138,9 @@ export default function MetricasPage() {
 
       setRankingJugos(rankingOrdenado);
 
-      // Consolidar personal
       const personalList = [];
       const nombresProcesados = new Set();
 
-      // Agregar los que salieron en los pedidos recientes
       Object.keys(rendimientoEquipo).forEach((nombre) => {
         nombresProcesados.add(nombre);
         personalList.push({
@@ -151,7 +150,6 @@ export default function MetricasPage() {
         });
       });
 
-      // Agregar los demás registrados en personal humano con 0 si no tienen actividad este mes
       personalGuardado.forEach((p) => {
         if (!nombresProcesados.has(p.nombre)) {
           personalList.push({
@@ -175,7 +173,6 @@ export default function MetricasPage() {
 
   return (
     <div className="space-y-8">
-      {/* Encabezado con botón de recargar funcional */}
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Métricas & Analítica Visual</h1>
@@ -189,13 +186,11 @@ export default function MetricasPage() {
         </button>
       </div>
 
-      {/* Barra de estado limpia */}
       <div className="bg-slate-100 p-3 rounded-xl text-xs text-slate-600 flex justify-between items-center">
-        <span>📊 <b>Registros sincronizados desde Dashboard:</b> {debugInfo.totalPedidos} pedido(s)</span>
+        <span>📊 <b>Registros sincronizados:</b> {debugInfo.totalPedidos} pedido(s) encontrados en llave: <code className="bg-slate-200 px-1 py-0.5 rounded">{debugInfo.fuente}</code></span>
         <span className="text-emerald-600 font-bold">● Conectado correctamente</span>
       </div>
 
-      {/* Tarjetas Comparativas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
           <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-wider">
@@ -306,7 +301,6 @@ export default function MetricasPage() {
                 ))
               )}
             </div>
-          </div>
         </div>
       </div>
     </div>
