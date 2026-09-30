@@ -444,14 +444,18 @@ export default function AdminDashboard() {
                   pedidoVerDetalles.fecha || pedidoVerDetalles.fechaCreacion
                 )}
               </div>
-             <div className="flex justify-between text-xs py-1 border-b">
-  <span className="text-slate-500 font-medium">Vendedor:</span>
-  <span className="font-bold text-slate-800">{pedidoVerDetalles.vendedor || pedidoVerDetalles.vendedorAsignado || pedidoVerDetalles.Asignado || "Sin Asignar"}</span>
-</div>
-<div className="flex justify-between text-xs py-1 border-b">
-  <span className="text-slate-500 font-medium">Delivery:</span>
-  <span className="font-bold text-slate-800">{pedidoVerDetalles.deliveryAsignado || "No asignado"}</span>
-</div>
+              <div className="flex justify-between text-xs py-1 border-b">
+                <span className="text-slate-500 font-medium">Vendedor:</span>
+                <span className="font-bold text-slate-800">
+                  {pedidoVerDetalles.vendedor || pedidoVerDetalles.vendedorAsignado || pedidoVerDetalles.Asignado || "Sin Asignar"}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs py-1 border-b">
+                <span className="text-slate-500 font-medium">Delivery:</span>
+                <span className="font-bold text-slate-800">
+                  {pedidoVerDetalles.deliveryAsignado || "No asignado"}
+                </span>
+              </div>
               {pedidoVerDetalles.datosEnvio?.fechaEntrega && (
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-emerald-500" />
@@ -497,13 +501,14 @@ export default function AdminDashboard() {
                       pedidoVerDetalles.datosEnvio?.direccion ||
                       "No especificada"}
                   </p>
-                  {pedidoVerDetalles.zonaActual && (
-                    <p className="text-[11px] text-amber-700 font-medium mt-0.5">
-                      Zona:{" "}
-                      {pedidoVerDetalles.zonaActual.nombre ||
-                        pedidoVerDetalles.zonaActual}
-                    </p>
-                  )}
+                  <p className="text-[11px] text-amber-700 font-medium mt-0.5">
+                    Zona:{" "}
+                    {pedidoVerDetalles.zonaEnvio?.nombre ||
+                      pedidoVerDetalles.zonaActual?.nombre ||
+                      pedidoVerDetalles.zonaActual ||
+                      pedidoVerDetalles.zona ||
+                      "No especificada"}
+                  </p>
                 </div>
               </div>
             </div>
@@ -525,11 +530,9 @@ export default function AdminDashboard() {
                         <p className="font-semibold text-slate-800">
                           {item.cantidad || 1}x {item.nombre || item.titulo}
                         </p>
-                        {item.tamano && (
-                          <p className="text-slate-400 text-[11px]">
-                            Tamaño/Presentación: {item.tamano}
-                          </p>
-                        )}
+                        <p className="text-slate-400 text-[11px]">
+                          Tamaño/Presentación: {item.tamano || item.presentacion || item.formato || item.medida || "Estándar"}
+                        </p>
                       </div>
                       <span className="font-medium text-slate-700">
                         RD${" "}
@@ -557,14 +560,12 @@ export default function AdminDashboard() {
                   </span>
                 </div>
               )}
-              {pedidoVerDetalles.envio !== undefined && (
-                <div className="flex justify-between">
-                  <span>Costo de Envío:</span>
-                  <span>
-                    RD$ {Number(pedidoVerDetalles.envio).toLocaleString()}
-                  </span>
-                </div>
-              )}
+              <div className="flex justify-between">
+                <span>Costo de Envío:</span>
+                <span>
+                  RD$ {Number(pedidoVerDetalles.costoEnvio || pedidoVerDetalles.envio || pedidoVerDetalles.zonaEnvio?.costo || 0).toLocaleString()}
+                </span>
+              </div>
               <div className="flex justify-between font-bold text-slate-800 text-sm pt-1 border-t">
                 <span>Total a Pagar:</span>
                 <span className="text-amber-600">
