@@ -10,7 +10,7 @@ export default function NominaPage() {
   const [mostrarDetalleId, setMostrarDetalleId] = useState(null);
   const [reciboSeleccionado, setReciboSeleccionado] = useState(null);
 
-  // Nuevos estados para filtros
+  // Estados para filtros
   const [busqueda, setBusqueda] = useState("");
   const [filtroPosicion, setFiltroPosicion] = useState("Todos");
   
@@ -47,11 +47,31 @@ export default function NominaPage() {
     const equipoConComisionesCalculadas = equipo.map((colaborador) => {
       const nombreColaborador = (colaborador.nombre || "").trim().toLowerCase();
 
+      // Función auxiliar para verificar si una fecha de pedido coincide con el mesSeleccionado (YYYY-MM)
+      const coincideMesSeleccionado = (fechaPedido) => {
+        if (!fechaPedido) return true; // Si no tiene fecha estricta, lo tomamos por defecto
+        let fechaStr = "";
+        if (typeof fechaPedido.toDate === "function") {
+          // Es un Timestamp de Firebase
+          fechaStr = fechaPedido.toDate().toISOString().slice(0, 7);
+        } else if (typeof fechaPedido === "string") {
+          fechaStr = fechaPedido.slice(0, 7);
+        } else if (fechaPedido instanceof Date) {
+          fechaStr = fechaPedido.toISOString().slice(0, 7);
+        }
+        if (!fechaStr) return true;
+        return fechaStr === mesSeleccionado;
+      };
+
       if (colaborador.rol === "Vendedor" && Number(colaborador.valorConfigurado) > 0) {
         const ventasDelVendedor = pedidos.filter((v) => {
           const vendedorPedido = (v.vendedor || v.vendedorAsignado || v.usuario || "").toString().trim().toLowerCase();
           const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
-          return vendedorPedido.includes(nombreColaborador) && estadoPedido === "completado";
+          const fechaPedido = v.fecha || v.creadoEn || v.createdAt;
+
+          return vendedorPedido.includes(nombreColaborador) && 
+                 estadoPedido === "completado" && 
+                 coincideMesSeleccionado(fechaPedido);
         });
         
         const ventasPorCliente = {};
@@ -86,7 +106,11 @@ export default function NominaPage() {
           }
           const deliveryPedido = deliveryBruto.toString().trim().toLowerCase();
           const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
-          return deliveryPedido.includes(nombreColaborador) && estadoPedido === "completado";
+          const fechaPedido = v.fecha || v.creadoEn || v.createdAt;
+
+          return deliveryPedido.includes(nombreColaborador) && 
+                 estadoPedido === "completado" &&
+                 coincideMesSeleccionado(fechaPedido);
         });
 
         const totalEntregas = entregasDelDelivery.length;
@@ -99,7 +123,6 @@ export default function NominaPage() {
         };
       }
 
-      // Si es empleado fijo, aseguramos su sueldo asignado como pendiente si aplica
       if (colaborador.rol === "Colaborador / Empleado") {
         return {
           ...colaborador,
@@ -111,7 +134,7 @@ export default function NominaPage() {
     });
 
     setEquipo(equipoConComisionesCalculadas);
-  }, [pedidos]);
+  }, [pedidos, mesSeleccionado]);
 
   const actualizarYGuardarEquipo = (nuevoEquipo) => {
     setEquipo(nuevoEquipo);
@@ -131,7 +154,7 @@ export default function NominaPage() {
   const infoNomina = obtenerInfoNomina();
 
   const registrarPagoNomina = (colaborador) => {
-    const confirmar = confirm(`¿Confirmas que le has pagado la quincena a ${colaborador.nombre}?\n\nEsto registrará el pago y pondrá su balance pendiente en RD$ 0.`);
+    const confirmar = confirm(`¿Confirmas que le has pagado la quincena a ${colaborador.nombre} para el mes ${mesSeleccionado}?\n\nEsto registrará el pago y pondrá su balance pendiente en RD$ 0.`);
     if (!confirmar) return;
 
     const equipoActualizado = equipo.map((item) => {
@@ -139,7 +162,7 @@ export default function NominaPage() {
         const nuevoHistorial = [
           {
             fecha: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString(),
-            concepto: `Pago Quincenal (${infoNomina.proximoCorte} de ${infoNomina.mesAnio}) [Mes: ${mesSeleccionado}]`,
+            concepto: `Pago Quincenal (${infoNomina.proximoCorte}) [Mes: ${mesSeleccionado}]`,
             monto: item.comisionAcumulada || 0,
           },
           ...(Array.isArray(item.historialDetalle) ? item.historialDetalle : [])
@@ -171,7 +194,6 @@ export default function NominaPage() {
     return coincideTexto && colaborador.rol === filtroPosicion;
   });
 
-  // Cálculo del total de nómina a pagar en base al equipo filtrado o total general
   const totalNominaMes = equipoFiltrado.reduce((acc, curr) => acc + (Number(curr.comisionAcumulada) || 0), 0);
 
   return (
@@ -191,7 +213,6 @@ export default function NominaPage() {
 
       {/* Bloque de Resumen e Info de Nómina */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Alerta de Corte */}
         <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-2xl flex flex-col justify-between shadow-lg md:col-span-2">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-amber-500/20 text-amber-400 rounded-xl">
@@ -205,7 +226,6 @@ export default function NominaPage() {
           </div>
         </div>
 
-        {/* Total a Pagar en el Mes */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-wider">
             <Wallet className="w-4 h-4 text-emerald-600" /> Total Nómina Pendiente
@@ -295,7 +315,7 @@ export default function NominaPage() {
                   </div>
 
                   <div className="border-t border-b py-3 flex justify-between items-center text-sm">
-                    <span className="text-slate-500 font-medium">Total Pendiente:</span>
+                    <span className="text-slate-500 font-medium">Total Pendiente ({mesSeleccionado}):</span>
                     <span className="font-extrabold text-slate-900 text-xl text-emerald-600">RD$ {(colaborador.comisionAcumulada || 0).toLocaleString()}</span>
                   </div>
 
@@ -311,7 +331,7 @@ export default function NominaPage() {
 
                       {estaExpandido && (
                         <div className="mt-3 p-3 bg-slate-900 text-white rounded-xl space-y-2 text-xs max-h-60 overflow-y-auto">
-                          <p className="font-bold text-amber-400 uppercase tracking-wider text-[10px] border-b border-slate-700 pb-1">Pedidos completados asociados:</p>
+                          <p className="font-bold text-amber-400 uppercase tracking-wider text-[10px] border-b border-slate-700 pb-1">Pedidos completados ({mesSeleccionado}):</p>
                           {colaborador.registrosAsociados && colaborador.registrosAsociados.length > 0 ? (
                             colaborador.registrosAsociados.map((ped, idx) => {
                               const monto = Number(ped.subtotal) || Number(ped.total) || Number(ped.monto) || 0;
@@ -329,7 +349,7 @@ export default function NominaPage() {
                               );
                             })
                           ) : (
-                            <p className="text-slate-400 italic text-center py-2">No hay registros completados en este corte.</p>
+                            <p className="text-slate-400 italic text-center py-2">No hay registros completados en este mes.</p>
                           )}
                         </div>
                       )}
@@ -366,7 +386,7 @@ export default function NominaPage() {
                 </div>
                 <div className="text-right text-xs text-slate-500">
                   <p><span className="font-bold">Fecha:</span> {new Date().toLocaleDateString()}</p>
-                  <p><span className="font-bold">Corte:</span> Quincenal ({infoNomina.proximoCorte})</p>
+                  <p><span className="font-bold">Mes Evaluado:</span> {mesSeleccionado}</p>
                 </div>
               </div>
 
@@ -399,7 +419,7 @@ export default function NominaPage() {
               </div>
 
               <div className="bg-slate-900 text-white p-4 rounded-2xl flex justify-between items-center">
-                <span className="font-medium text-sm">Balance Actual Pendiente:</span>
+                <span className="font-medium text-sm">Balance Actual Pendiente ({mesSeleccionado}):</span>
                 <span className="text-xl font-black text-amber-400">RD$ {(reciboSeleccionado.comisionAcumulada || 0).toLocaleString()}</span>
               </div>
 
