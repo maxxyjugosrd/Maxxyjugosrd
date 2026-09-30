@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, DollarSign, Bike, Calendar, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { FileText, DollarSign, Bike, Calendar, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Download, Search, Filter, Users, Wallet } from "lucide-react";
 import { obtenerPedidosEnVivo } from "@/services/pedidosService";
 
 export default function NominaPage() {
@@ -10,12 +10,19 @@ export default function NominaPage() {
   const [mostrarDetalleId, setMostrarDetalleId] = useState(null);
   const [reciboSeleccionado, setReciboSeleccionado] = useState(null);
 
+  // Nuevos estados para filtros
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroPosicion, setFiltroPosicion] = useState("Todos");
+  
+  // Filtro por mes (por defecto el mes actual en formato YYYY-MM)
+  const fechaActualStr = new Date().toISOString().slice(0, 7);
+  const [mesSeleccionado, setMesSeleccionado] = useState(fechaActualStr);
+
   useEffect(() => {
     const personalGuardado = localStorage.getItem("maxi_personal");
     if (personalGuardado) {
       try {
         const parsed = JSON.parse(personalGuardado);
-        // Aseguramos que sea un array válido
         if (Array.isArray(parsed)) {
           setEquipo(parsed);
         }
@@ -92,6 +99,14 @@ export default function NominaPage() {
         };
       }
 
+      // Si es empleado fijo, aseguramos su sueldo asignado como pendiente si aplica
+      if (colaborador.rol === "Colaborador / Empleado") {
+        return {
+          ...colaborador,
+          comisionAcumulada: colaborador.comisionAcumulada !== undefined ? colaborador.comisionAcumulada : (Number(colaborador.valorConfigurado) || 0)
+        };
+      }
+
       return colaborador;
     });
 
@@ -124,7 +139,7 @@ export default function NominaPage() {
         const nuevoHistorial = [
           {
             fecha: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString(),
-            concepto: `Pago Quincenal (${infoNomina.proximoCorte} de ${infoNomina.mesAnio})`,
+            concepto: `Pago Quincenal (${infoNomina.proximoCorte} de ${infoNomina.mesAnio}) [Mes: ${mesSeleccionado}]`,
             monto: item.comisionAcumulada || 0,
           },
           ...(Array.isArray(item.historialDetalle) ? item.historialDetalle : [])
@@ -138,7 +153,6 @@ export default function NominaPage() {
     alert(`¡Pago registrado con éxito! El balance de ${colaborador.nombre} se ha reiniciado a 0.`);
   };
 
-  // Función auxiliar segura para extraer texto de campos que podrían venir como objeto
   const formatearTextoSeguro = (valor) => {
     if (!valor) return "N/D";
     if (typeof valor === "object") {
@@ -146,6 +160,19 @@ export default function NominaPage() {
     }
     return String(valor);
   };
+
+  // Filtrado de empleados por Posición, Nombre o Cédula
+  const equipoFiltrado = equipo.filter((colaborador) => {
+    const nombreMatch = (colaborador.nombre || "").toLowerCase().includes(busqueda.toLowerCase());
+    const cedulaMatch = (colaborador.cedula || "").toLowerCase().includes(busqueda.toLowerCase());
+    const coincideTexto = nombreMatch || cedulaMatch;
+
+    if (filtroPosicion === "Todos") return coincideTexto;
+    return coincideTexto && colaborador.rol === filtroPosicion;
+  });
+
+  // Cálculo del total de nómina a pagar en base al equipo filtrado o total general
+  const totalNominaMes = equipoFiltrado.reduce((acc, curr) => acc + (Number(curr.comisionAcumulada) || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -162,107 +189,167 @@ export default function NominaPage() {
         <p className="text-slate-500 text-sm">Cortes automáticos quincenales, auditoría de comisiones por pedidos y recibos oficiales.</p>
       </div>
 
-      {/* Alerta de Nómina */}
-      <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-lg">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-amber-500/20 text-amber-400 rounded-xl">
-            <Calendar className="w-7 h-7" />
+      {/* Bloque de Resumen e Info de Nómina */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Alerta de Corte */}
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-2xl flex flex-col justify-between shadow-lg md:col-span-2">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-amber-500/20 text-amber-400 rounded-xl">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <div>
+              <span className="text-xs text-amber-400 font-bold uppercase tracking-wider">Próximo Corte Quincenal</span>
+              <h3 className="text-lg font-black">Día {infoNomina.proximoCorte} de {infoNomina.mesAnio}</h3>
+              <p className="text-xs text-slate-300">Faltan aprox. <span className="font-bold text-white">{infoNomina.diasFaltantes} días</span> para realizar los desembolsos.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Total a Pagar en el Mes */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-wider">
+            <Wallet className="w-4 h-4 text-emerald-600" /> Total Nómina Pendiente
           </div>
           <div>
-            <span className="text-xs text-amber-400 font-bold uppercase tracking-wider">Próximo Corte Quincenal</span>
-            <h3 className="text-lg font-black">Día {infoNomina.proximoCorte} de {infoNomina.mesAnio}</h3>
-            <p className="text-xs text-slate-300">Faltan aprox. <span className="font-bold text-white">{infoNomina.diasFaltantes} días</span> para realizar los desembolsos.</p>
+            <h2 className="text-2xl font-black text-slate-900">RD$ {totalNominaMes.toLocaleString()}</h2>
+            <p className="text-[11px] text-slate-400">Filtrado para el mes: {mesSeleccionado}</p>
           </div>
         </div>
-        <div className="bg-white/10 px-4 py-2 rounded-xl text-xs backdrop-blur-sm border border-white/10 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-amber-400" />
-          <span>Sincronizado con Firebase Firestore</span>
+      </div>
+
+      {/* Barra de Búsqueda y Filtros */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
+        <div className="relative w-full md:w-96">
+          <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar por nombre o cédula..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-amber-500"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold px-2">
+            <Filter className="w-3.5 h-3.5" /> Posición:
+          </div>
+          <select
+            value={filtroPosicion}
+            onChange={(e) => setFiltroPosicion(e.target.value)}
+            className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-medium focus:outline-none focus:border-amber-500"
+          >
+            <option value="Todos">Todas las posiciones</option>
+            <option value="Delivery">Delivery</option>
+            <option value="Vendedor">Vendedor</option>
+            <option value="Colaborador / Empleado">Empleado Fijo</option>
+          </select>
+
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold px-2">
+            Mes:
+          </div>
+          <input
+            type="month"
+            value={mesSeleccionado}
+            onChange={(e) => setMesSeleccionado(e.target.value)}
+            className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-medium focus:outline-none focus:border-amber-500"
+          />
         </div>
       </div>
 
-      {/* Listado de colaboradores para auditoría de pagos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {equipo.map((colaborador) => {
-          const estaExpandido = mostrarDetalleId === colaborador.id;
+      {/* Listado de colaboradores filtrados */}
+      {equipoFiltrado.length === 0 ? (
+        <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center space-y-3">
+          <Users className="w-10 h-10 text-slate-300 mx-auto" />
+          <p className="text-slate-500 text-sm font-medium">No se encontraron colaboradores con los filtros seleccionados.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {equipoFiltrado.map((colaborador) => {
+            const estaExpandido = mostrarDetalleId === colaborador.id;
 
-          return (
-            <div key={colaborador.id} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
-              <div className="space-y-4">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-slate-100 rounded-xl text-slate-700">
-                      {colaborador.rol === "Delivery" ? <Bike className="w-6 h-6 text-amber-600" /> : colaborador.rol === "Vendedor" ? <DollarSign className="w-6 h-6 text-emerald-600" /> : <FileText className="w-6 h-6 text-slate-700" />}
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-800 text-base">{formatearTextoSeguro(colaborador.nombre)}</h3>
-                      <span className="text-xs bg-slate-100 px-2 py-0.5 rounded-md font-semibold text-slate-600">{formatearTextoSeguro(colaborador.rol)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-xs space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <p><span className="font-semibold text-slate-600">Banco:</span> {colaborador.banco ? `${formatearTextoSeguro(colaborador.banco)} (${formatearTextoSeguro(colaborador.tipoCuenta)}) - ${formatearTextoSeguro(colaborador.numeroCuenta)}` : "Sin cuenta bancaria registrada"}</p>
-                  <div className="pt-1 border-t mt-1 flex justify-between">
-                    <span className="text-slate-400">Modalidad:</span>
-                    <span className="font-bold text-slate-700">{formatearTextoSeguro(colaborador.tipoPago)}</span>
-                  </div>
-                </div>
-
-                <div className="border-t border-b py-3 flex justify-between items-center text-sm">
-                  <span className="text-slate-500 font-medium">Total Pendiente:</span>
-                  <span className="font-extrabold text-slate-900 text-xl text-emerald-600">RD$ {colaborador.comisionAcumulada || 0}</span>
-                </div>
-
-                {(colaborador.rol === "Delivery" || colaborador.rol === "Vendedor") && (
-                  <div>
-                    <button
-                      onClick={() => setMostrarDetalleId(estaExpandido ? null : colaborador.id)}
-                      className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition"
-                    >
-                      <span>{estaExpandido ? "Ocultar desglose" : `Auditar cuentas (${colaborador.rol === "Delivery" ? `${colaborador.entregasRealizadas || 0} entregas` : `RD$ ${colaborador.totalVentasPeriodo || 0} ventas`})`}</span>
-                      {estaExpandido ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </button>
-
-                    {estaExpandido && (
-                      <div className="mt-3 p-3 bg-slate-900 text-white rounded-xl space-y-2 text-xs max-h-60 overflow-y-auto">
-                        <p className="font-bold text-amber-400 uppercase tracking-wider text-[10px] border-b border-slate-700 pb-1">Pedidos completados asociados:</p>
-                        {colaborador.registrosAsociados && colaborador.registrosAsociados.length > 0 ? (
-                          colaborador.registrosAsociados.map((ped, idx) => {
-                            const monto = Number(ped.subtotal) || Number(ped.total) || Number(ped.monto) || 0;
-                            const clienteStr = formatearTextoSeguro(ped.cliente || ped.nombreCliente || "Cliente");
-                            return (
-                              <div key={idx} className="flex justify-between items-center border-b border-slate-800 pb-1.5 pt-1">
-                                <div>
-                                  <span className="font-bold text-white block">{clienteStr}</span>
-                                  <span className="text-[10px] text-slate-400">ID: {ped.id ? String(ped.id).slice(-6) : "N/A"}</span>
-                                </div>
-                                <div className="text-right">
-                                  {colaborador.rol === "Delivery" ? <span className="font-bold text-amber-400">+ RD$ 100</span> : <span className="font-bold text-emerald-400">RD$ {monto}</span>}
-                                </div>
-                              </div>
-                            );
-                          })
-                        ) : (
-                          <p className="text-slate-400 italic text-center py-2">No hay registros completados en este corte.</p>
-                        )}
+            return (
+              <div key={colaborador.id} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 bg-slate-100 rounded-xl text-slate-700">
+                        {colaborador.rol === "Delivery" ? <Bike className="w-6 h-6 text-amber-600" /> : colaborador.rol === "Vendedor" ? <DollarSign className="w-6 h-6 text-emerald-600" /> : <FileText className="w-6 h-6 text-slate-700" />}
                       </div>
-                    )}
+                      <div>
+                        <h3 className="font-bold text-slate-800 text-base">{formatearTextoSeguro(colaborador.nombre)}</h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs bg-slate-100 px-2 py-0.5 rounded-md font-semibold text-slate-600">{formatearTextoSeguro(colaborador.rol)}</span>
+                          <span className="text-[11px] text-slate-400">Cédula: {formatearTextoSeguro(colaborador.cedula)}</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
 
-              <div className="space-y-2 pt-2 border-t">
-                <button onClick={() => registrarPagoNomina(colaborador)} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 transition">
-                  <CheckCircle2 className="w-4 h-4" /> Registrar Pago Quincenal (Poner en 0)
-                </button>
-                <button onClick={() => setReciboSeleccionado(colaborador)} className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 transition">
-                  <FileText className="w-4 h-4 text-amber-400" /> Ver Comprobante Impreso
-                </button>
+                  <div className="text-xs space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <p><span className="font-semibold text-slate-600">Banco:</span> {colaborador.banco ? `${formatearTextoSeguro(colaborador.banco)} (${formatearTextoSeguro(colaborador.tipoCuenta)}) - ${formatearTextoSeguro(colaborador.numeroCuenta)}` : "Sin cuenta bancaria registrada"}</p>
+                    <div className="pt-1 border-t mt-1 flex justify-between">
+                      <span className="text-slate-400">Modalidad:</span>
+                      <span className="font-bold text-slate-700">{formatearTextoSeguro(colaborador.tipoPago)}</span>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-b py-3 flex justify-between items-center text-sm">
+                    <span className="text-slate-500 font-medium">Total Pendiente:</span>
+                    <span className="font-extrabold text-slate-900 text-xl text-emerald-600">RD$ {(colaborador.comisionAcumulada || 0).toLocaleString()}</span>
+                  </div>
+
+                  {(colaborador.rol === "Delivery" || colaborador.rol === "Vendedor") && (
+                    <div>
+                      <button
+                        onClick={() => setMostrarDetalleId(estaExpandido ? null : colaborador.id)}
+                        className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition"
+                      >
+                        <span>{estaExpandido ? "Ocultar desglose" : `Auditar cuentas (${colaborador.rol === "Delivery" ? `${colaborador.entregasRealizadas || 0} entregas` : `RD$ ${(colaborador.totalVentasPeriodo || 0).toLocaleString()} ventas`})`}</span>
+                        {estaExpandido ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+
+                      {estaExpandido && (
+                        <div className="mt-3 p-3 bg-slate-900 text-white rounded-xl space-y-2 text-xs max-h-60 overflow-y-auto">
+                          <p className="font-bold text-amber-400 uppercase tracking-wider text-[10px] border-b border-slate-700 pb-1">Pedidos completados asociados:</p>
+                          {colaborador.registrosAsociados && colaborador.registrosAsociados.length > 0 ? (
+                            colaborador.registrosAsociados.map((ped, idx) => {
+                              const monto = Number(ped.subtotal) || Number(ped.total) || Number(ped.monto) || 0;
+                              const clienteStr = formatearTextoSeguro(ped.cliente || ped.nombreCliente || "Cliente");
+                              return (
+                                <div key={idx} className="flex justify-between items-center border-b border-slate-800 pb-1.5 pt-1">
+                                  <div>
+                                    <span className="font-bold text-white block">{clienteStr}</span>
+                                    <span className="text-[10px] text-slate-400">ID: {ped.id ? String(ped.id).slice(-6) : "N/A"}</span>
+                                  </div>
+                                  <div className="text-right">
+                                    {colaborador.rol === "Delivery" ? <span className="font-bold text-amber-400">+ RD$ 100</span> : <span className="font-bold text-emerald-400">RD$ {monto.toLocaleString()}</span>}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <p className="text-slate-400 italic text-center py-2">No hay registros completados en este corte.</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 pt-2 border-t">
+                  <button onClick={() => registrarPagoNomina(colaborador)} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 transition">
+                    <CheckCircle2 className="w-4 h-4" /> Registrar Pago Quincenal (Poner en 0)
+                  </button>
+                  <button onClick={() => setReciboSeleccionado(colaborador)} className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 transition">
+                    <FileText className="w-4 h-4 text-amber-400" /> Ver Comprobante Impreso
+                  </button>
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Modal de Comprobante / Recibo de Pago */}
       {reciboSeleccionado && (
@@ -301,7 +388,7 @@ export default function NominaPage() {
                     <tbody>
                       {Array.isArray(reciboSeleccionado.historialDetalle) && reciboSeleccionado.historialDetalle.length > 0 ? (
                         reciboSeleccionado.historialDetalle.map((h, i) => (
-                          <tr key={i} className="border-b"><td className="p-3">{formatearTextoSeguro(h.concepto)}<br/><span className="text-[10px] text-slate-400">{formatearTextoSeguro(h.fecha)}</span></td><td className="p-3 text-right font-bold">RD$ {h.monto || 0}</td></tr>
+                          <tr key={i} className="border-b"><td className="p-3">{formatearTextoSeguro(h.concepto)}<br/><span className="text-[10px] text-slate-400">{formatearTextoSeguro(h.fecha)}</span></td><td className="p-3 text-right font-bold">RD$ {(h.monto || 0).toLocaleString()}</td></tr>
                         ))
                       ) : (
                         <tr><td colSpan="2" className="p-4 text-center text-slate-400 italic">No hay pagos anteriores registrados.</td></tr>
@@ -313,7 +400,7 @@ export default function NominaPage() {
 
               <div className="bg-slate-900 text-white p-4 rounded-2xl flex justify-between items-center">
                 <span className="font-medium text-sm">Balance Actual Pendiente:</span>
-                <span className="text-xl font-black text-amber-400">RD$ {reciboSeleccionado.comisionAcumulada || 0}</span>
+                <span className="text-xl font-black text-amber-400">RD$ {(reciboSeleccionado.comisionAcumulada || 0).toLocaleString()}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-8 pt-8 text-center text-xs text-slate-600">
