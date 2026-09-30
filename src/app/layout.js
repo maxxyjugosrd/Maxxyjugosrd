@@ -1,7 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Maxi Jugos",
+  title: "Maxxy Jugos",
   description: "Panel de control y tienda de Maxi Jugos",
 };
 
