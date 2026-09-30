@@ -35,15 +35,29 @@ export default function PersonalPage() {
     const equipoConComisionesCalculadas = equipo.map((colaborador) => {
       const nombreColaborador = (colaborador.nombre || "").trim().toLowerCase();
 
-      // Si es Vendedor, calculamos su porcentaje sobre los pedidos completados
+      // Si es Vendedor, calculamos su porcentaje agrupando ventas de pedidos completados (coherente con CRM)
       if (colaborador.rol === "Vendedor" && colaborador.valorConfigurado > 0) {
+        // 1. Filtrar solo pedidos completados asignados a este vendedor
         const ventasDelVendedor = pedidos.filter((v) => {
           const vendedorPedido = (v.vendedor || v.vendedorAsignado || v.usuario || "").trim().toLowerCase();
           const estadoPedido = (v.estado || "").toLowerCase();
           return vendedorPedido.includes(nombreColaborador) && estadoPedido === "completado";
         });
         
-        const totalVendido = ventasDelVendedor.reduce((acc, curr) => acc + (Number(curr.subtotal) || Number(curr.total) || Number(curr.monto) || 0), 0);
+        // 2. Agrupar por cliente para mantener idéntica fuente de verdad que el expediente del CRM
+        const ventasPorCliente = {};
+        ventasDelVendedor.forEach((pedido) => {
+          const clienteKey = (pedido.cliente || pedido.nombreCliente || pedido.telefonoCliente || "cliente_general").trim().toLowerCase();
+          const montoPedido = Number(pedido.subtotal) || Number(pedido.total) || Number(pedido.monto) || 0;
+
+          if (!ventasPorCliente[clienteKey]) {
+            ventasPorCliente[clienteKey] = 0;
+          }
+          ventasPorCliente[clienteKey] += montoPedido;
+        });
+
+        // 3. Sumar el total consolidado de las ventas del periodo
+        const totalVendido = Object.values(ventasPorCliente).reduce((acc, curr) => acc + curr, 0);
         const comisionCalculada = (totalVendido * Number(colaborador.valorConfigurado)) / 100;
 
         return {
