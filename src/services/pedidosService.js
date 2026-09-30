@@ -19,22 +19,13 @@ const COLECCION_CLIENTES = "clientes";
 
 /**
  * Guarda un nuevo pedido (Web o POS WhatsApp) en Firebase Firestore 
- * y gestiona automáticamente el perfil e historial del cliente.
+ * y gestiona automáticamente el perfil, historial y herencia de vendedor del cliente.
  */
 export const crearPedido = async (datosPedido) => {
   try {
     console.log("📥 Datos completos recibidos al crear pedido:", datosPedido);
 
-    // 1. Guardar el pedido en la colección 'pedidos'
-    const docRef = await addDoc(collection(db, COLECCION_PEDIDOS), {
-      ...datosPedido,
-      estado: datosPedido.estado || "Pendiente",
-      fecha: serverTimestamp(),
-    });
-
-    console.log("✅ Pedido guardado en 'pedidos' con ID:", docRef.id);
-
-    // 2. Gestionar automáticamente el cliente en la colección 'clientes' (Blindado para cualquier estructura)
+    // 1. Detectar datos clave del cliente
     const telefonoCliente = 
       datosPedido.cliente?.telefono || 
       datosPedido.telefono || 
@@ -50,6 +41,36 @@ export const crearPedido = async (datosPedido) => {
     console.log("📞 Teléfono detectado para el CRM:", telefonoCliente);
     console.log("👤 Nombre detectado para el CRM:", nombreCliente);
 
+    // 2. HERENCIA AUTOMÁTICA DE VENDEDOR
+    // Si el pedido no trae un vendedor explícito, revisamos si el cliente ya tiene uno asignado en el CRM.
+    let vendedorHeredado = datosPedido.vendedor || datosPedido.vendedorAsignado || "";
+
+    if (telefonoCliente && telefonoCliente !== "Sin teléfono" && String(telefonoCliente).trim() !== "") {
+      const clientesRef = collection(db, COLECCION_CLIENTES);
+      const qCliente = query(clientesRef, where("telefono", "==", String(telefonoCliente).trim()));
+      const querySnapshotCliente = await getDocs(qCliente);
+
+      if (!querySnapshotCliente.empty) {
+        const datosC = querySnapshotCliente.docs[0].data();
+        if ((!vendedorHeredado || vendedorHeredado === "Sin Asignar") && datosC.vendedorAsignado && datosC.vendedorAsignado !== "Sin Asignar") {
+          vendedorHeredado = datosC.vendedorAsignado;
+          console.log("🤝 Vendedor heredado automáticamente del cliente existente:", vendedorHeredado);
+        }
+      }
+    }
+
+    // 3. Guardar el pedido en la colección 'pedidos' con el vendedor asignado/heredado
+    const docRef = await addDoc(collection(db, COLECCION_PEDIDOS), {
+      ...datosPedido,
+      vendedor: vendedorHeredado || "Sin Asignar",
+      vendedorAsignado: vendedorHeredado || "Sin Asignar",
+      estado: datosPedido.estado || "Pendiente",
+      fecha: serverTimestamp(),
+    });
+
+    console.log("✅ Pedido guardado en 'pedidos' con ID:", docRef.id);
+
+    // 4. Gestionar automáticamente el cliente en la colección 'clientes'
     if (telefonoCliente && telefonoCliente !== "Sin teléfono" && String(telefonoCliente).trim() !== "") {
       const clientesRef = collection(db, COLECCION_CLIENTES);
       const q = query(clientesRef, where("telefono", "==", String(telefonoCliente).trim()));
@@ -64,13 +85,20 @@ export const crearPedido = async (datosPedido) => {
       };
 
       if (!querySnapshot.empty) {
-        // El cliente ya existe -> Actualizamos su historial y métricas
+        // El cliente ya existe -> Actualizamos su historial, métricas y aseguramos su vendedor
         const docCliente = querySnapshot.docs[0];
         const clienteData = docCliente.data();
         const historialActual = clienteData.historialCompras || [];
 
+        // Mantener el vendedor actual del cliente a menos que tuviera "Sin Asignar" y ahora se le haya asignado uno
+        const vendedorFinalCliente = 
+          (!clienteData.vendedorAsignado || clienteData.vendedorAsignado === "Sin Asignar") && vendedorHeredado 
+            ? vendedorHeredado 
+            : (clienteData.vendedorAsignado || "Sin Asignar");
+
         await updateDoc(doc(db, COLECCION_CLIENTES, docCliente.id), {
           nombre: nombreCliente !== "Cliente sin nombre" ? nombreCliente : clienteData.nombre,
+          vendedorAsignado: vendedorFinalCliente,
           ultimaCompra: serverTimestamp(),
           totalGastado: Number(clienteData.totalGastado || 0) + Number(datosPedido.total || 0),
           cantidadPedidos: (clienteData.cantidadPedidos || 0) + 1,
@@ -84,6 +112,7 @@ export const crearPedido = async (datosPedido) => {
           nombre: nombreCliente,
           telefono: String(telefonoCliente).trim(),
           direccionFrecuente: datosPedido.direccion || "",
+          vendedorAsignado: vendedorHeredado || "Sin Asignar",
           primeraCompra: serverTimestamp(),
           ultimaCompra: serverTimestamp(),
           totalGastado: Number(datosPedido.total || 0),
