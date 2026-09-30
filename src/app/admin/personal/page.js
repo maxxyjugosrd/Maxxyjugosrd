@@ -2,40 +2,42 @@
 
 import { useState, useEffect } from "react";
 import { Users, Plus, FileText, DollarSign, Bike, UserCheck, Download, Trash2, Edit, CreditCard, Calendar, AlertCircle, CheckCircle2 } from "lucide-react";
+import { obtenerPedidosEnVivo } from "@/services/pedidosService";
 
 export default function PersonalPage() {
   const [equipo, setEquipo] = useState([]);
+  const [pedidos, setPedidos] = useState([]);
 
-  // Cargar personal y calcular comisiones automáticas basadas en las ventas o pedidos guardados
+  // Cargar personal desde localStorage al iniciar
   useEffect(() => {
     const personalGuardado = localStorage.getItem("maxi_personal");
-    const ventasGuardadas = localStorage.getItem("maxi_ventas") || localStorage.getItem("maxi_pedidos");
-    
-    let listaPersonal = [];
     if (personalGuardado) {
       try {
-        listaPersonal = JSON.parse(personalGuardado);
+        setEquipo(JSON.parse(personalGuardado));
       } catch (e) {
-        listaPersonal = [];
+        setEquipo([]);
       }
     }
+  }, []);
 
-    let listaVentas = [];
-    if (ventasGuardadas) {
-      try {
-        listaVentas = JSON.parse(ventasGuardadas);
-      } catch (e) {
-        listaVentas = [];
-      }
-    }
+  // Escuchar los pedidos en tiempo real desde Firebase Firestore
+  useEffect(() => {
+    const unsubscribe = obtenerPedidosEnVivo((pedidosFirestore) => {
+      setPedidos(pedidosFirestore);
+    });
+    return () => unsubscribe();
+  }, []);
 
-    // Contabilizar comisiones y entregas automáticamente
-    const equipoConComisionesCalculadas = listaPersonal.map((colaborador) => {
+  // Calcular comisiones y entregas cada vez que cambien el equipo o los pedidos de Firebase
+  useEffect(() => {
+    if (equipo.length === 0) return;
+
+    const equipoConComisionesCalculadas = equipo.map((colaborador) => {
       const nombreColaborador = (colaborador.nombre || "").trim().toLowerCase();
 
       // Si es Vendedor, calculamos su porcentaje sobre los pedidos completados
       if (colaborador.rol === "Vendedor" && colaborador.valorConfigurado > 0) {
-        const ventasDelVendedor = listaVentas.filter((v) => {
+        const ventasDelVendedor = pedidos.filter((v) => {
           const vendedorPedido = (v.vendedor || v.vendedorAsignado || v.usuario || "").trim().toLowerCase();
           const estadoPedido = (v.estado || "").toLowerCase();
           return vendedorPedido.includes(nombreColaborador) && estadoPedido === "completado";
@@ -46,14 +48,14 @@ export default function PersonalPage() {
 
         return {
           ...colaborador,
-          comisionAcumulada: comisionCalculada || colaborador.comisionAcumulada || 0,
+          comisionAcumulada: comisionCalculada || 0,
           totalVentasPeriodo: totalVendido
         };
       }
 
       // Si es Delivery, calculamos las entregas realizadas en pedidos completados
       if (colaborador.rol === "Delivery") {
-        const entregasDelDelivery = listaVentas.filter((v) => {
+        const entregasDelDelivery = pedidos.filter((v) => {
           const deliveryPedido = (v.deliveryAsignado || v.delivery || "").trim().toLowerCase();
           const estadoPedido = (v.estado || "").toLowerCase();
           return deliveryPedido.includes(nombreColaborador) && estadoPedido === "completado";
@@ -64,17 +66,18 @@ export default function PersonalPage() {
         return {
           ...colaborador,
           entregasRealizadas: totalEntregas,
-          comisionAcumulada: totalEntregas * 100 // O el costo por carrera que tenga configurado
+          comisionAcumulada: totalEntregas * 100 // Costo estándar por carrera si aplica
         };
       }
 
       return colaborador;
     });
 
+    // Solo actualizamos si hay diferencias reales para evitar bucles
     setEquipo(equipoConComisionesCalculadas);
-  }, []);
+  }, [pedidos]);
 
-  // Función auxiliar para actualizar el estado y guardarlo automáticamente
+  // Función auxiliar para actualizar el estado y guardarlo en localStorage
   const actualizarYGuardarEquipo = (nuevoEquipo) => {
     setEquipo(nuevoEquipo);
     localStorage.setItem("maxi_personal", JSON.stringify(nuevoEquipo));
@@ -309,7 +312,7 @@ export default function PersonalPage() {
         </div>
         <div className="bg-white/10 px-4 py-2 rounded-xl text-xs backdrop-blur-sm border border-white/10 flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-amber-400" />
-          <span>Cálculo automático de comisiones por ventas activo</span>
+          <span>Sincronizado en tiempo real con Firebase Firestore</span>
         </div>
       </div>
 
