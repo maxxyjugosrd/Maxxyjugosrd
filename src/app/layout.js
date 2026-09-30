@@ -2,7 +2,7 @@ import "./globals.css";
 
 export const metadata = {
   title: "Maxxy Jugos",
-  description: "Panel de control y tienda de Maxi Jugos",
+  description: "Panel de control y tienda de Maxxy Jugos",
 };
 
 export default function RootLayout({ children }) {
