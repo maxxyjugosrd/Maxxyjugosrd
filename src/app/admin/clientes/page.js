@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, Plus, Search, Phone, Mail, MapPin, UserCheck, Trash2, Edit, Eye, ShoppingBag, Calendar, Clock, DollarSign, X } from "lucide-react";
+import { Users, Plus, Search, Phone, Mail, MapPin, UserCheck, Trash2, Edit, Eye, ShoppingBag, Calendar, X } from "lucide-react";
 import { obtenerClientesEnVivo, crearClienteManual, eliminarCliente } from "@/services/clientesService";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -112,7 +112,6 @@ export default function ClientesPage() {
     }
   };
 
-  // Funciones de cálculo para métricas del cliente
   const calcularPromedioGasto = (cliente) => {
     const total = Number(cliente.totalGastado) || 0;
     const cantidad = Number(cliente.cantidadPedidos) || 0;
@@ -189,7 +188,6 @@ export default function ClientesPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
-                    {/* Botón Ojito para ver Historial */}
                     <button 
                       onClick={() => setClienteSeleccionadoHistorial(cliente)}
                       className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
@@ -222,7 +220,7 @@ export default function ClientesPage() {
 
                   <div className="bg-slate-50 p-2.5 rounded-xl border mt-2 space-y-1">
                     <div className="flex justify-between">
-                      <span className="text-slate-500">Pedidos realizados:</span>
+                      <span className="text-slate-500">Pedidos completados:</span>
                       <span className="font-bold text-slate-800">{cliente.cantidadPedidos || 0}</span>
                     </div>
                     <div className="flex justify-between">
@@ -253,17 +251,22 @@ export default function ClientesPage() {
         </div>
       )}
 
-      {/* Modal / Vista de Historial Detallado del Cliente (Ojito) */}
+      {/* Modal / Vista de Expediente Completo del Cliente (Ojito) */}
       {clienteSeleccionadoHistorial && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-2xl w-full space-y-6 shadow-2xl border my-8">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-2xl w-full space-y-6 shadow-2xl border my-8 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start border-b pb-4">
               <div>
                 <span className="text-xs bg-amber-100 text-amber-800 font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
-                  Expediente de Cliente
+                  Expediente Completo del Cliente
                 </span>
                 <h2 className="text-2xl font-black text-slate-900 mt-1">{clienteSeleccionadoHistorial.nombre}</h2>
-                <p className="text-xs text-slate-500">Tel: {clienteSeleccionadoHistorial.telefono} | Vendedor: <span className="font-bold text-slate-700">{clienteSeleccionadoHistorial.vendedorAsignado || "Sin Asignar"}</span></p>
+                <div className="text-xs text-slate-600 space-y-1 mt-1">
+                  <p>📞 <strong>Teléfono:</strong> {clienteSeleccionadoHistorial.telefono || "No registrado"}</p>
+                  <p>📧 <strong>Correo:</strong> {clienteSeleccionadoHistorial.email || "No registrado"}</p>
+                  <p>📍 <strong>Dirección Principal:</strong> {clienteSeleccionadoHistorial.direccionFrecuente || clienteSeleccionadoHistorial.direccion || "No registrada"}</p>
+                  <p>👤 <strong>Vendedor Asignado:</strong> <span className="font-bold text-slate-800">{clienteSeleccionadoHistorial.vendedorAsignado || "Sin Asignar"}</span></p>
+                </div>
               </div>
               <button 
                 onClick={() => setClienteSeleccionadoHistorial(null)}
@@ -284,7 +287,7 @@ export default function ClientesPage() {
                 <span className="text-base font-black text-slate-900">RD$ {calcularPromedioGasto(clienteSeleccionadoHistorial).toLocaleString()}</span>
               </div>
               <div className="bg-slate-50 p-3 rounded-2xl border">
-                <span className="text-[11px] text-slate-400 block font-semibold uppercase">Cant. Pedidos</span>
+                <span className="text-[11px] text-slate-400 block font-semibold uppercase">Pedidos Completados</span>
                 <span className="text-base font-black text-amber-600">{clienteSeleccionadoHistorial.cantidadPedidos || 0}</span>
               </div>
             </div>
@@ -292,7 +295,7 @@ export default function ClientesPage() {
             {/* Listado de compras anteriores */}
             <div className="space-y-3">
               <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                <ShoppingBag className="w-4 h-4 text-amber-500" /> Historial de Órdenes y Productos Frecuentes
+                <ShoppingBag className="w-4 h-4 text-amber-500" /> Historial de Órdenes y Zonas de Envío
               </h3>
               
               <div className="max-h-72 overflow-y-auto space-y-3 pr-1">
@@ -321,8 +324,10 @@ export default function ClientesPage() {
                           <p className="text-slate-400 italic">Detalle de productos no especificado en esta orden.</p>
                         )}
                       </div>
-                      <div className="text-[11px] text-slate-400 pt-1 flex justify-between">
-                        <span>Zona de envío: <strong className="text-slate-600">{compra.zonaEnvio || "Local"}</strong></span>
+
+                      <div className="text-[11px] text-slate-600 pt-1 border-t flex flex-col gap-0.5">
+                        <span>🚚 <strong>Zona de envío / Dirección de entrega:</strong> {compra.zonaEnvio || compra.direccionEnvio || clienteSeleccionadoHistorial.direccionFrecuente || "Local"}</span>
+                        <span>📋 <strong>Estado de la orden:</strong> <span className="font-semibold text-amber-600">{compra.estado || "Completado"}</span></span>
                       </div>
                     </div>
                   ))
