@@ -2,12 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { 
-  BarChart3, 
   TrendingUp, 
   TrendingDown, 
   Clock, 
   Flame, 
-  Users, 
   Award,
   Calendar,
   RefreshCw
@@ -23,37 +21,53 @@ export default function MetricasPage() {
   const [difGanancia, setDifGanancia] = useState("0.0");
   const [rankingJugos, setRankingJugos] = useState([]);
   const [topPersonal, setTopPersonal] = useState([]);
-  const [debugKeys, setDebugKeys] = useState([]);
+  const [debugInfo, setDebugInfo] = useState({ keys: [], totalPedidosEncontrados: 0 });
 
   const cargarMetricas = () => {
     try {
-      // 1. Diagnóstico de llaves disponibles en localStorage
+      // 1. Revisar absolutamente todas las llaves del localStorage del navegador
       const keysEnStorage = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        keysEnStorage.push(localStorage.key(i));
-      }
-      setDebugKeys(keysEnStorage);
+      let pedidosEncontrados = [];
 
-      // 2. Intentar buscar los pedidos en cualquier llave común posible
-      let pedidosGuardados = [];
-      const posiblesLlaves = ["maxi_pedidos", "maxxy_pedidos", "pedidos", "maxxy_ventas", "maxi_ventas", "ventas"];
-      
-      for (const llave of posiblesLlaves) {
-        const data = localStorage.getItem(llave);
-        if (data) {
-          try {
-            const parsed = JSON.parse(data);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              pedidosGuardados = parsed;
-              break;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        keysEnStorage.push(key);
+        
+        // Intentar parsear cualquier llave que parezca contener datos de pedidos o ventas
+        try {
+          const rawValue = localStorage.getItem(key);
+          const parsed = JSON.parse(rawValue);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            // Verificar si los objetos parecen órdenes/pedidos (tienen total, items, fecha, cliente, etc.)
+            const primerItem = parsed[0];
+            if (
+              primerItem && 
+              (primerItem.total !== undefined || primerItem.monto !== undefined || primerItem.items || primerItem.productos || primerItem.id)
+            ) {
+              pedidosEncontrados = parsed;
             }
-          } catch (err) {
-            // continuar buscando si falla el parse
           }
+        } catch (err) {
+          // Si no es JSON válido, ignorar
         }
       }
 
-      const personalGuardado = JSON.parse(localStorage.getItem("maxi_personal") || localStorage.getItem("maxxy_personal") || "[]");
+      setDebugInfo({
+        keys: keysEnStorage,
+        totalPedidosEncontrados: pedidosEncontrados.length
+      });
+
+      // Cargar personal de cualquier llave disponible
+      let personalGuardado = [];
+      try {
+        personalGuardado = JSON.parse(
+          localStorage.getItem("maxi_personal") || 
+          localStorage.getItem("maxxy_personal") || 
+          localStorage.getItem("personal") || "[]"
+        );
+      } catch (e) {
+        personalGuardado = [];
+      }
 
       const ahora = new Date();
       const mesActualIndex = ahora.getMonth();
@@ -70,17 +84,19 @@ export default function MetricasPage() {
       const conteoJugos = {};
       const rendimientoEquipo = {};
 
-      pedidosGuardados.forEach((pedido) => {
-        // Intentar leer la fecha del pedido con varios nombres de campo posibles
-        const fechaStr = pedido.fecha || pedido.createdAt || pedido.date || Date.now();
+      pedidosEncontrados.forEach((pedido) => {
+        // Extraer fecha con múltiples alternativas
+        const fechaStr = pedido.fecha || pedido.createdAt || pedido.date || pedido.fechaCreacion || Date.now();
         const fechaPedido = new Date(fechaStr);
-        const mesP = fechaPedido.getMonth();
-        const anioP = fechaPedido.getFullYear();
+        const mesP = isNaN(fechaPedido.getTime()) ? mesActualIndex : fechaPedido.getMonth();
+        const anioP = isNaN(fechaPedido.getTime()) ? anioActual : fechaPedido.getFullYear();
         
-        const totalP = Number(pedido.total || pedido.montoTotal || pedido.monto || 0);
-        const gananciaP = Number(pedido.ganancia || totalP * 0.55); // Estimación del 55% si no existe campo
+        // Extraer total con múltiples alternativas
+        const totalP = Number(pedido.total || pedido.montoTotal || pedido.monto || pedido.subtotal || 0);
+        // Si hay una ganancia explícita la usamos, sino estimamos el 55%
+        const gananciaP = Number(pedido.ganancia || totalP * 0.55);
 
-        // Filtrar por Mes Actual vs Mes Anterior
+        // Filtrar mes actual vs mes anterior
         if (mesP === mesActualIndex && anioP === anioActual) {
           ventasActual += totalP;
           pedidosActual += 1;
@@ -91,12 +107,12 @@ export default function MetricasPage() {
           gananciaAnterior += gananciaP;
         }
 
-        // Conteo de productos / jugos (soportando varios formatos de items)
-        const items = pedido.items || pedido.productos || [];
+        // Extraer items / productos con múltiples alternativas
+        const items = pedido.items || pedido.productos || pedido.cart || [];
         if (Array.isArray(items)) {
           items.forEach((item) => {
-            const nombreJugo = item.nombre || item.producto || item.titulo || "Jugo Natural";
-            const cant = Number(item.cantidad || item.qty || 1);
+            const nombreJugo = item.nombre || item.producto || item.titulo || item.name || "Jugo Natural";
+            const cant = Number(item.cantidad || item.qty || item.quantity || 1);
             const precioItem = Number(item.precio || item.price || 0);
             const subtotal = precioItem > 0 ? precioItem * cant : Number(item.subtotal || 0);
 
@@ -104,12 +120,12 @@ export default function MetricasPage() {
               conteoJugos[nombreJugo] = { unidades: 0, total: 0 };
             }
             conteoJugos[nombreJugo].unidades += cant;
-            conteoJugos[nombreJugo].total += subtotal;
+            conteoJugos[nombreJugo].total += (subtotal > 0 ? subtotal : precioItem * cant);
           });
         }
 
-        // Rendimiento de personal
-        const personaAsignada = pedido.vendedor || pedido.delivery || pedido.empleado;
+        // Extraer personal asignado
+        const personaAsignada = pedido.vendedor || pedido.delivery || pedido.empleado || pedido.responsable;
         if (personaAsignada) {
           if (!rendimientoEquipo[personaAsignada]) {
             rendimientoEquipo[personaAsignada] = 0;
@@ -147,9 +163,22 @@ export default function MetricasPage() {
           nombre: p.nombre,
           rol: p.rol,
           actividad: stats,
-          tipoStr: p.rol === "Delivery" ? "envíos" : "ventas"
+          tipoStr: p.rol && p.rol.toLowerCase().includes("delivery") ? "envíos" : "ventas/gestiones"
         };
       });
+
+      // Si hay personal en los pedidos que no está en la lista guardada, agregarlos también
+      Object.keys(rendimientoEquipo).forEach((nombrePersona) => {
+        if (!personalList.some(p => p.nombre === nombrePersona)) {
+          personalList.push({
+            nombre: nombrePersona,
+            rol: "Personal Asignado",
+            actividad: rendimientoEquipo[nombrePersona],
+            tipoStr: "gestiones"
+          });
+        }
+      });
+
       setTopPersonal(personalList);
 
     } catch (e) {
@@ -177,10 +206,10 @@ export default function MetricasPage() {
         </button>
       </div>
 
-      {/* Panel de Diagnóstico Oculto/Informativo si gustas verificar */}
-      <div className="bg-slate-100 p-3 rounded-xl text-xs text-slate-500 flex flex-wrap gap-2 items-center">
-        <span className="font-bold text-slate-700">Llaves detectadas en navegador:</span>
-        {debugKeys.length === 0 ? "Ninguna" : debugKeys.join(", ")}
+      {/* Barra de diagnóstico para confirmar lectura */}
+      <div className="bg-slate-100 p-3 rounded-xl text-xs text-slate-600 flex flex-wrap justify-between items-center gap-2">
+        <span>📊 <b>Pedidos detectados en navegador:</b> {debugInfo.totalPedidosEncontrados} registros</span>
+        <span className="text-slate-400 text-[11px]">Llaves: {debugInfo.keys.join(", ")}</span>
       </div>
 
       {/* Tarjetas Comparativas */}
@@ -243,7 +272,7 @@ export default function MetricasPage() {
 
           <div className="space-y-4">
             {rankingJugos.length === 0 ? (
-              <p className="text-xs text-slate-400 italic py-4">No se encontraron productos registrados en los pedidos actuales. Verifica que tus pedidos guarden la estructura de items.</p>
+              <p className="text-xs text-slate-400 italic py-4">No se encontraron productos registrados en los pedidos actuales.</p>
             ) : (
               rankingJugos.map((jugo, i) => (
                 <div key={i} className="space-y-1">
@@ -286,7 +315,7 @@ export default function MetricasPage() {
             </h3>
             <div className="space-y-3">
               {topPersonal.length === 0 ? (
-                <p className="text-xs text-slate-400 italic py-2">No hay personal registrado.</p>
+                <p className="text-xs text-slate-400 italic py-2">No hay personal registrado en los pedidos.</p>
               ) : (
                 topPersonal.map((p, i) => (
                   <div key={i} className="flex justify-between items-center text-xs">
