@@ -39,15 +39,19 @@ export default function PersonalPage() {
       if (colaborador.rol === "Vendedor" && colaborador.valorConfigurado > 0) {
         // 1. Filtrar solo pedidos completados asignados a este vendedor
         const ventasDelVendedor = pedidos.filter((v) => {
-          const vendedorPedido = (v.vendedor || v.vendedorAsignado || v.usuario || "").trim().toLowerCase();
-          const estadoPedido = (v.estado || "").toLowerCase();
+          const vendedorPedido = (v.vendedor || v.vendedorAsignado || v.usuario || "").toString().trim().toLowerCase();
+          const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
           return vendedorPedido.includes(nombreColaborador) && estadoPedido === "completado";
         });
         
         // 2. Agrupar por cliente para mantener idéntica fuente de verdad que el expediente del CRM
         const ventasPorCliente = {};
         ventasDelVendedor.forEach((pedido) => {
-          const clienteKey = (pedido.cliente || pedido.nombreCliente || pedido.telefonoCliente || "cliente_general").trim().toLowerCase();
+          let clienteBruto = pedido.cliente || pedido.nombreCliente || pedido.telefonoCliente || "cliente_general";
+          if (typeof clienteBruto === "object" && clienteBruto !== null) {
+            clienteBruto = clienteBruto.nombre || clienteBruto.nombreCliente || clienteBruto.telefono || "cliente_general";
+          }
+          const clienteKey = clienteBruto.toString().trim().toLowerCase();
           const montoPedido = Number(pedido.subtotal) || Number(pedido.total) || Number(pedido.monto) || 0;
 
           if (!ventasPorCliente[clienteKey]) {
@@ -70,8 +74,12 @@ export default function PersonalPage() {
       // Si es Delivery, calculamos las entregas realizadas en pedidos completados
       if (colaborador.rol === "Delivery") {
         const entregasDelDelivery = pedidos.filter((v) => {
-          const deliveryPedido = (v.deliveryAsignado || v.delivery || "").trim().toLowerCase();
-          const estadoPedido = (v.estado || "").toLowerCase();
+          let deliveryBruto = v.deliveryAsignado || v.delivery || "";
+          if (typeof deliveryBruto === "object" && deliveryBruto !== null) {
+            deliveryBruto = deliveryBruto.nombre || "";
+          }
+          const deliveryPedido = deliveryBruto.toString().trim().toLowerCase();
+          const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
           return deliveryPedido.includes(nombreColaborador) && estadoPedido === "completado";
         });
 
@@ -87,7 +95,6 @@ export default function PersonalPage() {
       return colaborador;
     });
 
-    // Solo actualizamos si hay diferencias reales para evitar bucles
     setEquipo(equipoConComisionesCalculadas);
   }, [pedidos]);
 
