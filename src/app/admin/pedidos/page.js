@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ShoppingCart, Plus, Minus, Trash2, Send, User, Phone, MapPin, Bike, Loader2, Sparkles, Check, Zap, Users, Truck, UserCheck } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, Send, User, Phone, MapPin, Bike, Loader2, Sparkles, Check, Zap, Users, Truck, UserCheck, Calendar } from "lucide-react";
 import { crearPedido } from "@/services/pedidosService";
 import { obtenerProductosEnVivo, obtenerIngredientesEnVivo } from "@/services/catalogoService";
 import { obtenerClientesEnVivo } from "@/services/clientesService";
@@ -86,6 +86,9 @@ export default function PedidosManuales() {
   const [vendedorAsignado, setVendedorAsignado] = useState("");
   const [metodoPago, setMetodoPago] = useState("Efectivo");
   
+  // Estado para Fecha de Entrega (por defecto la fecha actual en formato YYYY-MM-DD)
+  const [fechaEntrega, setFechaEntrega] = useState(() => new Date().toISOString().split("T")[0]);
+  
   // Estados de Envío
   const [zonaSeleccionadaId, setZonaSeleccionadaId] = useState("");
   const [tipoCostoCamion, setTipoCostoCamion] = useState("costoNormal"); // "costoNormal" o "costoFrio"
@@ -117,7 +120,6 @@ export default function PedidosManuales() {
         direccion: clienteEncontrado.direccionFrecuente || ""
       });
 
-      // Opcional: Si el vendedor asignado está registrado en el CRM, lo autoseleccionamos también
       if (clienteEncontrado.vendedorAsignado && clienteEncontrado.vendedorAsignado !== "Sin Asignar") {
         setVendedorAsignado(clienteEncontrado.vendedorAsignado);
       }
@@ -255,6 +257,7 @@ export default function PedidosManuales() {
       deliveryAsignado: deliveryAsignado || "Sin asignar",
       vendedorAsignado: vendedorAsignado || "Sin asignar",
       metodoPago,
+      fechaEntrega: fechaEntrega || new Date().toISOString().split("T")[0],
       origen: "WhatsApp / Manual",
       estado: "pendiente",
       fechaCreacion: Date.now(),
@@ -279,7 +282,7 @@ export default function PedidosManuales() {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Registrar Pedido (WhatsApp / Teléfono) </h1>
+        <h1 className="text-2xl font-bold text-slate-800">Registrar Pedido (WhatsApp / Teléfono)</h1>
         <p className="text-slate-500 text-sm">Selecciona un cliente del CRM o ingresa uno nuevo con sus zonas y detalles.</p>
       </div>
 
@@ -433,6 +436,19 @@ export default function PedidosManuales() {
                 value={cliente.direccion}
                 onChange={(e) => setCliente({ ...cliente, direccion: e.target.value })}
                 className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+            {/* Campo Nuevo: Fecha de Entrega */}
+            <div>
+              <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
+                <Calendar className="w-3.5 h-3.5 text-amber-600" /> Fecha de Entrega *
+              </label>
+              <input
+                type="date"
+                required
+                value={fechaEntrega}
+                onChange={(e) => setFechaEntrega(e.target.value)}
+                className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
               />
             </div>
           </div>
