@@ -221,7 +221,7 @@ export default function PedidosManuales() {
       costoEnvio,
       total: totalPedido,
       deliveryAsignado: deliveryAsignado || "Sin asignar",
-      Asignado: Asignado || "Sin asignar",
+      vendedorAsignado: vendedorAsignado || "Sin asignar", // <-- Corregido aquí
       metodoPago,
       origen: "WhatsApp / Manual",
       estado: "pendiente",
