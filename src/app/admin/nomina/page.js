@@ -14,7 +14,11 @@ export default function NominaPage() {
     const personalGuardado = localStorage.getItem("maxi_personal");
     if (personalGuardado) {
       try {
-        setEquipo(JSON.parse(personalGuardado));
+        const parsed = JSON.parse(personalGuardado);
+        // Aseguramos que sea un array válido
+        if (Array.isArray(parsed)) {
+          setEquipo(parsed);
+        }
       } catch (e) {
         setEquipo([]);
       }
@@ -23,7 +27,9 @@ export default function NominaPage() {
 
   useEffect(() => {
     const unsubscribe = obtenerPedidosEnVivo((pedidosFirestore) => {
-      setPedidos(pedidosFirestore);
+      if (Array.isArray(pedidosFirestore)) {
+        setPedidos(pedidosFirestore);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -34,7 +40,7 @@ export default function NominaPage() {
     const equipoConComisionesCalculadas = equipo.map((colaborador) => {
       const nombreColaborador = (colaborador.nombre || "").trim().toLowerCase();
 
-      if (colaborador.rol === "Vendedor" && colaborador.valorConfigurado > 0) {
+      if (colaborador.rol === "Vendedor" && Number(colaborador.valorConfigurado) > 0) {
         const ventasDelVendedor = pedidos.filter((v) => {
           const vendedorPedido = (v.vendedor || v.vendedorAsignado || v.usuario || "").toString().trim().toLowerCase();
           const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
@@ -119,9 +125,9 @@ export default function NominaPage() {
           {
             fecha: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString(),
             concepto: `Pago Quincenal (${infoNomina.proximoCorte} de ${infoNomina.mesAnio})`,
-            monto: item.comisionAcumulada,
+            monto: item.comisionAcumulada || 0,
           },
-          ...(item.historialDetalle || [])
+          ...(Array.isArray(item.historialDetalle) ? item.historialDetalle : [])
         ];
         return { ...item, comisionAcumulada: 0, historialDetalle: nuevoHistorial };
       }
@@ -130,6 +136,15 @@ export default function NominaPage() {
 
     actualizarYGuardarEquipo(equipoActualizado);
     alert(`¡Pago registrado con éxito! El balance de ${colaborador.nombre} se ha reiniciado a 0.`);
+  };
+
+  // Función auxiliar segura para extraer texto de campos que podrían venir como objeto
+  const formatearTextoSeguro = (valor) => {
+    if (!valor) return "N/D";
+    if (typeof valor === "object") {
+      return valor.nombre || valor.telefono || JSON.stringify(valor);
+    }
+    return String(valor);
   };
 
   return (
@@ -179,17 +194,17 @@ export default function NominaPage() {
                       {colaborador.rol === "Delivery" ? <Bike className="w-6 h-6 text-amber-600" /> : colaborador.rol === "Vendedor" ? <DollarSign className="w-6 h-6 text-emerald-600" /> : <FileText className="w-6 h-6 text-slate-700" />}
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800 text-base">{colaborador.nombre}</h3>
-                      <span className="text-xs bg-slate-100 px-2 py-0.5 rounded-md font-semibold text-slate-600">{colaborador.rol}</span>
+                      <h3 className="font-bold text-slate-800 text-base">{formatearTextoSeguro(colaborador.nombre)}</h3>
+                      <span className="text-xs bg-slate-100 px-2 py-0.5 rounded-md font-semibold text-slate-600">{formatearTextoSeguro(colaborador.rol)}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="text-xs space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <p><span className="font-semibold text-slate-600">Banco:</span> {colaborador.banco ? `${colaborador.banco} (${colaborador.tipoCuenta}) - ${colaborador.numeroCuenta}` : "Sin cuenta bancaria registrada"}</p>
+                  <p><span className="font-semibold text-slate-600">Banco:</span> {colaborador.banco ? `${formatearTextoSeguro(colaborador.banco)} (${formatearTextoSeguro(colaborador.tipoCuenta)}) - ${formatearTextoSeguro(colaborador.numeroCuenta)}` : "Sin cuenta bancaria registrada"}</p>
                   <div className="pt-1 border-t mt-1 flex justify-between">
                     <span className="text-slate-400">Modalidad:</span>
-                    <span className="font-bold text-slate-700">{colaborador.tipoPago}</span>
+                    <span className="font-bold text-slate-700">{formatearTextoSeguro(colaborador.tipoPago)}</span>
                   </div>
                 </div>
 
@@ -214,12 +229,12 @@ export default function NominaPage() {
                         {colaborador.registrosAsociados && colaborador.registrosAsociados.length > 0 ? (
                           colaborador.registrosAsociados.map((ped, idx) => {
                             const monto = Number(ped.subtotal) || Number(ped.total) || Number(ped.monto) || 0;
-                            const cliente = ped.cliente || ped.nombreCliente || "Cliente";
+                            const clienteStr = formatearTextoSeguro(ped.cliente || ped.nombreCliente || "Cliente");
                             return (
                               <div key={idx} className="flex justify-between items-center border-b border-slate-800 pb-1.5 pt-1">
                                 <div>
-                                  <span className="font-bold text-white block">{cliente}</span>
-                                  <span className="text-[10px] text-slate-400">ID: {ped.id?.slice(-6)}</span>
+                                  <span className="font-bold text-white block">{clienteStr}</span>
+                                  <span className="text-[10px] text-slate-400">ID: {ped.id ? String(ped.id).slice(-6) : "N/A"}</span>
                                 </div>
                                 <div className="text-right">
                                   {colaborador.rol === "Delivery" ? <span className="font-bold text-amber-400">+ RD$ 100</span> : <span className="font-bold text-emerald-400">RD$ {monto}</span>}
@@ -269,11 +284,11 @@ export default function NominaPage() {
               </div>
 
               <div className="bg-slate-50 p-4 rounded-2xl grid grid-cols-2 gap-4 text-xs">
-                <div><span className="text-slate-400 block">Colaborador:</span><span className="font-bold text-slate-800 text-sm">{reciboSeleccionado.nombre}</span></div>
-                <div><span className="text-slate-400 block">Cargo / Rol:</span><span className="font-bold text-slate-800 text-sm">{reciboSeleccionado.rol}</span></div>
-                <div><span className="text-slate-400 block">Cédula:</span><span className="font-bold text-slate-800">{reciboSeleccionado.cedula || "N/D"}</span></div>
-                <div><span className="text-slate-400 block">Teléfono:</span><span className="font-bold text-slate-800">{reciboSeleccionado.telefono || "N/D"}</span></div>
-                <div className="col-span-2 border-t pt-2"><span className="text-slate-400 block">Datos Bancarios:</span><span className="font-bold text-slate-800">{reciboSeleccionado.banco ? `${reciboSeleccionado.banco} - Cuenta de ${reciboSeleccionado.tipoCuenta}: ${reciboSeleccionado.numeroCuenta}` : "Efectivo"}</span></div>
+                <div><span className="text-slate-400 block">Colaborador:</span><span className="font-bold text-slate-800 text-sm">{formatearTextoSeguro(reciboSeleccionado.nombre)}</span></div>
+                <div><span className="text-slate-400 block">Cargo / Rol:</span><span className="font-bold text-slate-800 text-sm">{formatearTextoSeguro(reciboSeleccionado.rol)}</span></div>
+                <div><span className="text-slate-400 block">Cédula:</span><span className="font-bold text-slate-800">{formatearTextoSeguro(reciboSeleccionado.cedula)}</span></div>
+                <div><span className="text-slate-400 block">Teléfono:</span><span className="font-bold text-slate-800">{formatearTextoSeguro(reciboSeleccionado.telefono)}</span></div>
+                <div className="col-span-2 border-t pt-2"><span className="text-slate-400 block">Datos Bancarios:</span><span className="font-bold text-slate-800">{reciboSeleccionado.banco ? `${formatearTextoSeguro(reciboSeleccionado.banco)} - Cuenta de ${formatearTextoSeguro(reciboSeleccionado.tipoCuenta)}: ${formatearTextoSeguro(reciboSeleccionado.numeroCuenta)}` : "Efectivo"}</span></div>
               </div>
 
               <div className="space-y-2">
@@ -284,9 +299,9 @@ export default function NominaPage() {
                       <tr className="bg-slate-100 text-slate-600 border-b"><th className="p-3">Concepto</th><th className="p-3 text-right">Monto</th></tr>
                     </thead>
                     <tbody>
-                      {reciboSeleccionado.historialDetalle?.length > 0 ? (
+                      {Array.isArray(reciboSeleccionado.historialDetalle) && reciboSeleccionado.historialDetalle.length > 0 ? (
                         reciboSeleccionado.historialDetalle.map((h, i) => (
-                          <tr key={i} className="border-b"><td className="p-3">{h.concepto}<br/><span className="text-[10px] text-slate-400">{h.fecha}</span></td><td className="p-3 text-right font-bold">RD$ {h.monto}</td></tr>
+                          <tr key={i} className="border-b"><td className="p-3">{formatearTextoSeguro(h.concepto)}<br/><span className="text-[10px] text-slate-400">{formatearTextoSeguro(h.fecha)}</span></td><td className="p-3 text-right font-bold">RD$ {h.monto || 0}</td></tr>
                         ))
                       ) : (
                         <tr><td colSpan="2" className="p-4 text-center text-slate-400 italic">No hay pagos anteriores registrados.</td></tr>
