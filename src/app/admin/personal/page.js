@@ -6,15 +6,18 @@ import { Users, Plus, FileText, DollarSign, Bike, UserCheck, Download, Trash2, E
 export default function PersonalPage() {
   const [equipo, setEquipo] = useState([]);
 
- // Cargar personal y calcular comisiones automáticas basadas en las ventas o pedidos guardados
+  // Cargar personal y calcular comisiones automáticas basadas en las ventas o pedidos guardados
   useEffect(() => {
     const personalGuardado = localStorage.getItem("maxi_personal");
-    // Buscamos tanto en maxi_ventas, maxi_pedidos como en los datos sincronizados del panel
     const ventasGuardadas = localStorage.getItem("maxi_ventas") || localStorage.getItem("maxi_pedidos");
     
     let listaPersonal = [];
     if (personalGuardado) {
-      listaPersonal = JSON.parse(personalGuardado);
+      try {
+        listaPersonal = JSON.parse(personalGuardado);
+      } catch (e) {
+        listaPersonal = [];
+      }
     }
 
     let listaVentas = [];
@@ -26,21 +29,20 @@ export default function PersonalPage() {
       }
     }
 
-    // Contabilizar comisiones automáticamente si el rol es Vendedor y hay ventas asociadas
+    // Contabilizar comisiones y entregas automáticamente
     const equipoConComisionesCalculadas = listaPersonal.map((colaborador) => {
+      const nombreColaborador = (colaborador.nombre || "").trim().toLowerCase();
+
+      // Si es Vendedor, calculamos su porcentaje sobre los pedidos completados
       if (colaborador.rol === "Vendedor" && colaborador.valorConfigurado > 0) {
-        // Filtramos las ventas o pedidos completados del vendedor
-        const ventasDelVendedor = listaVentas.filter(
-          (v) => 
-            (v.vendedor === colaborador.nombre || v.vendedorAsignado === colaborador.nombre || v.usuario === colaborador.nombre) &&
-            (v.estado ? v.estado.toLowerCase() === "completado" : true)
-        );
+        const ventasDelVendedor = listaVentas.filter((v) => {
+          const vendedorPedido = (v.vendedor || v.vendedorAsignado || v.usuario || "").trim().toLowerCase();
+          const estadoPedido = (v.estado || "").toLowerCase();
+          return vendedorPedido.includes(nombreColaborador) && estadoPedido === "completado";
+        });
         
-        // Sumar el total vendido por este colaborador
         const totalVendido = ventasDelVendedor.reduce((acc, curr) => acc + (Number(curr.subtotal) || Number(curr.total) || Number(curr.monto) || 0), 0);
-        
-        // Calcular la comisión automática basada en el porcentaje configurado
-        const comisionCalculada = (totalVendido * colaborador.valorConfigurado) / 100;
+        const comisionCalculada = (totalVendido * Number(colaborador.valorConfigurado)) / 100;
 
         return {
           ...colaborador,
@@ -48,6 +50,24 @@ export default function PersonalPage() {
           totalVentasPeriodo: totalVendido
         };
       }
+
+      // Si es Delivery, calculamos las entregas realizadas en pedidos completados
+      if (colaborador.rol === "Delivery") {
+        const entregasDelDelivery = listaVentas.filter((v) => {
+          const deliveryPedido = (v.deliveryAsignado || v.delivery || "").trim().toLowerCase();
+          const estadoPedido = (v.estado || "").toLowerCase();
+          return deliveryPedido.includes(nombreColaborador) && estadoPedido === "completado";
+        });
+
+        const totalEntregas = entregasDelDelivery.length;
+
+        return {
+          ...colaborador,
+          entregasRealizadas: totalEntregas,
+          comisionAcumulada: totalEntregas * 100 // O el costo por carrera que tenga configurado
+        };
+      }
+
       return colaborador;
     });
 
@@ -187,7 +207,7 @@ export default function PersonalPage() {
           numeroCuenta: nuevoEmpleado.numeroCuenta,
           tipoPago: tipoPago,
           valorConfigurado: valorAsignado,
-          comisionAcumulada: valorAsignado > 0 && nuevoEmpleado.rol === "Colaborador / Empleado" ? valorAsignado / 2 : 0, 
+          comisionAcumulada: 0,
           historialDetalle: [],
         },
       ];
@@ -358,12 +378,17 @@ export default function PersonalPage() {
                       Ventas del período: RD$ {colaborador.totalVentasPeriodo || 0}
                     </p>
                   )}
+                  {colaborador.rol === "Delivery" && (
+                    <p className="text-[11px] text-amber-600 font-medium pt-1">
+                      Entregas realizadas: {colaborador.entregasRealizadas || 0}
+                    </p>
+                  )}
                 </div>
 
                 {/* Monto Acumulado */}
                 <div className="border-t border-b py-3 flex justify-between items-center text-sm">
                   <span className="text-slate-500 font-medium">Pendiente de Pago:</span>
-                  <span className="font-extrabold text-slate-900 text-lg">RD$ {colaborador.comisionAcumulada}</span>
+                  <span className="font-extrabold text-slate-900 text-lg">RD$ {colaborador.comisionAcumulada || 0}</span>
                 </div>
               </div>
 
@@ -462,7 +487,7 @@ export default function PersonalPage() {
 
               <div className="bg-slate-900 text-white p-4 rounded-2xl flex justify-between items-center">
                 <span className="font-medium text-sm">Balance Actual Pendiente:</span>
-                <span className="text-xl font-black text-amber-400">RD$ {reciboSeleccionado.comisionAcumulada}</span>
+                <span className="text-xl font-black text-amber-400">RD$ {reciboSeleccionado.comisionAcumulada || 0}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-8 pt-8 text-center text-xs text-slate-600">
