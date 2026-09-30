@@ -44,7 +44,7 @@ export default function AdminLayout({ children }) {
           <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
             <span className="text-3xl">🥤</span>
             <div>
-              <h2 className="font-black tracking-wider text-amber-500 text-lg">MAXI JUGOS</h2>
+              <h2 className="font-black tracking-wider text-amber-500 text-lg">MAXXY JUGOS</h2>
               <p className="text-xs text-slate-400">Panel de Control</p>
             </div>
           </div>
