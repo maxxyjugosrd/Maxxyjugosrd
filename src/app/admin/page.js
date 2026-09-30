@@ -66,13 +66,58 @@ export default function AdminDashboard() {
     };
   }, []);
 
-  // Función para actualizar el estado del pedido en Firestore
+  // Función para actualizar el estado del pedido en Firestore y contabilizar comisiones/entregas solo al completar
   const cambiarEstadoPedido = async (idPedidoDoc, nuevoEstado) => {
     if (!idPedidoDoc) return;
     setActualizandoId(idPedidoDoc);
     try {
+      // Encontrar el pedido actual en la lista para verificar su estado anterior
+      const pedidoActual = pedidos.find(p => (p.idDoc || p.id) === idPedidoDoc);
+      const estadoAnterior = pedidoActual?.estado || "Pendiente";
+
       const pedidoRef = doc(db, "pedidos", idPedidoDoc);
       await updateDoc(pedidoRef, { estado: nuevoEstado });
+
+      // OJO: Solo contabilizar si el nuevo estado es "Completado" y antes NO estaba completado
+      if (nuevoEstado.toLowerCase() === "completado" && estadoAnterior.toLowerCase() !== "completado") {
+        const personalGuardado = localStorage.getItem("maxi_personal");
+        if (personalGuardado && pedidoActual) {
+          try {
+            let personalArr = JSON.parse(personalGuardado);
+            const vendedorAsignado = pedidoActual.vendedor || pedidoActual.vendedorAsignado || pedidoActual.Asignado;
+            const deliveryAsignado = pedidoActual.deliveryAsignado;
+            const subtotalVenta = Number(pedidoActual.subtotal || pedidoActual.total || 0);
+
+            personalArr = personalArr.map((persona) => {
+              // Si coincide con el vendedor y tiene rol de Vendedor
+              if (persona.rol === "Vendedor" && persona.nombre === vendedorAsignado) {
+                const porcentaje = Number(persona.valorConfigurado || 0);
+                const comisionGanada = (subtotalVenta * porcentaje) / 100;
+                return {
+                  ...persona,
+                  ventasTotales: (persona.ventasTotales || 0) + subtotalVenta,
+                  comisionesAcumuladas: (persona.comisionesAcumuladas || 0) + comisionGanada,
+                };
+              }
+
+              // Si coincide con el delivery y tiene rol de Delivery
+              if (persona.rol === "Delivery" && persona.nombre === deliveryAsignado) {
+                return {
+                  ...persona,
+                  entregasRealizadas: (persona.entregasRealizadas || 0) + 1,
+                };
+              }
+
+              return persona;
+            });
+
+            localStorage.setItem("maxi_personal", JSON.stringify(personalArr));
+            console.log("¡Comisiones y entregas actualizadas con éxito en el personal!");
+          } catch (e) {
+            console.error("Error al actualizar la nómina del personal:", e);
+          }
+        }
+      }
     } catch (error) {
       console.error("Error al actualizar estado del pedido:", error);
       alert("No se pudo actualizar el estado. Inténtalo nuevamente.");
