@@ -49,7 +49,6 @@ export const crearClienteManual = async (datosCliente) => {
   try {
     const clientesRef = collection(db, COLECCION_CLIENTES);
     
-    // Verificar si ya existe por teléfono
     if (datosCliente.telefono) {
       const q = query(clientesRef, where("telefono", "==", datosCliente.telefono.trim()));
       const querySnapshot = await getDocs(q);
@@ -81,29 +80,60 @@ export const crearClienteManual = async (datosCliente) => {
 
 /**
  * Sincroniza o registra automáticamente un cliente cuando se procesa o actualiza un pedido.
- * Recalcula automáticamente el total gastado basándose puramente en los pedidos "Completado" o "Entregado".
+ * Captura de forma flexible cualquier formato de nombre, dirección, municipio, zona y camión frío.
  */
 export const sincronizarClientePorPedido = async (datosPedido) => {
   try {
-    const {
-      idPedido, // ID único de la orden (opcional pero recomendado para evitar duplicados en el historial)
-      nombreCliente,
-      telefonoCliente,
-      emailCliente,
-      direccionEnvio,
-      zonaEnvio,
-      totalPedido,
-      productos,
-      estadoPedido, // "Pendiente", "Completado", "Entregado", "Cancelado"
-      vendedorAsignado
-    } = datosPedido;
+    // Capturamos con compatibilidad total para cualquier nombre de propiedad que envíe tu app
+    const idPedido = datosPedido.idPedido || datosPedido.id || Date.now().toString();
+    
+    const nombreCliente = 
+      datosPedido.nombreCliente || 
+      datosPedido.cliente || 
+      datosPedido.nombre || 
+      datosPedido.comprador || 
+      "Cliente Sin Nombre";
+
+    const telefonoCliente = 
+      datosPedido.telefonoCliente || 
+      datosPedido.telefono || 
+      datosPedido.celular || 
+      "";
+
+    const emailCliente = 
+      datosPedido.emailCliente || 
+      datosPedido.email || 
+      datosPedido.correo || 
+      "";
+
+    // Unificamos dirección, municipio, zona y tipo de envío (Camión frío, etc.)
+    const direccionBase = datosPedido.direccionEnvio || datosPedido.direccion || datosPedido.calle || "";
+    const municipio = datosPedido.municipio || datosPedido.ciudad || datosPedido.provincia || "";
+    const zona = datosPedido.zonaEnvio || datosPedido.zona || "";
+    const transporte = datosPedido.metodoEnvio || datosPedido.transporte || datosPedido.tipoEnvio || "";
+
+    // Construimos una dirección completa y detallada para el CRM
+    let direccionCompletaParts = [];
+    if (direccionBase) direccionCompletaParts.push(direccionBase);
+    if (municipio) direccionCompletaParts.push(municipio);
+    if (zona) direccionCompletaParts.push(`Zona: ${zona}`);
+    if (transporte) direccionCompletaParts.push(`Transporte: ${transporte}`);
+
+    const direccionFinal = direccionCompletaParts.length > 0 
+      ? direccionCompletaParts.join(" - ") 
+      : "Dirección no especificada";
+
+    const totalPedido = Number(datosPedido.totalPedido || datosPedido.total || 0);
+    const productos = datosPedido.productos || datosPedido.items || [];
+    const estadoPedido = datosPedido.estadoPedido || datosPedido.estado || "Pendiente";
+    const vendedorAsignado = datosPedido.vendedorAsignado || datosPedido.vendedor || "Sin Asignar";
 
     if (!nombreCliente && !telefonoCliente) return;
 
     const clientesRef = collection(db, COLECCION_CLIENTES);
     let q = null;
 
-    if (telefonoCliente) {
+    if (telefonoCliente && telefonoCliente.trim() !== "") {
       q = query(clientesRef, where("telefono", "==", telefonoCliente.trim()));
     } else {
       q = query(clientesRef, where("nombre", "==", nombreCliente.trim()));
@@ -112,50 +142,50 @@ export const sincronizarClientePorPedido = async (datosPedido) => {
     const querySnapshot = await getDocs(q);
 
     const nuevoItemHistorial = {
-      idPedido: idPedido || Date.now().toString(),
+      idPedido: idPedido,
       fecha: new Date().toISOString(),
-      total: Number(totalPedido) || 0,
-      productos: productos || [],
-      direccionEnvio: direccionEnvio || "No especificada",
-      zonaEnvio: zonaEnvio || "Principal",
-      estado: estadoPedido || "Pendiente"
+      total: totalPedido,
+      productos: productos,
+      direccionEnvio: direccionFinal,
+      zonaEnvio: zona || municipio || "Principal",
+      transporte: transporte || "Normal",
+      estado: estadoPedido
     };
 
     if (querySnapshot.empty) {
-      // Si el cliente no existe, se crea evaluando si el primer pedido está completado
+      // Si el cliente no existe, evaluamos si el primer pedido está completado para sumar las finanzas
       const esCompletado = estadoPedido === "Completado" || estadoPedido === "Entregado";
       
       await addDoc(clientesRef, {
-        nombre: nombreCliente || "Cliente Anónimo",
-        telefono: telefonoCliente || "",
-        email: emailCliente || "",
-        direccionFrecuente: direccionEnvio || "",
-        vendedorAsignado: vendedorAsignado || "Sin Asignar",
+        nombre: nombreCliente,
+        telefono: telefonoCliente,
+        email: emailCliente,
+        direccionFrecuente: direccionFinal,
+        vendedorAsignado: vendedorAsignado,
         categoria: "Regular",
         primeraCompra: serverTimestamp(),
         ultimaCompra: serverTimestamp(),
-        totalGastado: esCompletado ? (Number(totalPedido) || 0) : 0,
+        totalGastado: esCompletado ? totalPedido : 0,
         cantidadPedidos: esCompletado ? 1 : 0,
         historialCompras: [nuevoItemHistorial]
       });
     } else {
-      // Si el cliente ya existe, actualizamos y filtramos el historial existente
+      // Si el cliente ya existe, actualizamos su expediente
       const clienteDoc = querySnapshot.docs[0];
       const clienteData = clienteDoc.data();
       const clienteRef = doc(db, COLECCION_CLIENTES, clienteDoc.id);
 
       let historialActual = clienteData.historialCompras || [];
 
-      // Si el pedido ya existía en el historial (actualización de estado), lo reemplazamos
+      // Si el pedido ya existe en el historial, lo actualizamos (ej. pasó de Pendiente a Completado)
       const indexExistente = historialActual.findIndex(item => item.idPedido === idPedido);
       if (indexExistente !== -1) {
         historialActual[indexExistente] = nuevoItemHistorial;
       } else {
-        // Si es nuevo, lo añadimos al inicio
         historialActual = [nuevoItemHistorial, ...historialActual];
       }
 
-      // RECÁLCULO MATEMÁTICO SEGURO: Sumamos únicamente los que estén completados o entregados
+      // RECALCULAMOS FINANZAS: Solo sumamos al total gastado y contador si el estado es "Completado" o "Entregado"
       let nuevoTotalGastado = 0;
       let nuevaCantidadPedidos = 0;
 
@@ -167,9 +197,10 @@ export const sincronizarClientePorPedido = async (datosPedido) => {
       });
 
       await updateDoc(clienteRef, {
+        nombre: nombreCliente !== "Cliente Sin Nombre" ? nombreCliente : (clienteData.nombre || "Cliente Sin Nombre"),
         email: emailCliente || clienteData.email || "",
-        direccionFrecuente: direccionEnvio || clienteData.direccionFrecuente || "",
-        vendedorAsignado: vendedorAsignado || clienteData.vendedorAsignado || "Sin Asignar",
+        direccionFrecuente: direccionFinal !== "Dirección no especificada" ? direccionFinal : (clienteData.direccionFrecuente || ""),
+        vendedorAsignado: vendedorAsignado !== "Sin Asignar" ? vendedorAsignado : (clienteData.vendedorAsignado || "Sin Asignar"),
         ultimaCompra: serverTimestamp(),
         totalGastado: nuevoTotalGastado,
         cantidadPedidos: nuevaCantidadPedidos,
