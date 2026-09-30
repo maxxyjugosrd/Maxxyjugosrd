@@ -7,6 +7,7 @@ import { obtenerPedidosEnVivo } from "@/services/pedidosService";
 export default function PersonalPage() {
   const [equipo, setEquipo] = useState([]);
   const [pedidos, setPedidos] = useState([]);
+  const [filtroRol, setFiltroRol] = useState("Todos"); // Estado para dividir por rol
 
   // Cargar personal desde localStorage al iniciar
   useEffect(() => {
@@ -37,14 +38,12 @@ export default function PersonalPage() {
 
       // Si es Vendedor, calculamos su porcentaje agrupando ventas de pedidos completados (coherente con CRM)
       if (colaborador.rol === "Vendedor" && colaborador.valorConfigurado > 0) {
-        // 1. Filtrar solo pedidos completados asignados a este vendedor
         const ventasDelVendedor = pedidos.filter((v) => {
           const vendedorPedido = (v.vendedor || v.vendedorAsignado || v.usuario || "").toString().trim().toLowerCase();
           const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
           return vendedorPedido.includes(nombreColaborador) && estadoPedido === "completado";
         });
         
-        // 2. Agrupar por cliente para mantener idéntica fuente de verdad que el expediente del CRM
         const ventasPorCliente = {};
         ventasDelVendedor.forEach((pedido) => {
           let clienteBruto = pedido.cliente || pedido.nombreCliente || pedido.telefonoCliente || "cliente_general";
@@ -60,7 +59,6 @@ export default function PersonalPage() {
           ventasPorCliente[clienteKey] += montoPedido;
         });
 
-        // 3. Sumar el total consolidado de las ventas del periodo
         const totalVendido = Object.values(ventasPorCliente).reduce((acc, curr) => acc + curr, 0);
         const comisionCalculada = (totalVendido * Number(colaborador.valorConfigurado)) / 100;
 
@@ -88,7 +86,7 @@ export default function PersonalPage() {
         return {
           ...colaborador,
           entregasRealizadas: totalEntregas,
-          comisionAcumulada: totalEntregas * 100 // Costo estándar por carrera si aplica
+          comisionAcumulada: totalEntregas * 100
         };
       }
 
@@ -98,7 +96,6 @@ export default function PersonalPage() {
     setEquipo(equipoConComisionesCalculadas);
   }, [pedidos]);
 
-  // Función auxiliar para actualizar el estado y guardarlo en localStorage
   const actualizarYGuardarEquipo = (nuevoEquipo) => {
     setEquipo(nuevoEquipo);
     localStorage.setItem("maxi_personal", JSON.stringify(nuevoEquipo));
@@ -123,7 +120,6 @@ export default function PersonalPage() {
 
   const [reciboSeleccionado, setReciboSeleccionado] = useState(null);
 
-  // Cálculo de días para la próxima quincena (15 o 30)
   const obtenerInfoNomina = () => {
     const hoy = new Date();
     const dia = hoy.getDate();
@@ -283,6 +279,15 @@ export default function PersonalPage() {
     window.print();
   };
 
+  // Filtrar equipo según la pestaña seleccionada
+  const equipoFiltrado = equipo.filter((colaborador) => {
+    if (filtroRol === "Todos") return true;
+    if (filtroRol === "Delivery") return colaborador.rol === "Delivery";
+    if (filtroRol === "Vendedor") return colaborador.rol === "Vendedor";
+    if (filtroRol === "Empleado") return colaborador.rol === "Colaborador / Empleado";
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       <style jsx global>{`
@@ -337,18 +342,40 @@ export default function PersonalPage() {
         </div>
       </div>
 
+      {/* Pestañas de Filtrado por Rol */}
+      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        {[
+          { label: "Todos", id: "Todos" },
+          { label: "Deliveries", id: "Delivery" },
+          { label: "Vendedores", id: "Vendedor" },
+          { label: "Empleados Fijos", id: "Empleado" },
+        ].map((pestana) => (
+          <button
+            key={pestana.id}
+            onClick={() => setFiltroRol(pestana.id)}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm ${
+              filtroRol === pestana.id
+                ? "bg-slate-900 text-white"
+                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
+          >
+            {pestana.label}
+          </button>
+        ))}
+      </div>
+
       {/* Lista de Personal / Tarjetas de Nómina */}
-      {equipo.length === 0 ? (
+      {equipoFiltrado.length === 0 ? (
         <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-3 shadow-sm">
           <Users className="w-12 h-12 text-slate-300 mx-auto" />
-          <h3 className="font-bold text-slate-700 text-lg">No hay personal registrado en nómina</h3>
+          <h3 className="font-bold text-slate-700 text-lg">No hay personal registrado en esta categoría</h3>
           <p className="text-slate-400 text-sm max-w-sm mx-auto">
-            Agrega tu primer empleado para gestionar sus datos bancarios, teléfonos, direcciones y montos a pagar.
+            No se encontraron colaboradores bajo este filtro o aún no has agregado personal.
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {equipo.map((colaborador) => (
+          {equipoFiltrado.map((colaborador) => (
             <div key={colaborador.id} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
               <div className="space-y-4">
                 <div className="flex justify-between items-start">
