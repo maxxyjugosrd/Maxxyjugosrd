@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Package, Plus, DollarSign, Layers, ShoppingBag, Trash2, AlertCircle } from "lucide-react";
+import { Package, Plus, DollarSign, Layers, ShoppingBag, Trash2 } from "lucide-react";
 
 export default function InventarioPage() {
   const [inventario, setInventario] = useState({
@@ -13,7 +13,7 @@ export default function InventarioPage() {
   const [mostrarModal, setMostrarModal] = useState(false);
   const [tipoEnvaseSeleccionado, setTipoEnvaseSeleccionado] = useState("potes12oz");
   const [cantidadAgregar, setCantidadAgregar] = useState("");
-  const [montoInvertido, setMontoInvertido] = useState("");
+  const [costoUnitario, setCostoUnitario] = useState("");
 
   // Cargar inventario y sincronizar/descontar con pedidos guardados
   useEffect(() => {
@@ -29,7 +29,6 @@ export default function InventarioPage() {
     if (pedidosGuardados) {
       try {
         const pedidos = JSON.parse(pedidosGuardados);
-        // Creamos una clave en localStorage para llevar el registro de qué pedidos ya se descontaron
         const pedidosProcesadosKey = "maxi_pedidos_procesados_inventario";
         const procesadosGuardados = localStorage.getItem(pedidosProcesadosKey);
         const idsProcesados = procesadosGuardados ? JSON.parse(procesadosGuardados) : [];
@@ -37,7 +36,6 @@ export default function InventarioPage() {
         let huboCambios = false;
         pedidos.forEach((pedido) => {
           if (!idsProcesados.includes(pedido.id)) {
-            // Analizar los items del pedido para descontar envases
             if (pedido.items && Array.isArray(pedido.items)) {
               pedido.items.forEach((item) => {
                 const nombreItem = (item.nombre || "").toLowerCase();
@@ -45,14 +43,9 @@ export default function InventarioPage() {
 
                 if (nombreItem.includes("galon") || nombreItem.includes("galón")) {
                   stockActual.galones.cantidad = Math.max(0, stockActual.galones.cantidad - cantidadVendida);
-                  // Reducir la inversión proporcionalmente al stock consumido si hay valor
-                  if (stockActual.galones.cantidad > 0 && stockActual.galones.inversionTotal > 0) {
-                    // Ajuste proporcional aproximado o se mantiene el costo unitario
-                  }
                 } else if (nombreItem.includes("verde") || nombreItem.includes("8 oz") || nombreItem.includes("shot")) {
                   stockActual.potes8oz.cantidad = Math.max(0, stockActual.potes8oz.cantidad - cantidadVendida);
                 } else {
-                  // Por defecto los jugos normales usan potes de 12 oz
                   stockActual.potes12oz.cantidad = Math.max(0, stockActual.potes12oz.cantidad - cantidadVendida);
                 }
               });
@@ -82,17 +75,20 @@ export default function InventarioPage() {
   const manejarAgregarStock = (e) => {
     e.preventDefault();
     const cant = Number(cantidadAgregar) || 0;
-    const monto = Number(montoInvertido) || 0;
+    const costoU = Number(costoUnitario) || 0;
 
     if (cant <= 0) return;
 
+    // Cálculo automático del total invertido en esta compra (Cantidad x Costo Unitario)
+    const montoTotalCompra = cant * costoU;
+
     const stockActualizado = { ...inventario };
     stockActualizado[tipoEnvaseSeleccionado].cantidad += cant;
-    stockActualizado[tipoEnvaseSeleccionado].inversionTotal += monto;
+    stockActualizado[tipoEnvaseSeleccionado].inversionTotal += montoTotalCompra;
 
     guardarInventarioEnStorage(stockActualizado);
     setCantidadAgregar("");
-    setMontoInvertido("");
+    setCostoUnitario("");
     setMostrarModal(false);
   };
 
@@ -111,6 +107,11 @@ export default function InventarioPage() {
   // Cálculos totales globales
   const totalCantidadEnvases = inventario.potes12oz.cantidad + inventario.potes8oz.cantidad + inventario.galones.cantidad;
   const totalDineroInvertido = inventario.potes12oz.inversionTotal + inventario.potes8oz.inversionTotal + inventario.galones.inversionTotal;
+
+  // Cálculo de costos unitarios promedios actuales para mostrar en tarjetas
+  const costoPromedio12oz = inventario.potes12oz.cantidad > 0 ? (inventario.potes12oz.inversionTotal / inventario.potes12oz.cantidad) : 0;
+  const costoPromedio8oz = inventario.potes8oz.cantidad > 0 ? (inventario.potes8oz.inversionTotal / inventario.potes8oz.cantidad) : 0;
+  const costoPromedioGalon = inventario.galones.cantidad > 0 ? (inventario.galones.inversionTotal / inventario.galones.cantidad) : 0;
 
   return (
     <div className="space-y-6">
@@ -179,7 +180,11 @@ export default function InventarioPage() {
                 <span className="font-bold text-slate-900">{inventario.potes12oz.cantidad} unidades</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Inversión Invertida:</span>
+                <span className="text-slate-500">Costo Unitario Ref:</span>
+                <span className="font-semibold text-slate-700">RD$ {costoPromedio12oz.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm pt-2 border-t border-slate-200">
+                <span className="text-slate-500">Inversión Total:</span>
                 <span className="font-bold text-amber-600">RD$ {inventario.potes12oz.inversionTotal.toLocaleString()}</span>
               </div>
             </div>
@@ -201,7 +206,11 @@ export default function InventarioPage() {
                 <span className="font-bold text-slate-900">{inventario.potes8oz.cantidad} unidades</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Inversión Invertida:</span>
+                <span className="text-slate-500">Costo Unitario Ref:</span>
+                <span className="font-semibold text-slate-700">RD$ {costoPromedio8oz.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm pt-2 border-t border-slate-200">
+                <span className="text-slate-500">Inversión Total:</span>
                 <span className="font-bold text-emerald-600">RD$ {inventario.potes8oz.inversionTotal.toLocaleString()}</span>
               </div>
             </div>
@@ -223,7 +232,11 @@ export default function InventarioPage() {
                 <span className="font-bold text-slate-900">{inventario.galones.cantidad} unidades</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Inversión Invertida:</span>
+                <span className="text-slate-500">Costo Unitario Ref:</span>
+                <span className="font-semibold text-slate-700">RD$ {costoPromedioGalon.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm pt-2 border-t border-slate-200">
+                <span className="text-slate-500">Inversión Total:</span>
                 <span className="font-bold text-blue-600">RD$ {inventario.galones.inversionTotal.toLocaleString()}</span>
               </div>
             </div>
@@ -237,7 +250,7 @@ export default function InventarioPage() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <form onSubmit={manejarAgregarStock} className="bg-white rounded-3xl p-8 max-w-md w-full space-y-4 shadow-2xl border">
             <h2 className="text-xl font-bold text-slate-900">Registrar Compra de Envases</h2>
-            <p className="text-xs text-slate-500">Ingresa la cantidad comprada y el monto total pagado para sumarlo al stock y capital invertido.</p>
+            <p className="text-xs text-slate-500">Indica la cantidad comprada y el costo unitario; el sistema calculará automáticamente el total invertido.</p>
             
             <div className="space-y-3 pt-2">
               <div>
@@ -254,7 +267,7 @@ export default function InventarioPage() {
               </div>
 
               <div>
-                <label className="text-xs text-slate-500 font-semibold">Cantidad de Unidades Compradas</label>
+                <label className="text-xs text-slate-500 font-semibold">Cantidad Comprada (Unidades)</label>
                 <input 
                   type="number" 
                   placeholder="Ej: 50" 
@@ -266,16 +279,25 @@ export default function InventarioPage() {
               </div>
 
               <div>
-                <label className="text-xs text-slate-500 font-semibold">Monto Total Invertido (RD$)</label>
+                <label className="text-xs text-slate-500 font-semibold">Costo por Unidad (RD$)</label>
                 <input 
                   type="number" 
-                  placeholder="Ej: 1500" 
-                  value={montoInvertido} 
-                  onChange={(e) => setMontoInvertido(e.target.value)} 
+                  step="0.01"
+                  placeholder="Ej: 15.50" 
+                  value={costoUnitario} 
+                  onChange={(e) => setCostoUnitario(e.target.value)} 
                   className="w-full p-3 border rounded-xl text-sm" 
                   required 
                 />
               </div>
+
+              {/* Vista previa en tiempo del cálculo total */}
+              {cantidadAgregar && costoUnitario && (
+                <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-xs flex justify-between items-center text-amber-900 font-bold">
+                  <span>Total a sumar a la inversión:</span>
+                  <span>RD$ {(Number(cantidadAgregar) * Number(costoUnitario)).toLocaleString()}</span>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3 pt-4">
