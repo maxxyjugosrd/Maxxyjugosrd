@@ -10,6 +10,7 @@ import {
   UtensilsCrossed, 
   BarChart3,
   UserCheck,
+  Package,
   LogOut 
 } from "lucide-react";
 import { getAuth, signOut } from "firebase/auth";
