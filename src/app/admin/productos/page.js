@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Package, Plus, DollarSign, Layers, ShoppingBag, Trash2, Tag, Box } from "lucide-react";
+import { Package, Plus, DollarSign, Layers, ShoppingBag, Trash2, Tag, Box, Edit3 } from "lucide-react";
 
 export default function InventarioPage() {
   const [inventario, setInventario] = useState({
@@ -9,11 +9,13 @@ export default function InventarioPage() {
     potes2oz: { cantidad: 0, inversionTotal: 0 },
     potes8oz: { cantidad: 0, inversionTotal: 0 },
     galones: { cantidad: 0, inversionTotal: 0 },
-    otros: {}, // Aquí guardaremos dinámicamente los productos personalizados ej: { "Cajas de Cartón Grandes": { cantidad: 20, inversionTotal: 3000 } }
+    otros: {}, 
   });
 
   const [mostrarModal, setMostrarModal] = useState(false);
-  const [mostrarModalNuevo, setMostrarModalNuevo] = useState(false); // Para crear un "Otro" producto nuevo
+  const [mostrarModalNuevo, setMostrarModalNuevo] = useState(false); 
+  const [mostrarModalEditar, setMostrarModalEditar] = useState(false); // Modal para editar un producto existente
+
   const [tipoEnvaseSeleccionado, setTipoEnvaseSeleccionado] = useState("potes12oz");
   const [cantidadAgregar, setCantidadAgregar] = useState("");
   const [costoUnitario, setCostoUnitario] = useState("");
@@ -22,6 +24,11 @@ export default function InventarioPage() {
   const [nombreNuevoProducto, setNombreNuevoProducto] = useState("");
   const [cantidadNuevoProducto, setCantidadNuevoProducto] = useState("");
   const [costoNuevoProducto, setCostoNuevoProducto] = useState("");
+
+  // Estados para editar un producto existente
+  const [itemEditandoKey, setItemEditandoKey] = useState(""); // Ej: "potes12oz" o nombre de "otros"
+  const [cantidadEditada, setCantidadEditada] = useState("");
+  const [inversionEditada, setInversionEditada] = useState("");
 
   useEffect(() => {
     const inventarioGuardado = localStorage.getItem("maxi_inventario");
@@ -60,7 +67,6 @@ export default function InventarioPage() {
         let huboCambios = false;
         pedidos.forEach((pedido) => {
           if (!idsProcesados.includes(pedido.id)) {
-            // 1. Revisar items principales del pedido (potes, galones)
             if (pedido.items && Array.isArray(pedido.items)) {
               pedido.items.forEach((item) => {
                 const nombreItem = (item.nombre || "").toLowerCase();
@@ -78,7 +84,6 @@ export default function InventarioPage() {
               });
             }
 
-            // 2. Revisar si el pedido seleccionó insumos o "otros" productos adicionales
             if (pedido.otrosItems && Array.isArray(pedido.otrosItems)) {
               pedido.otrosItems.forEach((otro) => {
                 const nombreOtro = otro.nombre;
@@ -154,7 +159,6 @@ export default function InventarioPage() {
       stockActualizado.otros = {};
     }
 
-    // Si ya existe, acumulamos, si no, lo creamos
     const existente = stockActualizado.otros[nombre] || { cantidad: 0, inversionTotal: 0 };
     stockActualizado.otros[nombre] = {
       cantidad: existente.cantidad + cant,
@@ -166,6 +170,44 @@ export default function InventarioPage() {
     setCantidadNuevoProducto("");
     setCostoNuevoProducto("");
     setMostrarModalNuevo(false);
+  };
+
+  // Abrir modal de edición para un item
+  const abrirModalEditar = (key, datos) => {
+    setItemEditandoKey(key);
+    setCantidadEditada(datos.cantidad.toString());
+    setInversionEditada(datos.inversionTotal.toString());
+    setMostrarModalEditar(true);
+  };
+
+  // Guardar cambios de edición
+  const manejarGuardarEdicion = (e) => {
+    e.preventDefault();
+    const nuevaCant = Number(cantidadEditada) || 0;
+    const nuevaInv = Number(inversionEditada) || 0;
+
+    const stockActualizado = { ...inventario };
+
+    if (["potes12oz", "potes2oz", "potes8oz", "galones"].includes(itemEditandoKey)) {
+      stockActualizado[itemEditandoKey] = {
+        cantidad: nuevaCant,
+        inversionTotal: nuevaInv,
+      };
+    } else {
+      // Es un producto dentro de 'otros'
+      if (stockActualizado.otros[itemEditandoKey]) {
+        stockActualizado.otros[itemEditandoKey] = {
+          cantidad: nuevaCant,
+          inversionTotal: nuevaInv,
+        };
+      }
+    }
+
+    guardarInventarioEnStorage(stockActualizado);
+    setMostrarModalEditar(false);
+    setItemEditandoKey("");
+    setCantidadEditada("");
+    setInversionEditada("");
   };
 
   const eliminarOtroProducto = (nombre) => {
@@ -277,7 +319,16 @@ export default function InventarioPage() {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-xs font-bold bg-amber-100 text-amber-800 px-3 py-1 rounded-full">Naturales</span>
-              <Layers className="w-5 h-5 text-amber-600" />
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => abrirModalEditar("potes12oz", p12)}
+                  className="text-slate-400 hover:text-indigo-600 transition p-1"
+                  title="Editar stock"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+                <Layers className="w-5 h-5 text-amber-600" />
+              </div>
             </div>
             <h3 className="text-lg font-bold text-slate-800">Potes de 12 oz</h3>
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
@@ -303,7 +354,16 @@ export default function InventarioPage() {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-xs font-bold bg-purple-100 text-purple-800 px-3 py-1 rounded-full">Shots</span>
-              <Layers className="w-5 h-5 text-purple-600" />
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => abrirModalEditar("potes2oz", p2)}
+                  className="text-slate-400 hover:text-indigo-600 transition p-1"
+                  title="Editar stock"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+                <Layers className="w-5 h-5 text-purple-600" />
+              </div>
             </div>
             <h3 className="text-lg font-bold text-slate-800">Potes 2-4 oz</h3>
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
@@ -329,7 +389,16 @@ export default function InventarioPage() {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full">Verdes</span>
-              <Layers className="w-5 h-5 text-emerald-600" />
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => abrirModalEditar("potes8oz", p8)}
+                  className="text-slate-400 hover:text-indigo-600 transition p-1"
+                  title="Editar stock"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+                <Layers className="w-5 h-5 text-emerald-600" />
+              </div>
             </div>
             <h3 className="text-lg font-bold text-slate-800">Potes de 8 oz</h3>
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
@@ -355,7 +424,16 @@ export default function InventarioPage() {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-xs font-bold bg-blue-100 text-blue-800 px-3 py-1 rounded-full">Grandes</span>
-              <ShoppingBag className="w-5 h-5 text-blue-600" />
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => abrirModalEditar("galones", gal)}
+                  className="text-slate-400 hover:text-indigo-600 transition p-1"
+                  title="Editar stock"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+                <ShoppingBag className="w-5 h-5 text-blue-600" />
+              </div>
             </div>
             <h3 className="text-lg font-bold text-slate-800">Galones</h3>
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
@@ -377,7 +455,7 @@ export default function InventarioPage() {
         </div>
       </div>
 
-      {/* Sección de Otros Productos / Insumos Personalizados (Cajas, etc.) */}
+      {/* Sección de Otros Productos / Insumos Personalizados */}
       <div className="space-y-4 pt-4">
         <div className="flex justify-between items-center">
           <div>
@@ -390,7 +468,7 @@ export default function InventarioPage() {
           <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-8 text-center space-y-2">
             <Box className="w-10 h-10 text-slate-400 mx-auto" />
             <p className="text-sm font-semibold text-slate-700">No hay otros productos registrados aún.</p>
-            <p className="text-xs text-slate-400">Haz clic en &quot;Registrar Nuevo Insumo / Producto&quot; arriba para crear el primero (ej: Cajas para exportar).</p>
+            <p className="text-xs text-slate-400">Haz clic en &quot;Registrar Nuevo Insumo / Producto&quot; arriba para crear el primero.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -400,14 +478,23 @@ export default function InventarioPage() {
                 <div key={nombre} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full truncate max-w-[180px]">{nombre}</span>
-                      <button 
-                        onClick={() => eliminarOtroProducto(nombre)} 
-                        className="text-slate-400 hover:text-rose-600 transition"
-                        title="Eliminar producto"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <span className="text-xs font-bold bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full truncate max-w-[150px]">{nombre}</span>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={() => abrirModalEditar(nombre, datos)}
+                          className="text-slate-400 hover:text-indigo-600 transition p-1"
+                          title="Editar producto"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => eliminarOtroProducto(nombre)} 
+                          className="text-slate-400 hover:text-rose-600 transition p-1"
+                          title="Eliminar producto"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                     <h3 className="text-base font-bold text-slate-900 truncate">{nombre}</h3>
                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
@@ -557,6 +644,59 @@ export default function InventarioPage() {
                 Crear e Inventariar
               </button>
               <button type="button" onClick={() => setMostrarModalNuevo(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-3 rounded-xl text-sm">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modal para Editar Stock o Inversión Directamente */}
+      {mostrarModalEditar && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <form onSubmit={manejarGuardarEdicion} className="bg-white rounded-3xl p-8 max-w-md w-full space-y-4 shadow-2xl border">
+            <h2 className="text-xl font-bold text-slate-900">Corregir / Editar Artículo</h2>
+            <p className="text-xs text-slate-500">
+              Modifica directamente la cantidad actual o la inversión total de <span className="font-bold text-slate-800">{itemEditandoKey}</span>.
+            </p>
+            
+            <div className="space-y-3 pt-2">
+              <div>
+                <label className="text-xs text-slate-500 font-semibold">Cantidad en Stock (Unidades reales)</label>
+                <input 
+                  type="number" 
+                  value={cantidadEditada} 
+                  onChange={(e) => setCantidadEditada(e.target.value)} 
+                  className="w-full p-3 border rounded-xl text-sm font-bold text-slate-900" 
+                  required 
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-500 font-semibold">Inversión Total Acumulada (RD$)</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  value={inversionEditada} 
+                  onChange={(e) => setInversionEditada(e.target.value)} 
+                  className="w-full p-3 border rounded-xl text-sm font-bold text-slate-900" 
+                  required 
+                />
+              </div>
+
+              {Number(cantidadEditada) > 0 && (
+                <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-200 text-xs flex justify-between items-center text-indigo-900 font-semibold">
+                  <span>Nuevo costo unitario resultante:</span>
+                  <span>RD$ {(Number(inversionEditada) / Number(cantidadEditada)).toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-sm">
+                Guardar Cambios
+              </button>
+              <button type="button" onClick={() => setMostrarModalEditar(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-3 rounded-xl text-sm">
                 Cancelar
               </button>
             </div>
