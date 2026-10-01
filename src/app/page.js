@@ -386,15 +386,21 @@ try {
 
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm" id="inicio">
-       <div className="flex items-center gap-3">
-        <img 
-         src="/logo.JPG" 
-         alt="Maxxy Jugos Logo" 
-         className="w-12 h-12 object-cover rounded-2xl shadow-md border" 
-        />
-       <span className="font-black text-slate-900 text-lg">Maxxy Jugos</span>
-      </div>
+  <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    
+    {/* Contenedor del Logo y Título */}
+    <div className="flex items-center gap-3">
+      <img 
+        src="/logo.JPG" 
+        alt="Maxxy Jugos Logo" 
+        className="w-12 h-12 object-cover rounded-2xl shadow-md border" 
+      />
+      <span className="font-black text-slate-900 text-lg">Maxxy Jugos</span>
     </div>
+
+    {/* Búsqueda u otros elementos del header... */}
+  </div>
+</header>
 
             {/* Búsqueda Desktop */}
             <div className="hidden md:flex flex-1 max-w-md relative">
