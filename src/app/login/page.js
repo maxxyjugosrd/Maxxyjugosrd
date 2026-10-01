@@ -32,12 +32,33 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl w-full max-w-md space-y-6">
-        <div className="text-center space-y-2">
-          <span className="text-4xl inline-block">🥤</span>
-          <h1 className="text-2xl font-bold text-slate-800">Maxxy Jugos</h1>
-          <p className="text-slate-500 text-sm">Acceso al Panel de Control Administrador</p>
+    <div 
+      className="min-h-screen flex items-center justify-center p-4 relative bg-cover bg-center"
+      style={{
+        backgroundImage: `url('https://st2.depositphotos.com/3990675/7777/v/450/depositphotos_77777388-stock-illustration-doodle-fruits-and-berries-seamless.jpg')`
+      }}
+    >
+      {/* Capa de superposición oscura/translúcida para que el formulario resalte perfectamente */}
+      <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"></div>
+
+      {/* Contenedor principal del Login */}
+      <div className="relative z-10 bg-white/95 backdrop-blur-md p-8 rounded-3xl border border-slate-200/80 shadow-2xl w-full max-w-md space-y-6">
+        <div className="text-center space-y-3">
+          <div className="flex justify-center">
+            <img 
+              src="/logo.png" 
+              alt="Maxxy Jugos Logo" 
+              className="w-20 h-20 object-contain rounded-2xl shadow-md bg-white p-1 border border-slate-100" 
+              onError={(e) => {
+                // Si la imagen falla en cargar por alguna razón, muestra el emoji de respaldo
+                e.target.style.display = 'none';
+              }}
+            />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Maxxy Jugos</h1>
+            <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mt-1">Panel de Control Administrador</p>
+          </div>
         </div>
 
         {error && (
@@ -57,7 +78,7 @@ export default function LoginPage() {
               placeholder="admin@maxxyjugos.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white text-slate-900"
             />
           </div>
 
@@ -71,7 +92,7 @@ export default function LoginPage() {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white text-slate-900"
             />
           </div>
 
