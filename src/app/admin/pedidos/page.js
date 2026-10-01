@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ShoppingCart, Plus, Minus, Trash2, Send, User, Phone, MapPin, Bike, Loader2, Sparkles, Check, Zap, Users, Truck, UserCheck, Calendar } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, Send, User, Phone, MapPin, Bike, Loader2, Sparkles, Check, Zap, Users, Truck, UserCheck, Calendar, Package } from "lucide-react";
 import { crearPedido } from "@/services/pedidosService";
 import { obtenerProductosEnVivo, obtenerIngredientesEnVivo, descontarStockProductos } from "@/services/catalogoService";
 import { obtenerClientesEnVivo } from "@/services/clientesService";
@@ -86,26 +86,28 @@ export default function PedidosManuales() {
   const [vendedorAsignado, setVendedorAsignado] = useState("");
   const [metodoPago, setMetodoPago] = useState("Efectivo");
   
-  // Estado para Código de Pedido en texto (Interpretador automático de envases)
-  const [codigoPedidoTexto, setCodigoPedidoTexto] = useState("");
-
-  // Estado para Fecha de Entrega (por defecto la fecha actual en formato YYYY-MM-DD)
+  // Estado para Fecha de Entrega
   const [fechaEntrega, setFechaEntrega] = useState(() => new Date().toISOString().split("T")[0]);
   
   // Estados de Envío
   const [zonaSeleccionadaId, setZonaSeleccionadaId] = useState("");
-  const [tipoCostoCamion, setTipoCostoCamion] = useState("costoNormal"); // "costoNormal" o "costoFrio"
+  const [tipoCostoCamion, setTipoCostoCamion] = useState("costoNormal");
   const [guardando, setGuardando] = useState(false);
 
-  // Estado para el Modal de Personalización de Jugo Verde
+  // Estados para Modal de Jugo Verde
   const [modalVerdeAbierto, setModalVerdeAbierto] = useState(false);
   const [ingredientesVerdes, setIngredientesVerdes] = useState([]);
   const [tamanoJugoVerde, setTamanoJugoVerde] = useState("12 oz");
 
-  // Estado para el Modal de Personalización de Shots
+  // Estados para Modal de Shots
   const [modalShotAbierto, setModalShotAbierto] = useState(false);
   const [ingredientesShot, setIngredientesShot] = useState([]);
   const [precioShot] = useState(100);
+
+  // Estados para Selector de Caja / Artículo Personalizado (Sección nueva solicitada)
+  const [productoSeleccionadoCaja, setProductoSeleccionadoCaja] = useState("");
+  const [tipoCaja, setTipoCaja] = useState("mediana"); // "pequena", "mediana", "grande"
+  const [cantidadCajas, setCantidadCajas] = useState(1);
 
   // Función para seleccionar un cliente existente del CRM
   const handleSeleccionarClienteExistente = (e) => {
@@ -178,7 +180,7 @@ export default function PedidosManuales() {
       precio: precioShot,
       cantidad: 1,
       categoria: "Shot Personalizado",
-      detallesPersonalizacion: ingredientesShot.join(", ")
+      detallesPersonalizacion: ingrdientesShotTextoFormat(ingredientesShot)
     };
 
     setCarrito([...carrito, itemShot]);
@@ -186,17 +188,77 @@ export default function PedidosManuales() {
     setModalShotAbierto(false);
   };
 
+  const ingrdientesShotTextoFormat = (arr) => arr.join(", ");
+
   const agregarAlCarrito = (producto) => {
-    const existe = carrito.find((item) => item.id === producto.id);
+    const existe = carrito.find((item) => item.id === producto.id && !item.esPorCaja);
     if (existe) {
       setCarrito(
         carrito.map((item) =>
-          item.id === producto.id ? { ...item, cantidad: item.cantidad + 1 } : item
+          item.id === producto.id && !item.esPorCaja ? { ...item, cantidad: item.cantidad + 1 } : item
         )
       );
     } else {
-      setCarrito([...carrito, { ...producto, cantidad: 1 }]);
+      setCarrito([...carrito, { ...producto, cantidad: 1, unidadesReales: 1 }]);
     }
+  };
+
+  // Función para agregar por Caja / Paquete con cálculo automático de unidades para inventario
+  const agregarPorCajaAlCarrito = () => {
+    if (!productoSeleccionadoCaja) {
+      alert("Selecciona un producto del catálogo.");
+      return;
+    }
+
+    const prodObj = productosDisponibles.find((p) => p.id === productoSeleccionadoCaja);
+    if (!prodObj) return;
+
+    let unidadesPorCaja = 0;
+    let etiquetaCaja = "";
+
+    const esShot = prodObj.categoria?.toLowerCase().includes("shot");
+
+    if (esShot) {
+      // Reglas de Shots
+      if (tipoCaja === "pequena") {
+        unidadesPorCaja = 6; // Media docena
+        etiquetaCaja = "Caja Pequeña (Media Docena - 6 uds)";
+      } else if (tipoCaja === "mediana" || tipoCaja === "grande") {
+        unidadesPorCaja = 12; // 1 docena o más
+        etiquetaCaja = "Caja Mediana/Grande (1 Docena - 12 uds)";
+      }
+    } else {
+      // Reglas de Botellas 12 oz / 8 oz u otros jugos
+      if (tipoCaja === "pequena") {
+        unidadesPorCaja = 6; // Media docena
+        etiquetaCaja = "Caja Pequeña (Media Docena - 6 uds)";
+      } else if (tipoCaja === "mediana") {
+        unidadesPorCaja = 12; // Docena
+        etiquetaCaja = "Caja Mediana (Docena - 12 uds)";
+      } else if (tipoCaja === "grande") {
+        unidadesPorCaja = 24; // 2 docenas
+        etiquetaCaja = "Caja Grande (24 uds)";
+      }
+    }
+
+    const cantidadTotalUnidades = unidadesPorCaja * Number(cantidadCajas);
+    const precioUnitario = Number(prodObj.precio || 0);
+    const precioTotalItem = precioUnitario * cantidadTotalUnidades;
+
+    const itemCaja = {
+      id: "caja-" + prodObj.id + "-" + Date.now(),
+      nombre: `${prodObj.nombre} [Por Caja: ${etiquetaCaja}]`,
+      precio: precioTotalItem / Number(cantidadCajas), // Precio por la presentación de caja elegida
+      precioUnitarioReferencia: precioUnitario,
+      cantidad: Number(cantidadCajas), // Cantidad de cajas
+      unidadesReales: cantidadTotalUnidades, // Unidades físicas exactas a descontar en Firestore
+      esPorCaja: true,
+      categoria: prodObj.categoria || "Jugo Natural"
+    };
+
+    setCarrito([...carrito, itemCaja]);
+    setProductoSeleccionadoCaja("");
+    setCantidadCajas(1);
   };
 
   const cambiarCantidad = (id, delta) => {
@@ -205,7 +267,18 @@ export default function PedidosManuales() {
         .map((item) => {
           if (item.id === id) {
             const nuevaCantidad = item.cantidad + delta;
-            return nuevaCantidad > 0 ? { ...item, cantidad: nuevaCantidad } : null;
+            if (nuevaCantidad <= 0) return null;
+            
+            // Si es por caja, recalculamos unidades reales proporcionales
+            if (item.esPorCaja && item.unidadesReales) {
+              const factorUnidadesPorCaja = item.unidadesReales / item.cantidad;
+              return {
+                ...item,
+                cantidad: nuevaCantidad,
+                unidadesReales: factorUnidadesPorCaja * nuevaCantidad
+              };
+            }
+            return { ...item, cantidad: nuevaCantidad, unidadesReales: nuevaCantidad };
           }
           return item;
         })
@@ -233,8 +306,8 @@ export default function PedidosManuales() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (carrito.length === 0 && !codigoPedidoTexto.trim()) {
-      alert("Por favor agrega productos al carrito o ingresa el texto del código de pedido.");
+    if (carrito.length === 0) {
+      alert("Por favor agrega al menos un producto al pedido.");
       return;
     }
 
@@ -245,25 +318,6 @@ export default function PedidosManuales() {
 
     setGuardando(true);
 
-    // Si hay texto de código de pedido, interpretamos líneas para agregarlas o descontarlas
-    let productosFinales = [...carrito];
-    if (codigoPedidoTexto.trim()) {
-      const lineas = codigoPedidoTexto.split("\n");
-      lineas.forEach((linea) => {
-        if (!linea.trim()) return;
-        const matchCantidad = linea.match(/^(\d+)/);
-        const cantidad = matchCantidad ? parseInt(matchCantidad[1]) : 1;
-        
-        productosFinales.push({
-          id: "codigo-texto-" + Math.random(),
-          nombre: linea.trim(),
-          precio: 0, // Se asume que el precio se maneja globalmente o es informativo
-          cantidad: cantidad,
-          categoria: "Código de Pedido Externo"
-        });
-      });
-    }
-
     const objetoPedido = {
       cliente: {
         nombre: cliente.nombre.trim(),
@@ -272,8 +326,7 @@ export default function PedidosManuales() {
       telefono: cliente.telefono.trim(),
       direccion: cliente.direccion.trim() || "Local / Mostrador",
       zonaEnvio: zonaActual ? { nombre: zonaActual.nombre, tipo: zonaActual.tipo, costo: costoEnvio } : null,
-      productos: productosFinales,
-      codigoPedidoTexto: codigoPedidoTexto.trim() || null,
+      productos: carrito,
       subtotal: subtotalProductos,
       costoEnvio,
       total: totalPedido,
@@ -290,20 +343,19 @@ export default function PedidosManuales() {
     const resultado = await crearPedido(objetoPedido);
 
     if (resultado.exito) {
-      // 2. Conectar con admin/productos para descontar existencias automáticamente
+      // 2. Descontar stock automáticamente en base a las unidades reales calculadas (tanto unitarios como cajas)
       try {
         if (typeof descontarStockProductos === "function") {
-          await descontarStockProductos(productosFinales);
+          await descontarStockProductos(carrito);
         }
       } catch (err) {
-        console.error("Error al actualizar el inventario (admin/productos):", err);
+        console.error("Error al actualizar el inventario:", err);
       }
 
       setGuardando(false);
       alert(`¡Pedido registrado con éxito por RD$ ${totalPedido.toLocaleString()} y stock descontado del inventario!`);
       setCliente({ nombre: "", telefono: "", direccion: "" });
       setCarrito([]);
-      setCodigoPedidoTexto("");
       setDeliveryAsignado("");
       setVendedorAsignado("");
       setZonaSeleccionadaId("");
@@ -317,11 +369,11 @@ export default function PedidosManuales() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-800">Registrar Pedido (WhatsApp / Teléfono)</h1>
-        <p className="text-slate-500 text-sm">Selecciona un cliente del CRM, ingresa productos o pega el código de pedido para descontar inventario.</p>
+        <p className="text-slate-500 text-sm">Selecciona un cliente del CRM, arma tus jugos o selecciona artículos por caja para descontar inventario con precisión.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Columna 1 y 2: Personalización + Catálogo + Código de Pedido */}
+        {/* Columna 1 y 2: Personalización + Catálogo + Selector de Cajas */}
         <div className="lg:col-span-2 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-gradient-to-r from-emerald-500 to-teal-600 p-4 rounded-2xl text-white shadow-sm flex flex-col justify-between gap-3">
@@ -357,22 +409,63 @@ export default function PedidosManuales() {
             </div>
           </div>
 
-          {/* Sección para pegar el Código de Pedido en Texto */}
+          {/* Sección de Agregar por Caja / Paquete */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
             <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              📋 Código de Pedido del Cliente (Opcional / Texto)
+              <Package className="w-4 h-4 text-amber-600" /> Agregar Artículos por Caja (Paquetes)
             </h2>
-            <p className="text-xs text-slate-500">Pega aquí el mensaje del cliente para procesar envases (12 oz, 8 oz, galones) y descontar stock automáticamente.</p>
-            <textarea
-              rows="3"
-              placeholder="Ej:
-2 Chinola
-1 Galón Naranja Agria
-3 Limón Avena"
-              value={codigoPedidoTexto}
-              onChange={(e) => setCodigoPedidoTexto(e.target.value)}
-              className="w-full p-3 border rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-amber-500"
-            />
+            <p className="text-xs text-slate-500">Selecciona un producto registrado y el tipo de caja. El sistema calculará las unidades exactas para descontar del inventario.</p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="text-[11px] font-semibold text-slate-600 block mb-1">Producto Registrado:</label>
+                <select
+                  value={productoSeleccionadoCaja}
+                  onChange={(e) => setProductoSeleccionadoCaja(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                >
+                  <option value="">-- Seleccionar Producto --</option>
+                  {productosDisponibles.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre} {p.tamano ? `(${p.tamano})` : ""} - RD$ {p.precio}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-600 block mb-1">Tipo de Caja:</label>
+                <select
+                  value={tipoCaja}
+                  onChange={(e) => setTipoCaja(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                >
+                  <option value="pequena">Caja Pequeña (Media Docena - 6 uds)</option>
+                  <option value="mediana">Caja Mediana (Docena - 12 uds)</option>
+                  <option value="grande">Caja Grande (24 uds / 2 Docenas)</option>
+                </select>
+              </div>
+
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Cantidad Cajas:</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={cantidadCajas}
+                    onChange={(e) => setCantidadCajas(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-3 py-2 border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={agregarPorCajaAlCarrito}
+                  className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm h-[34px] shrink-0 flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Agregar Caja
+                </button>
+              </div>
+            </div>
           </div>
 
           <div>
@@ -407,7 +500,7 @@ export default function PedidosManuales() {
                           <p className="text-xs text-slate-400 mt-1 line-clamp-1">{jugo.descripcion}</p>
                         )}
                         {jugo.stock !== undefined && (
-                          <p className="text-[11px] text-slate-500 mt-1 font-medium">Stock: {jugo.stock}</p>
+                          <p className="text-[11px] text-slate-500 mt-1 font-medium">Stock disponible: {jugo.stock}</p>
                         )}
                       </div>
                       
@@ -420,7 +513,7 @@ export default function PedidosManuales() {
                           onClick={() => agregarAlCarrito(jugo)}
                           className="bg-amber-100 hover:bg-amber-200 text-amber-800 px-3 py-1.5 rounded-xl flex items-center gap-1 font-semibold text-xs transition"
                         >
-                          <Plus className="w-3.5 h-3.5" /> Agregar
+                          <Plus className="w-3.5 h-3.5" /> Agregar Unitario
                         </button>
                       </div>
                     </div>
@@ -572,6 +665,9 @@ export default function PedidosManuales() {
                 <div key={item.id} className="flex justify-between items-start text-xs border-b pb-2 gap-2">
                   <div>
                     <p className="font-semibold text-slate-800">{item.cantidad}x {item.nombre}</p>
+                    {item.esPorCaja && (
+                      <p className="text-[10px] text-amber-700 font-semibold mt-0.5">Descuenta: {item.unidadesReales} unidades físicas</p>
+                    )}
                     {item.detallesPersonalizacion && (
                       <p className="text-[10px] text-emerald-600 mt-0.5">Ingredientes: {item.detallesPersonalizacion}</p>
                     )}
