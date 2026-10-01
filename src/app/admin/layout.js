@@ -42,7 +42,11 @@ export default function AdminLayout({ children }) {
         <div className="space-y-6">
           {/* Logo / Encabezado */}
           <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
-            <span className="text-3xl">🥤</span>
+            <img 
+              src="/logo.JPG" 
+              alt="Maxxy Jugos Logo" 
+              className="w-10 h-10 object-cover rounded-xl border border-slate-700 shadow-sm" 
+            />
             <div>
               <h2 className="font-black tracking-wider text-amber-500 text-lg">MAXXY JUGOS</h2>
               <p className="text-xs text-slate-400">Panel de Control</p>
