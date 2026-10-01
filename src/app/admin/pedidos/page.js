@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { ShoppingCart, Plus, Minus, Trash2, Send, User, Phone, MapPin, Bike, Loader2, Sparkles, Check, Zap, Users, Truck, UserCheck, Calendar } from "lucide-react";
 import { crearPedido } from "@/services/pedidosService";
-import { obtenerProductosEnVivo, obtenerIngredientesEnVivo } from "@/services/catalogoService";
+import { obtenerProductosEnVivo, obtenerIngredientesEnVivo, descontarStockProductos } from "@/services/catalogoService";
 import { obtenerClientesEnVivo } from "@/services/clientesService";
 
 // Listas de Zonas de Envío configuradas
@@ -263,18 +263,28 @@ export default function PedidosManuales() {
       fechaCreacion: Date.now(),
     };
 
+    // 1. Guardar el pedido en Firestore
     const resultado = await crearPedido(objetoPedido);
 
-    setGuardando(false);
-
     if (resultado.exito) {
-      alert(`¡Pedido registrado en Firestore con éxito por RD$ ${totalPedido.toLocaleString()}!`);
+      // 2. Conectar con admin/productos (Inventario/Catálogo) para descontar stock de los productos vendidos
+      try {
+        if (typeof descontarStockProductos === "function") {
+          await descontarStockProductos(carrito);
+        }
+      } catch (err) {
+        console.error("Error al actualizar el inventario (admin/productos):", err);
+      }
+
+      setGuardando(false);
+      alert(`¡Pedido registrado en Firestore con éxito por RD$ ${totalPedido.toLocaleString()} y stock actualizado en inventario!`);
       setCliente({ nombre: "", telefono: "", direccion: "" });
       setCarrito([]);
       setDeliveryAsignado("");
       setVendedorAsignado("");
       setZonaSeleccionadaId("");
     } else {
+      setGuardando(false);
       alert("Ocurrió un error al guardar el pedido en la base de datos.");
     }
   };
@@ -353,6 +363,9 @@ export default function PedidosManuales() {
                         </div>
                         {jugo.descripcion && (
                           <p className="text-xs text-slate-400 mt-1 line-clamp-1">{jugo.descripcion}</p>
+                        )}
+                        {jugo.stock !== undefined && (
+                          <p className="text-[11px] text-slate-500 mt-1 font-medium">Stock disponible: {jugo.stock}</p>
                         )}
                       </div>
                       
