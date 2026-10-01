@@ -21,7 +21,7 @@ export default function LoginPage() {
     try {
       const auth = getAuth(app);
       await signInWithEmailAndPassword(auth, email, password);
-      // Redirigir al panel de administración tras iniciar sesión
+      // Redirigir al panel de administración tras iniciar sesión con éxito
       router.push("/admin");
     } catch (err) {
       console.error(err);
@@ -36,7 +36,7 @@ export default function LoginPage() {
       <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
           <span className="text-4xl inline-block">🥤</span>
-          <h1 className="text-2xl font-bold text-slate-800">Maxi Jugos</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Maxxy Jugos</h1>
           <p className="text-slate-500 text-sm">Acceso al Panel de Control Administrador</p>
         </div>
 
@@ -54,7 +54,7 @@ export default function LoginPage() {
             <input
               type="email"
               required
-              placeholder="admin@maxijugos.com"
+              placeholder="admin@maxxyjugos.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3.5 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -78,7 +78,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={cargando}
-            className="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-md disabled:opacity-50"
+            className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-md disabled:opacity-50"
           >
             {cargando ? (
               <>
