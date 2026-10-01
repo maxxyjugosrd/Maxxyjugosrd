@@ -6,7 +6,8 @@ import { Package, Plus, DollarSign, Layers, ShoppingBag, Trash2 } from "lucide-r
 export default function InventarioPage() {
   const [inventario, setInventario] = useState({
     potes12oz: { cantidad: 0, inversionTotal: 0 },
-    potes8oz: { cantidad: 0, inversionTotal: 0 },
+    potes2oz: { cantidad: 0, inversionTotal: 0 }, // Para Shots de 2-4 oz
+    potes8oz: { cantidad: 0, inversionTotal: 0 }, // Para Jugos Verdes
     galones: { cantidad: 0, inversionTotal: 0 },
   });
 
@@ -20,6 +21,7 @@ export default function InventarioPage() {
     const inventarioGuardado = localStorage.getItem("maxi_inventario");
     let stockActual = inventarioGuardado ? JSON.parse(inventarioGuardado) : {
       potes12oz: { cantidad: 0, inversionTotal: 0 },
+      potes2oz: { cantidad: 0, inversionTotal: 0 },
       potes8oz: { cantidad: 0, inversionTotal: 0 },
       galones: { cantidad: 0, inversionTotal: 0 },
     };
@@ -43,7 +45,9 @@ export default function InventarioPage() {
 
                 if (nombreItem.includes("galon") || nombreItem.includes("galón")) {
                   stockActual.galones.cantidad = Math.max(0, stockActual.galones.cantidad - cantidadVendida);
-                } else if (nombreItem.includes("verde") || nombreItem.includes("8 oz") || nombreItem.includes("shot")) {
+                } else if (nombreItem.includes("shot") || nombreItem.includes("2 oz") || nombreItem.includes("4 oz")) {
+                  stockActual.potes2oz.cantidad = Math.max(0, stockActual.potes2oz.cantidad - cantidadVendida);
+                } else if (nombreItem.includes("verde") || nombreItem.includes("8 oz")) {
                   stockActual.potes8oz.cantidad = Math.max(0, stockActual.potes8oz.cantidad - cantidadVendida);
                 } else {
                   stockActual.potes12oz.cantidad = Math.max(0, stockActual.potes12oz.cantidad - cantidadVendida);
@@ -79,7 +83,6 @@ export default function InventarioPage() {
 
     if (cant <= 0) return;
 
-    // Cálculo automático del total invertido en esta compra (Cantidad x Costo Unitario)
     const montoTotalCompra = cant * costoU;
 
     const stockActualizado = { ...inventario };
@@ -96,6 +99,7 @@ export default function InventarioPage() {
     if (confirm("¿Estás seguro de reiniciar todo el inventario a cero?")) {
       const stockVacio = {
         potes12oz: { cantidad: 0, inversionTotal: 0 },
+        potes2oz: { cantidad: 0, inversionTotal: 0 },
         potes8oz: { cantidad: 0, inversionTotal: 0 },
         galones: { cantidad: 0, inversionTotal: 0 },
       };
@@ -105,11 +109,12 @@ export default function InventarioPage() {
   };
 
   // Cálculos totales globales
-  const totalCantidadEnvases = inventario.potes12oz.cantidad + inventario.potes8oz.cantidad + inventario.galones.cantidad;
-  const totalDineroInvertido = inventario.potes12oz.inversionTotal + inventario.potes8oz.inversionTotal + inventario.galones.inversionTotal;
+  const totalCantidadEnvases = inventario.potes12oz.cantidad + inventario.potes2oz.cantidad + inventario.potes8oz.cantidad + inventario.galones.cantidad;
+  const totalDineroInvertido = inventario.potes12oz.inversionTotal + inventario.potes2oz.inversionTotal + inventario.potes8oz.inversionTotal + inventario.galones.inversionTotal;
 
-  // Cálculo de costos unitarios promedios actuales para mostrar en tarjetas
+  // Costos unitarios promedios actuales
   const costoPromedio12oz = inventario.potes12oz.cantidad > 0 ? (inventario.potes12oz.inversionTotal / inventario.potes12oz.cantidad) : 0;
+  const costoPromedio2oz = inventario.potes2oz.cantidad > 0 ? (inventario.potes2oz.inversionTotal / inventario.potes2oz.cantidad) : 0;
   const costoPromedio8oz = inventario.potes8oz.cantidad > 0 ? (inventario.potes8oz.inversionTotal / inventario.potes8oz.cantidad) : 0;
   const costoPromedioGalon = inventario.galones.cantidad > 0 ? (inventario.galones.inversionTotal / inventario.galones.cantidad) : 0;
 
@@ -165,83 +170,109 @@ export default function InventarioPage() {
       </div>
 
       {/* Desglose por Categoría de Envase */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Potes 12 oz */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-xs font-bold bg-amber-100 text-amber-800 px-3 py-1 rounded-full">Naturales Regulares</span>
+              <span className="text-xs font-bold bg-amber-100 text-amber-800 px-3 py-1 rounded-full">Naturales</span>
               <Layers className="w-5 h-5 text-amber-600" />
             </div>
             <h3 className="text-lg font-bold text-slate-800">Potes de 12 oz</h3>
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Stock Actual:</span>
-                <span className="font-bold text-slate-900">{inventario.potes12oz.cantidad} unidades</span>
+                <span className="text-slate-500">Stock:</span>
+                <span className="font-bold text-slate-900">{inventario.potes12oz.cantidad} un.</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Costo Unitario Ref:</span>
+                <span className="text-slate-500">Costo U:</span>
                 <span className="font-semibold text-slate-700">RD$ {costoPromedio12oz.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm pt-2 border-t border-slate-200">
-                <span className="text-slate-500">Inversión Total:</span>
+                <span className="text-slate-500">Total:</span>
                 <span className="font-bold text-amber-600">RD$ {inventario.potes12oz.inversionTotal.toLocaleString()}</span>
               </div>
             </div>
           </div>
-          <p className="text-[11px] text-slate-400 italic">Se descuenta automáticamente con pedidos de jugos naturales estándar.</p>
+          <p className="text-[11px] text-slate-400 italic">Jugos naturales estándar.</p>
+        </div>
+
+        {/* Potes 2 oz (Shots) */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold bg-purple-100 text-purple-800 px-3 py-1 rounded-full">Shots</span>
+              <Layers className="w-5 h-5 text-purple-600" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-800">Potes 2-4 oz</h3>
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Stock:</span>
+                <span className="font-bold text-slate-900">{inventario.potes2oz.cantidad} un.</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Costo U:</span>
+                <span className="font-semibold text-slate-700">RD$ {costoPromedio2oz.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm pt-2 border-t border-slate-200">
+                <span className="text-slate-500">Total:</span>
+                <span className="font-bold text-purple-600">RD$ {inventario.potes2oz.inversionTotal.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+          <p className="text-[11px] text-slate-400 italic">Shots de jengibre, cúrcuma, etc.</p>
         </div>
 
         {/* Potes 8 oz */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full">Verdes & Shots</span>
+              <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full">Verdes</span>
               <Layers className="w-5 h-5 text-emerald-600" />
             </div>
             <h3 className="text-lg font-bold text-slate-800">Potes de 8 oz</h3>
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Stock Actual:</span>
-                <span className="font-bold text-slate-900">{inventario.potes8oz.cantidad} unidades</span>
+                <span className="text-slate-500">Stock:</span>
+                <span className="font-bold text-slate-900">{inventario.potes8oz.cantidad} un.</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Costo Unitario Ref:</span>
+                <span className="text-slate-500">Costo U:</span>
                 <span className="font-semibold text-slate-700">RD$ {costoPromedio8oz.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm pt-2 border-t border-slate-200">
-                <span className="text-slate-500">Inversión Total:</span>
+                <span className="text-slate-500">Total:</span>
                 <span className="font-bold text-emerald-600">RD$ {inventario.potes8oz.inversionTotal.toLocaleString()}</span>
               </div>
             </div>
           </div>
-          <p className="text-[11px] text-slate-400 italic">Se descuenta automáticamente con pedidos de jugos verdes y shots.</p>
+          <p className="text-[11px] text-slate-400 italic">Jugos verdes y especiales.</p>
         </div>
 
         {/* Galones */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-xs font-bold bg-blue-100 text-blue-800 px-3 py-1 rounded-full">Presentación Grande</span>
+              <span className="text-xs font-bold bg-blue-100 text-blue-800 px-3 py-1 rounded-full">Grandes</span>
               <ShoppingBag className="w-5 h-5 text-blue-600" />
             </div>
             <h3 className="text-lg font-bold text-slate-800">Galones</h3>
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Stock Actual:</span>
-                <span className="font-bold text-slate-900">{inventario.galones.cantidad} unidades</span>
+                <span className="text-slate-500">Stock:</span>
+                <span className="font-bold text-slate-900">{inventario.galones.cantidad} un.</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Costo Unitario Ref:</span>
+                <span className="text-slate-500">Costo U:</span>
                 <span className="font-semibold text-slate-700">RD$ {costoPromedioGalon.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm pt-2 border-t border-slate-200">
-                <span className="text-slate-500">Inversión Total:</span>
+                <span className="text-slate-500">Total:</span>
                 <span className="font-bold text-blue-600">RD$ {inventario.galones.inversionTotal.toLocaleString()}</span>
               </div>
             </div>
           </div>
-          <p className="text-[11px] text-slate-400 italic">Se descuenta automáticamente con pedidos en presentación de galón.</p>
+          <p className="text-[11px] text-slate-400 italic">Presentación en galón.</p>
         </div>
       </div>
 
@@ -261,7 +292,8 @@ export default function InventarioPage() {
                   className="w-full p-3 border rounded-xl text-sm bg-white"
                 >
                   <option value="potes12oz">Potes de 12 oz (Naturales)</option>
-                  <option value="potes8oz">Potes de 8 oz (Verdes / Shots)</option>
+                  <option value="potes2oz">Potes de 2-4 oz (Shots)</option>
+                  <option value="potes8oz">Potes de 8 oz (Verdes)</option>
                   <option value="galones">Galones</option>
                 </select>
               </div>
@@ -291,7 +323,6 @@ export default function InventarioPage() {
                 />
               </div>
 
-              {/* Vista previa en tiempo del cálculo total */}
               {cantidadAgregar && costoUnitario && (
                 <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-xs flex justify-between items-center text-amber-900 font-bold">
                   <span>Total a sumar a la inversión:</span>
