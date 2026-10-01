@@ -86,6 +86,9 @@ export default function PedidosManuales() {
   const [vendedorAsignado, setVendedorAsignado] = useState("");
   const [metodoPago, setMetodoPago] = useState("Efectivo");
   
+  // Estado para Código de Pedido en texto (Interpretador automático de envases)
+  const [codigoPedidoTexto, setCodigoPedidoTexto] = useState("");
+
   // Estado para Fecha de Entrega (por defecto la fecha actual en formato YYYY-MM-DD)
   const [fechaEntrega, setFechaEntrega] = useState(() => new Date().toISOString().split("T")[0]);
   
@@ -230,8 +233,8 @@ export default function PedidosManuales() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (carrito.length === 0) {
-      alert("Por favor agrega al menos un producto al pedido.");
+    if (carrito.length === 0 && !codigoPedidoTexto.trim()) {
+      alert("Por favor agrega productos al carrito o ingresa el texto del código de pedido.");
       return;
     }
 
@@ -242,6 +245,25 @@ export default function PedidosManuales() {
 
     setGuardando(true);
 
+    // Si hay texto de código de pedido, interpretamos líneas para agregarlas o descontarlas
+    let productosFinales = [...carrito];
+    if (codigoPedidoTexto.trim()) {
+      const lineas = codigoPedidoTexto.split("\n");
+      lineas.forEach((linea) => {
+        if (!linea.trim()) return;
+        const matchCantidad = linea.match(/^(\d+)/);
+        const cantidad = matchCantidad ? parseInt(matchCantidad[1]) : 1;
+        
+        productosFinales.push({
+          id: "codigo-texto-" + Math.random(),
+          nombre: linea.trim(),
+          precio: 0, // Se asume que el precio se maneja globalmente o es informativo
+          cantidad: cantidad,
+          categoria: "Código de Pedido Externo"
+        });
+      });
+    }
+
     const objetoPedido = {
       cliente: {
         nombre: cliente.nombre.trim(),
@@ -250,7 +272,8 @@ export default function PedidosManuales() {
       telefono: cliente.telefono.trim(),
       direccion: cliente.direccion.trim() || "Local / Mostrador",
       zonaEnvio: zonaActual ? { nombre: zonaActual.nombre, tipo: zonaActual.tipo, costo: costoEnvio } : null,
-      productos: carrito,
+      productos: productosFinales,
+      codigoPedidoTexto: codigoPedidoTexto.trim() || null,
       subtotal: subtotalProductos,
       costoEnvio,
       total: totalPedido,
@@ -267,19 +290,20 @@ export default function PedidosManuales() {
     const resultado = await crearPedido(objetoPedido);
 
     if (resultado.exito) {
-      // 2. Conectar con admin/productos (Inventario/Catálogo) para descontar stock de los productos vendidos
+      // 2. Conectar con admin/productos para descontar existencias automáticamente
       try {
         if (typeof descontarStockProductos === "function") {
-          await descontarStockProductos(carrito);
+          await descontarStockProductos(productosFinales);
         }
       } catch (err) {
         console.error("Error al actualizar el inventario (admin/productos):", err);
       }
 
       setGuardando(false);
-      alert(`¡Pedido registrado en Firestore con éxito por RD$ ${totalPedido.toLocaleString()} y stock actualizado en inventario!`);
+      alert(`¡Pedido registrado con éxito por RD$ ${totalPedido.toLocaleString()} y stock descontado del inventario!`);
       setCliente({ nombre: "", telefono: "", direccion: "" });
       setCarrito([]);
+      setCodigoPedidoTexto("");
       setDeliveryAsignado("");
       setVendedorAsignado("");
       setZonaSeleccionadaId("");
@@ -293,11 +317,11 @@ export default function PedidosManuales() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-800">Registrar Pedido (WhatsApp / Teléfono)</h1>
-        <p className="text-slate-500 text-sm">Selecciona un cliente del CRM o ingresa uno nuevo con sus zonas y detalles.</p>
+        <p className="text-slate-500 text-sm">Selecciona un cliente del CRM, ingresa productos o pega el código de pedido para descontar inventario.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Columna 1 y 2: Personalización + Catálogo */}
+        {/* Columna 1 y 2: Personalización + Catálogo + Código de Pedido */}
         <div className="lg:col-span-2 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-gradient-to-r from-emerald-500 to-teal-600 p-4 rounded-2xl text-white shadow-sm flex flex-col justify-between gap-3">
@@ -333,6 +357,24 @@ export default function PedidosManuales() {
             </div>
           </div>
 
+          {/* Sección para pegar el Código de Pedido en Texto */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+              📋 Código de Pedido del Cliente (Opcional / Texto)
+            </h2>
+            <p className="text-xs text-slate-500">Pega aquí el mensaje del cliente para procesar envases (12 oz, 8 oz, galones) y descontar stock automáticamente.</p>
+            <textarea
+              rows="3"
+              placeholder="Ej:
+2 Chinola
+1 Galón Naranja Agria
+3 Limón Avena"
+              value={codigoPedidoTexto}
+              onChange={(e) => setCodigoPedidoTexto(e.target.value)}
+              className="w-full p-3 border rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+          </div>
+
           <div>
             <h2 className="text-lg font-semibold text-slate-700 mb-3">Catálogo Fijo (Firestore)</h2>
 
@@ -365,7 +407,7 @@ export default function PedidosManuales() {
                           <p className="text-xs text-slate-400 mt-1 line-clamp-1">{jugo.descripcion}</p>
                         )}
                         {jugo.stock !== undefined && (
-                          <p className="text-[11px] text-slate-500 mt-1 font-medium">Stock disponible: {jugo.stock}</p>
+                          <p className="text-[11px] text-slate-500 mt-1 font-medium">Stock: {jugo.stock}</p>
                         )}
                       </div>
                       
@@ -451,7 +493,6 @@ export default function PedidosManuales() {
                 className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
-            {/* Campo Nuevo: Fecha de Entrega */}
             <div>
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
                 <Calendar className="w-3.5 h-3.5 text-amber-600" /> Fecha de Entrega *
@@ -491,7 +532,6 @@ export default function PedidosManuales() {
               </select>
             </div>
 
-            {/* Si es camión, mostrar selector de Costo Normal vs Frío */}
             {zonaActual && zonaActual.tipo === "camion" && (
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
                 <label className="text-xs font-semibold text-slate-600 block">Tipo de Tarifa Camión:</label>
