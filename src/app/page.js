@@ -389,6 +389,7 @@ try {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 space-y-3">
           <div className="flex justify-between items-center gap-4">
             <div className="flex items-center gap-3">
+        <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-md">
               </div>
               <div className="flex items-center gap-3">
   <img 
