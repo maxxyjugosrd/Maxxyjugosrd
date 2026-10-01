@@ -392,12 +392,14 @@ try {
               <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-md">
                 MJ
               </div>
-              <div>
-                <h1 className="text-xl font-extrabold tracking-tight text-slate-900 leading-none">MAXXY JUGOS</h1>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600">
-                  100% Natural • Colmados, Supermercados & Cafeterías
-                </span>
-              </div>
+              <div className="flex items-center gap-3">
+  <img 
+    src="/logo.JPG" 
+    alt="Maxxy Jugos Logo" 
+    className="w-12 h-12 object-cover rounded-2xl shadow-md border" 
+  />
+  <span className="font-black text-slate-900 text-lg">Maxxy Jugos</span>
+</div>
             </div>
 
             {/* Búsqueda Desktop */}
