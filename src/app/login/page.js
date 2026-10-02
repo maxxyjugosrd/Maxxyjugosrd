@@ -35,7 +35,7 @@ export default function LoginPage() {
     <div 
       className="min-h-screen flex items-center justify-center p-4 relative bg-cover bg-center"
       style={{
-        backgroundImage: `url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSlNHVhSf58Eoq-dveabbN5yCHo-qCX4eDPHXabIXwxPBxmb_MnDRLIvRtl&s=10')`
+        backgroundImage: `url('https://thumbs.dreamstime.com/z/jugo-de-naranja-fresco-en-vidrio-con-naranjas-y-fondo-huerto-para-consumo-saludable-disfrute-la-frescura-esta-imagen-zumo-natural-396706649.jpg')`
       }}
     >
       {/* Capa de superposición oscura/translúcida para que el formulario resalte perfectamente */}
