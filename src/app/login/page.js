@@ -35,7 +35,7 @@ export default function LoginPage() {
     <div 
       className="min-h-screen flex items-center justify-center p-4 relative bg-cover bg-center"
       style={{
-        backgroundImage: `url('https://i.pinimg.com/736x/5b/3b/91/5b3b91e784e1acf294d19322cef1bcc6.jpg')`
+        backgroundImage: `url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSlNHVhSf58Eoq-dveabbN5yCHo-qCX4eDPHXabIXwxPBxmb_MnDRLIvRtl&s=10')`
       }}
     >
       {/* Capa de superposición oscura/translúcida para que el formulario resalte perfectamente */}
