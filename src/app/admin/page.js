@@ -17,6 +17,8 @@ import {
   Phone,
   Mail,
   Package,
+  Printer,
+  Filter,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -42,6 +44,10 @@ export default function AdminDashboard() {
   const [pedidoAEditar, setPedidoAEditar] = useState(null);
   const [pedidoVerDetalles, setPedidoVerDetalles] = useState(null);
 
+  // Estados para filtros de fecha (por defecto vacíos para mostrar todo o el mes actual)
+  const [fechaInicio, setFechaInicio] = useState("");
+  const [fechaFin, setFechaFin] = useState("");
+
   useEffect(() => {
     // Escuchar pedidos en tiempo real desde Firestore
     const desuscribirPedidos = obtenerPedidosEnVivo((datos) => {
@@ -66,19 +72,58 @@ export default function AdminDashboard() {
     };
   }, []);
 
-  // Función para actualizar el estado del pedido en Firestore y contabilizar comisiones/entregas solo al completar
+  // Función para obtener objeto Date limpio de un pedido (compatible con Timestamps de Firebase o strings)
+  const obtenerObjetoFecha = (fechaRaw) => {
+    if (!fechaRaw) return null;
+    if (fechaRaw.seconds) {
+      return new Date(fechaRaw.seconds * 1000);
+    }
+    if (typeof fechaRaw === "string") {
+      const fecha = new Date(fechaRaw);
+      return isNaN(fecha.getTime()) ? null : fecha;
+    }
+    return null;
+  };
+
+  // Filtrar pedidos según el rango de fechas seleccionado
+  const pedidosFiltrados = pedidos.filter((pedido) => {
+    if (!fechaInicio && !fechaFin) return true;
+
+    const fechaPedido = obtenerObjetoFecha(pedido.fecha || pedido.fechaCreacion);
+    if (!fechaPedido) return false;
+
+    // Normalizar la fecha del pedido a formato YYYY-MM-DD para comparar de forma exacta
+    const anio = fechaPedido.getFullYear();
+    const mes = String(fechaPedido.getMonth() + 1).padStart(2, "0");
+    const dia = String(fechaPedido.getDate).padStart ? String(fechaPedido.getDate()).padStart(2, "0") : "01";
+    const fechaStr = `${anio}-${mes}-${dia}`;
+
+    if (fechaInicio && fechaFin) {
+      return fechaStr >= fechaInicio && fechaStr <= fechaFin;
+    } else if (fechaInicio) {
+      return fechaStr >= fechaInicio;
+    } else if (fechaFin) {
+      return fechaStr <= fechaFin;
+    }
+    return true;
+  });
+
+  // Función para imprimir el reporte de ventas filtradas
+  const handleImprimirReporte = () => {
+    window.print();
+  };
+
+  // Función para actualizar el estado del pedido en Firestore
   const cambiarEstadoPedido = async (idPedidoDoc, nuevoEstado) => {
     if (!idPedidoDoc) return;
     setActualizandoId(idPedidoDoc);
     try {
-      // Encontrar el pedido actual en la lista para verificar su estado anterior
       const pedidoActual = pedidos.find(p => (p.idDoc || p.id) === idPedidoDoc);
       const estadoAnterior = pedidoActual?.estado || "Pendiente";
 
       const pedidoRef = doc(db, "pedidos", idPedidoDoc);
       await updateDoc(pedidoRef, { estado: nuevoEstado });
 
-      // OJO: Solo contabilizar si el nuevo estado es "Completado" y antes NO estaba completado
       if (nuevoEstado.toLowerCase() === "completado" && estadoAnterior.toLowerCase() !== "completado") {
         const personalGuardado = localStorage.getItem("maxi_personal");
         if (personalGuardado && pedidoActual) {
@@ -89,7 +134,6 @@ export default function AdminDashboard() {
             const subtotalVenta = Number(pedidoActual.subtotal || pedidoActual.total || 0);
 
             personalArr = personalArr.map((persona) => {
-              // Si coincide con el vendedor y tiene rol de Vendedor
               if (persona.rol === "Vendedor" && persona.nombre === vendedorAsignado) {
                 const porcentaje = Number(persona.valorConfigurado || 0);
                 const comisionGanada = (subtotalVenta * porcentaje) / 100;
@@ -99,20 +143,16 @@ export default function AdminDashboard() {
                   comisionesAcumuladas: (persona.comisionesAcumuladas || 0) + comisionGanada,
                 };
               }
-
-              // Si coincide con el delivery y tiene rol de Delivery
               if (persona.rol === "Delivery" && persona.nombre === deliveryAsignado) {
                 return {
                   ...persona,
                   entregasRealizadas: (persona.entregasRealizadas || 0) + 1,
                 };
               }
-
               return persona;
             });
 
             localStorage.setItem("maxi_personal", JSON.stringify(personalArr));
-            console.log("¡Comisiones y entregas actualizadas con éxito en el personal!");
           } catch (e) {
             console.error("Error al actualizar la nómina del personal:", e);
           }
@@ -128,11 +168,7 @@ export default function AdminDashboard() {
 
   // Función para eliminar un pedido
   const handleEliminarPedido = async (idPedidoDoc) => {
-    if (
-      confirm(
-        "¿Estás seguro de que deseas eliminar este pedido? Esta acción no se puede deshacer."
-      )
-    ) {
+    if (confirm("¿Estás seguro de que deseas eliminar este pedido? Esta acción no se puede deshacer.")) {
       const res = await eliminarPedido(idPedidoDoc);
       if (!res.exito) {
         alert("Hubo un error al intentar eliminar el pedido.");
@@ -180,8 +216,8 @@ export default function AdminDashboard() {
     return String(fechaRaw);
   };
 
-  // CÁLCULOS EN TIEMPO REAL DESDE FIRESTORE:
-  const ventasHoy = pedidos.reduce((total, p) => total + (p.total || 0), 0);
+  // CÁLCULOS BASADOS EN LOS PEDIDOS FILTRADOS
+  const ventasFiltradasTotal = pedidosFiltrados.reduce((total, p) => total + (p.total || 0), 0);
 
   const totalGastosContabilidad = gastosLista.reduce(
     (acc, g) => acc + Number(g.monto || g.costo || g.total || 0),
@@ -194,7 +230,7 @@ export default function AdminDashboard() {
   );
 
   const totalGastosYPagos = totalGastosContabilidad + totalPagosPersonal;
-  const gananciaNeta = ventasHoy - totalGastosYPagos;
+  const gananciaNeta = ventasFiltradasTotal - totalGastosYPagos;
 
   // Helper de estilos por estado
   const obtenerEstiloEstado = (estado = "") => {
@@ -205,15 +241,15 @@ export default function AdminDashboard() {
         return "bg-blue-100 text-blue-800 border-blue-300";
       case "cancelado":
         return "bg-rose-100 text-rose-800 border-rose-300";
-      default: // pendiente
+      default:
         return "bg-amber-100 text-amber-800 border-amber-300";
     }
   };
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      {/* Encabezado Ocultable / Adaptable para impresión */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">
             Panel de Control - Maxxy Jugos 🥤
@@ -222,13 +258,75 @@ export default function AdminDashboard() {
             Resumen financiero y operativo en tiempo real.
           </p>
         </div>
-        <Link
-          href="/admin/pedidos"
-          className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl font-medium transition shadow-sm"
-        >
-          <PlusCircle className="w-5 h-5" />
-          Nuevo Pedido (WhatsApp)
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleImprimirReporte}
+            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl font-medium transition shadow-sm"
+          >
+            <Printer className="w-4 h-4" />
+            Imprimir Reporte
+          </button>
+          <Link
+            href="/admin/pedidos"
+            className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl font-medium transition shadow-sm"
+          >
+            <PlusCircle className="w-5 h-5" />
+            Nuevo Pedido
+          </Link>
+        </div>
+      </div>
+
+      {/* CABECERA EXCLUSIVA PARA IMPRESIÓN (Logo y Título formal) */}
+      <div className="hidden print:flex flex-col items-center justify-center space-y-2 mb-6 border-b pb-4">
+        <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="Maxxy Jugos Logo" className="w-16 h-16 object-contain" />
+          <div>
+            <h1 className="text-2xl font-black text-slate-900">Maxxy Jugos S.R.L.</h1>
+            <p className="text-xs text-slate-500">Santo Domingo, Rep. Dominicana • Reporte de Ventas</p>
+          </div>
+        </div>
+        <p className="text-xs text-slate-600 font-medium pt-2">
+          Período: {fechaInicio || "Inicio"} al {fechaFin || "Actualidad"} | Generado el {new Date().toLocaleDateString("es-DO")}
+        </p>
+      </div>
+
+      {/* SECCIÓN DE FILTROS POR FECHA (Día a día o Mes a mes) */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 print:hidden">
+        <div className="flex items-center gap-2 text-slate-700 font-semibold text-sm">
+          <Filter className="w-4 h-4 text-amber-500" />
+          <span>Filtrar Pedidos por Fecha:</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-500 font-medium">Desde:</span>
+            <input
+              type="date"
+              value={fechaInicio}
+              onChange={(e) => setFechaInicio(e.target.value)}
+              className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs bg-slate-50 outline-none focus:border-amber-500"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-500 font-medium">Hasta:</span>
+            <input
+              type="date"
+              value={fechaFin}
+              onChange={(e) => setFechaFin(e.target.value)}
+              className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs bg-slate-50 outline-none focus:border-amber-500"
+            />
+          </div>
+          {(fechaInicio || fechaFin) && (
+            <button
+              onClick={() => {
+                setFechaInicio("");
+                setFechaFin("");
+              }}
+              className="text-xs text-rose-600 hover:text-rose-800 font-semibold underline px-2 py-1"
+            >
+              Limpiar Filtros
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tarjetas de Métricas Principales */}
@@ -236,7 +334,7 @@ export default function AdminDashboard() {
         {/* Ventas Totales */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-2">
           <div className="flex justify-between items-center text-slate-500">
-            <span className="text-sm font-medium">Ventas Totales</span>
+            <span className="text-sm font-medium">Ventas en el Período</span>
             <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
               <ShoppingBag className="w-5 h-5" />
             </div>
@@ -245,19 +343,18 @@ export default function AdminDashboard() {
             {cargando ? (
               <Loader2 className="w-7 h-7 animate-spin text-amber-500" />
             ) : (
-              `RD$ ${ventasHoy.toLocaleString()}`
+              `RD$ ${ventasFiltradasTotal.toLocaleString()}`
             )}
           </div>
           <p className="text-xs text-emerald-600 flex items-center gap-1 font-medium">
-            <ArrowUpRight className="w-3.5 h-3.5" /> {pedidos.length} pedidos
-            registrados
+            <ArrowUpRight className="w-3.5 h-3.5" /> {pedidosFiltrados.length} pedidos encontrados
           </p>
         </div>
 
-        {/* Gastos y Pagos (Dato Dinámico desde Firestore) */}
+        {/* Gastos y Pagos */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-2">
           <div className="flex justify-between items-center text-slate-500">
-            <span className="text-sm font-medium">Gastos & Pagos</span>
+            <span className="text-sm font-medium">Gastos & Pagos Generales</span>
             <div className="p-2 bg-rose-50 rounded-lg text-rose-600">
               <DollarSign className="w-5 h-5" />
             </div>
@@ -266,12 +363,11 @@ export default function AdminDashboard() {
             RD$ {totalGastosYPagos.toLocaleString()}
           </div>
           <p className="text-xs text-slate-400">
-            Gastos: RD$ {totalGastosContabilidad.toLocaleString()} | Personal:
-            RD$ {totalPagosPersonal.toLocaleString()}
+            Gastos: RD$ {totalGastosContabilidad.toLocaleString()} | Personal: RD$ {totalPagosPersonal.toLocaleString()}
           </p>
         </div>
 
-        {/* Ganancia Neta Limpia Real */}
+        {/* Ganancia Neta */}
         <div className="bg-gradient-to-br from-amber-500 to-orange-500 text-white p-5 rounded-2xl shadow-md space-y-2">
           <div className="flex justify-between items-center opacity-90">
             <span className="text-sm font-medium">Ganancia Neta Limpia</span>
@@ -292,14 +388,14 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Lista de Pedidos Recientes en Firestore */}
+      {/* Lista de Pedidos Filtrados */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 border-b flex justify-between items-center">
           <h2 className="font-semibold text-slate-800">
-            Pedidos Recientes (Firestore)
+            Registro de Pedidos {fechaInicio || fechaFin ? "(Filtrados)" : "(Todos)"}
           </h2>
           <span className="text-xs text-slate-400">
-            {pedidos.length} en total
+            {pedidosFiltrados.length} registros listos
           </span>
         </div>
 
@@ -308,13 +404,13 @@ export default function AdminDashboard() {
             <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
             <span>Cargando datos desde Firebase...</span>
           </div>
-        ) : pedidos.length === 0 ? (
+        ) : pedidosFiltrados.length === 0 ? (
           <div className="p-8 text-center text-slate-400">
-            No hay pedidos registrados en la base de datos todavía.
+            No se encontraron pedidos en el período seleccionado.
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {pedidos.map((pedido) => {
+            {pedidosFiltrados.map((pedido) => {
               const idDoc = pedido.idDoc || pedido.id;
               const nombreCliente =
                 typeof pedido.cliente === "string"
@@ -341,8 +437,7 @@ export default function AdminDashboard() {
                       )}
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      {telefonoCliente} • {pedido.metodoPago || "Pendiente"}{" "}
-                      {pedido.origen ? `• ${pedido.origen}` : ""}
+                      {telefonoCliente} • {pedido.metodoPago || "Pendiente"} {pedido.origen ? `• ${pedido.origen}` : ""} • <span className="font-medium text-slate-500">{formatearFecha(pedido.fecha || pedido.fechaCreacion)}</span>
                     </p>
                   </div>
 
@@ -351,8 +446,8 @@ export default function AdminDashboard() {
                       RD$ {(pedido.total || 0).toLocaleString()}
                     </span>
 
-                    {/* Selector interactivo para cambiar el estado */}
-                    <div className="relative">
+                    {/* Selector de estado (Oculto al imprimir para mayor prolijidad) */}
+                    <div className="relative print:hidden">
                       <select
                         value={pedido.estado || "Pendiente"}
                         disabled={actualizandoId === idDoc}
@@ -373,39 +468,39 @@ export default function AdminDashboard() {
                       )}
                     </div>
 
-                    {/* Botón Ver Detalles (Ojo) */}
-                    <button
-                      onClick={() => setPedidoVerDetalles(pedido)}
-                      className="p-1.5 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
-                      title="Ver detalles completos del pedido"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
+                    {/* Botones de acción (Ocultos al imprimir) */}
+                    <div className="flex items-center gap-1 print:hidden">
+                      <button
+                        onClick={() => setPedidoVerDetalles(pedido)}
+                        className="p-1.5 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+                        title="Ver detalles completos del pedido"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
 
-                    {/* Botón Editar (Lápiz) */}
-                    <button
-                      onClick={() =>
-                        setPedidoAEditar({
-                          ...pedido,
-                          idDoc,
-                          nombreCliente,
-                          telefonoCliente,
-                        })
-                      }
-                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                      title="Editar pedido"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
+                      <button
+                        onClick={() =>
+                          setPedidoAEditar({
+                            ...pedido,
+                            idDoc,
+                            nombreCliente,
+                            telefonoCliente,
+                          })
+                        }
+                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                        title="Editar pedido"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
 
-                    {/* Botón Eliminar (Basura) */}
-                    <button
-                      onClick={() => handleEliminarPedido(idDoc)}
-                      className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                      title="Eliminar pedido"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                      <button
+                        onClick={() => handleEliminarPedido(idDoc)}
+                        className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Eliminar pedido"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -414,9 +509,15 @@ export default function AdminDashboard() {
         )}
       </div>
 
+      {/* PIE DE PÁGINA EXCLUSIVO PARA IMPRESIÓN */}
+      <div className="hidden print:block pt-8 text-center text-xs text-slate-500 border-t mt-12">
+        <p>Maxxy Jugos S.R.L. • Documento de control interno de ventas y operaciones.</p>
+        <p className="mt-1">Total recaudado en este reporte: <strong className="text-slate-800">RD$ {ventasFiltradasTotal.toLocaleString()}</strong></p>
+      </div>
+
       {/* Modal para Ver Detalles Completos del Pedido */}
       {pedidoVerDetalles && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 print:hidden">
           <div className="bg-white rounded-2xl p-6 max-w-lg w-full space-y-5 shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
               <div>
@@ -435,7 +536,7 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            {/* Fechas */}
+            {/* Fechas y Personal */}
             <div className="bg-slate-50 p-3 rounded-xl space-y-1 text-xs text-slate-600 border border-slate-100">
               <div className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-amber-500" />
@@ -456,15 +557,6 @@ export default function AdminDashboard() {
                   {pedidoVerDetalles.deliveryAsignado || "No asignado"}
                 </span>
               </div>
-              {pedidoVerDetalles.datosEnvio?.fechaEntrega && (
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-emerald-500" />
-                  <span className="font-semibold">
-                    Fecha Programada de Entrega:
-                  </span>{" "}
-                  {pedidoVerDetalles.datosEnvio.fechaEntrega}
-                </div>
-              )}
             </div>
 
             {/* Datos del Cliente y Envío */}
@@ -484,12 +576,6 @@ export default function AdminDashboard() {
                   pedidoVerDetalles.datosEnvio?.telefono ||
                   "Sin teléfono"}
               </p>
-              {pedidoVerDetalles.correoDestino && (
-                <p className="flex items-center gap-2 text-xs text-slate-600">
-                  <Mail className="w-3.5 h-3.5 text-slate-400" />
-                  {pedidoVerDetalles.correoDestino}
-                </p>
-              )}
               <div className="flex items-start gap-2 text-xs text-slate-600 bg-amber-50/50 p-2.5 rounded-xl border border-amber-100">
                 <MapPin className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                 <div>
@@ -499,14 +585,6 @@ export default function AdminDashboard() {
                   <p>
                     {pedidoVerDetalles.direccion ||
                       pedidoVerDetalles.datosEnvio?.direccion ||
-                      "No especificada"}
-                  </p>
-                  <p className="text-[11px] text-amber-700 font-medium mt-0.5">
-                    Zona:{" "}
-                    {pedidoVerDetalles.zonaEnvio?.nombre ||
-                      pedidoVerDetalles.zonaActual?.nombre ||
-                      pedidoVerDetalles.zonaActual ||
-                      pedidoVerDetalles.zona ||
                       "No especificada"}
                   </p>
                 </div>
@@ -531,7 +609,7 @@ export default function AdminDashboard() {
                           {item.cantidad || 1}x {item.nombre || item.titulo}
                         </p>
                         <p className="text-slate-400 text-[11px]">
-                          Tamaño/Presentación: {item.tamano || item.presentacion || item.formato || item.medida || "Estándar"}
+                          Tamaño: {item.tamano || item.presentacion || "Estándar"}
                         </p>
                       </div>
                       <span className="font-medium text-slate-700">
@@ -552,20 +630,6 @@ export default function AdminDashboard() {
 
             {/* Resumen de Pago */}
             <div className="border-t pt-3 space-y-1 text-xs text-slate-600">
-              {pedidoVerDetalles.subtotal && (
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>
-                    RD$ {Number(pedidoVerDetalles.subtotal).toLocaleString()}
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span>Costo de Envío:</span>
-                <span>
-                  RD$ {Number(pedidoVerDetalles.costoEnvio || pedidoVerDetalles.envio || pedidoVerDetalles.zonaEnvio?.costo || 0).toLocaleString()}
-                </span>
-              </div>
               <div className="flex justify-between font-bold text-slate-800 text-sm pt-1 border-t">
                 <span>Total a Pagar:</span>
                 <span className="text-amber-600">
@@ -589,7 +653,7 @@ export default function AdminDashboard() {
 
       {/* Modal para Editar Pedido */}
       {pedidoAEditar && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 print:hidden">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 shadow-xl">
             <div className="flex justify-between items-center border-b pb-3">
               <h3 className="font-bold text-slate-800">Editar Pedido</h3>
