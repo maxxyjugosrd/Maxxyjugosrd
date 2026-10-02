@@ -35,7 +35,7 @@ export default function LoginPage() {
     <div 
       className="min-h-screen flex items-center justify-center p-4 relative bg-cover bg-center"
       style={{
-        backgroundImage: `https://i.pinimg.com/736x/48/75/5c/48755c810a42ca91ba212466e11efe64.jpg')`
+        backgroundImage: `url('https://i.pinimg.com/736x/5b/3b/91/5b3b91e784e1acf294d19322cef1bcc6.jpg')`
       }}
     >
       {/* Capa de superposición oscura/translúcida para que el formulario resalte perfectamente */}
@@ -50,7 +50,6 @@ export default function LoginPage() {
               alt="Maxxy Jugos Logo" 
               className="w-20 h-20 object-contain rounded-2xl shadow-md bg-white p-1 border border-slate-100" 
               onError={(e) => {
-                // Si la imagen falla en cargar por alguna razón, muestra el emoji de respaldo
                 e.target.style.display = 'none';
               }}
             />
