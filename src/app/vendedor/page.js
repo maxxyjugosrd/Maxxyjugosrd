@@ -24,6 +24,10 @@ import {
   Package,
   Lock,
   KeyRound,
+  Search,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 
 // Importación de servicios oficiales de tu proyecto y Firebase
@@ -31,7 +35,7 @@ import { crearPedido } from "@/services/pedidosService";
 import { obtenerProductosEnVivo, obtenerIngredientesEnVivo } from "@/services/catalogoService";
 import { obtenerClientesEnVivo } from "@/services/clientesService";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc } from "firebase/firestore";
 
 // Listas de Zonas de Envío configuradas
 const ZONAS_ENVIO = [
@@ -68,6 +72,7 @@ export default function PanelVendedorSeguro() {
   const [listaIngredientesVerdes, setListaIngredientesVerdes] = useState([]);
   const [listaIngredientesShots, setListaIngredientesShots] = useState([]);
   const [personalFirebase, setPersonalFirebase] = useState([]);
+  const [pedidosFirebase, setPedidosFirebase] = useState([]);
 
   // Formulario del pedido
   const [cliente, setCliente] = useState({ nombre: "", telefono: "", direccion: "" });
@@ -82,6 +87,10 @@ export default function PanelVendedorSeguro() {
   const [tipoCostoCamion, setTipoCostoCamion] = useState("costoNormal");
   const [guardando, setGuardando] = useState(false);
   const [exitoMensaje, setExitoMensaje] = useState("");
+
+  // Estados para Historial y Filtros del Vendedor
+  const [filtroEstado, setFiltroEstado] = useState("todos"); // "todos", "Pendiente", "Completado"
+  const [busquedaHistorial, setBusquedaHistorial] = useState("");
 
   // Modales de personalización
   const [modalVerdeAbierto, setModalVerdeAbierto] = useState(false);
@@ -115,10 +124,16 @@ export default function PanelVendedorSeguro() {
       setListaIngredientesShots(datos.filter((i) => i.tipo === "shot" && i.disponible !== false));
     });
 
+    const desuscribirPedidos = onSnapshot(collection(db, "pedidos"), (snapshot) => {
+      const lista = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      setPedidosFirebase(lista);
+    });
+
     return () => {
       desuscribirProductos && desuscribirProductos();
       desuscribirClientes && desuscribirClientes();
       desuscribirIngredientes && desuscribirIngredientes();
+      desuscribirPedidos && desuscribirPedidos();
     };
   }, []);
 
@@ -138,19 +153,34 @@ export default function PanelVendedorSeguro() {
     return () => unsubscribe();
   }, []);
 
-// Leer directamente la comisión acumulada y el porcentaje del documento en Firebase del vendedor
-const obtenerComisionVendedor = () => {
-  const info = personalFirebase.find(
-    (p) => p.nombre?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() && p.rol === "Vendedor"
-  );
+  // Leer directamente la comisión acumulada y el porcentaje del documento en Firebase del vendedor
+  const obtenerComisionVendedor = () => {
+    const info = personalFirebase.find(
+      (p) => p.nombre?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() && p.rol === "Vendedor"
+    );
 
-  return {
-    porcentaje: Number(info?.comisionPorcentaje || info?.valorConfigurado || 0),
-    comisionAcumulada: Number(info?.comisionAcumulada || 0),
+    return {
+      porcentaje: Number(info?.comisionPorcentaje || info?.valorConfigurado || 0),
+      comisionAcumulada: Number(info?.comisionAcumulada || 0),
+    };
   };
-};
 
-const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
+  const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
+
+  // Calcular comisiones pendientes basadas en los pedidos creados por este vendedor que están "Pendientes"
+  const calcularComisionPendiente = () => {
+    if (!vendedorActual) return 0;
+    const pedidosDelVendedor = pedidosFirebase.filter(
+      (p) =>
+        p.vendedorAsignado?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() &&
+        p.estado !== "Completado" &&
+        p.estado !== "Cancelado"
+    );
+    const totalVentasPendientes = pedidosDelVendedor.reduce((sum, p) => sum + Number(p.total || 0), 0);
+    return totalVentasPendientes * (porcentaje / 100);
+  };
+
+  const comisionPendienteCobro = calcularComisionPendiente();
   
   // Manejar PIN del Vendedor
   const handleSeleccionarNombreDropdown = (nombre) => {
@@ -329,10 +359,10 @@ const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
     };
 
     const resultado = await crearPedido(objetoPedido);
-    setGuardando(false);
-
-    // Actualizar la comisión acumulada en el documento de Firebase del vendedor
-      const montoTotalVenta = Number(nuevoPedido.total || 0);
+    
+    if (resultado.exito) {
+      // Actualizar la comisión acumulada en el documento de Firebase del vendedor
+      const montoTotalVenta = Number(objetoPedido.total || 0);
       const comisionEstaVenta = montoTotalVenta * (porcentaje / 100);
 
       const infoVendedor = personalFirebase.find(
@@ -348,16 +378,7 @@ const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
         });
       }
 
-      setExitoMensaje("¡Pedido registrado y comisión actualizada con éxito!");
-      setGuardando(false);
-      
-    } catch (error) {
-      console.error("Error al guardar el pedido:", error);
-      setGuardando(false);
-    }
-  
-    if (resultado.exito) {
-      setExitoMensaje("¡Pedido registrado con éxito! Quedó en estado Pendiente para aprobación.");
+      setExitoMensaje("¡Pedido registrado y comisión actualizada con éxito! Quedó en estado Pendiente.");
       setCliente({ nombre: "", telefono: "", direccion: "" });
       setClienteSeleccionadoObj(null);
       setCarrito([]);
@@ -367,6 +388,8 @@ const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
     } else {
       alert("Error al guardar el pedido en Firestore.");
     }
+    
+    setGuardando(false);
     setModalPasswordAbierto(false);
     setPasswordSupervisorInput("");
   };
@@ -406,6 +429,25 @@ const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
       alert("Contraseña incorrecta.");
     }
   };
+
+  // Filtrar pedidos del historial del vendedor actual
+  const pedidosDelVendedorActual = pedidosFirebase.filter(
+    (p) => p.vendedorAsignado?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase()
+  );
+
+  const pedidosFiltradosHistorial = pedidosDelVendedorActual.filter((p) => {
+    // Filtro por estado
+    const nombreClienteStr = typeof p.cliente === "string" ? p.cliente : p.cliente?.nombre || "";
+    const coincideEstado =
+      filtroEstado === "todos" ||
+      (filtroEstado === "Pendiente" && p.estado !== "Completado" && p.estado !== "Cancelado") ||
+      (filtroEstado === "Completado" && p.estado === "Completado");
+
+    // Filtro por barra de búsqueda (nombre de cliente)
+    const coincideBusqueda = nombreClienteStr.toLowerCase().includes(busquedaHistorial.toLowerCase());
+
+    return coincideEstado && coincideBusqueda;
+  });
 
   // Pantalla de Autenticación por PIN del Vendedor
   if (!vendedorActual) {
@@ -514,15 +556,28 @@ const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
           </div>
         )}
 
-        {/* Resumen Comisiones Vendedor (Directo de Firebase) */}
-        <div className="bg-gradient-to-br from-amber-500 to-orange-500 text-white p-6 rounded-3xl shadow-md flex justify-between items-center">
-          <div>
-            <span className="text-xs uppercase tracking-wider opacity-90 font-semibold">Tus Comisiones Acumuladas</span>
-            <div className="text-3xl font-black">RD$ {comisionAcumulada.toLocaleString()}</div>
-            <p className="text-xs opacity-80">Porcentaje configurado: <strong>{porcentaje}%</strong></p>
+        {/* Resumen Comisiones Vendedor (Directo de Firebase + Comisiones Pendientes) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="bg-gradient-to-br from-amber-500 to-orange-500 text-white p-6 rounded-3xl shadow-md flex justify-between items-center">
+            <div>
+              <span className="text-xs uppercase tracking-wider opacity-90 font-semibold">Tus Comisiones Acumuladas</span>
+              <div className="text-3xl font-black">RD$ {comisionAcumulada.toLocaleString()}</div>
+              <p className="text-xs opacity-80 mt-1">Porcentaje configurado: <strong>{porcentaje}%</strong></p>
+            </div>
+            <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
+              <TrendingUp className="w-8 h-8 text-white" />
+            </div>
           </div>
-          <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
-            <TrendingUp className="w-8 h-8 text-white" />
+
+          <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 rounded-3xl shadow-md flex justify-between items-center">
+            <div>
+              <span className="text-xs uppercase tracking-wider opacity-80 font-semibold">Comisiones Pendientes de Cobro</span>
+              <div className="text-3xl font-black text-amber-400">RD$ {comisionPendienteCobro.toLocaleString()}</div>
+              <p className="text-xs opacity-70 mt-1">De pedidos aún no completados</p>
+            </div>
+            <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm">
+              <Clock className="w-8 h-8 text-amber-400" />
+            </div>
           </div>
         </div>
 
@@ -600,6 +655,88 @@ const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* HISTORIAL DE PEDIDOS Y FILTROS PARA EL VENDEDOR */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-4">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <Package className="w-5 h-5 text-amber-500" /> Historial de Mis Pedidos
+                  </h2>
+                  <p className="text-xs text-slate-500">Monitorea el estatus de tus clientes (Cambiable solo en el panel principal)</p>
+                </div>
+
+                {/* Filtro por Estado */}
+                <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-semibold shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setFiltroEstado("todos")}
+                    className={`px-3 py-1.5 rounded-lg transition ${filtroEstado === "todos" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500"}`}
+                  >
+                    Todos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFiltroEstado("Pendiente")}
+                    className={`px-3 py-1.5 rounded-lg transition ${filtroEstado === "Pendiente" ? "bg-white text-amber-700 shadow-sm" : "text-slate-500"}`}
+                  >
+                    Pendientes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFiltroEstado("Completado")}
+                    className={`px-3 py-1.5 rounded-lg transition ${filtroEstado === "Completado" ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500"}`}
+                  >
+                    Completados
+                  </button>
+                </div>
+              </div>
+
+              {/* Barra de Búsqueda por Nombre de Cliente */}
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  placeholder="Buscar pedido por nombre de cliente..."
+                  value={busquedaHistorial}
+                  onChange={(e) => setBusquedaHistorial(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              {/* Lista de Pedidos Filtrados */}
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {pedidosFiltradosHistorial.length === 0 ? (
+                  <p className="text-xs text-slate-400 text-center py-6 italic">No se encontraron pedidos con estos criterios.</p>
+                ) : (
+                  pedidosFiltradosHistorial.map((ped) => {
+                    const nombreCliente = typeof ped.cliente === "string" ? ped.cliente : ped.cliente?.nombre || "Cliente";
+                    const telefonoCliente = typeof ped.cliente === "object" ? ped.cliente?.telefono : ped.telefono || "Sin teléfono";
+                    const esCompletado = ped.estado === "Completado";
+
+                    return (
+                      <div key={ped.id} className="border border-slate-200 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50/50">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-slate-800 text-sm">{nombreCliente}</h3>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 ${esCompletado ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                              {esCompletado ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                              {ped.estado || "Pendiente"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500">Tel: {telefonoCliente} • Dirección: {ped.direccion || "Local"}</p>
+                          <p className="text-[11px] text-slate-400">Entrega: {ped.fechaEntrega || "Hoy"} • Delivery: {ped.deliveryAsignado || "Sin asignar"}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-sm font-black text-slate-800">RD$ {Number(ped.total || 0).toLocaleString()}</div>
+                          <span className="text-[10px] text-slate-400 block">Comisión est.: RD$ {(Number(ped.total || 0) * (porcentaje / 100)).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           </div>
 
