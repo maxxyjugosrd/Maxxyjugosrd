@@ -138,20 +138,22 @@ export default function PanelVendedorSeguro() {
     return () => unsubscribe();
   }, []);
 
-const obtenerComisionVendedor = () => {
+// Obtener comisiones de forma segura sin romper el build
+  const obtenerComisionVendedor = () => {
     const info = personalFirebase.find((p) => p.nombre === vendedorActual && p.rol === "Vendedor");
+    const porcentajeConfigurado = Number(info?.valorConfigurado || info?.comisionPorcentaje || 0);
     
-    // O si prefieres calcularlo sumando directamente de los pedidos completados del vendedor:
-    const totalComisionesPedidos = pedidos
-      .filter((p) => p.vendedor === vendedorActual || p.vendedorAsignado === vendedorActual)
-      .reduce((acc, p) => acc + (Number(p.total) * (Number(info?.valorConfigurado || 0) / 100)), 0);
+    // Usamos el arreglo de pedidos disponible (asegúrate de que en tu archivo se llame pedidos o pedidosFirebase)
+    const listaPedidos = typeof pedidos !== 'undefined' ? pedidos : (typeof pedidosFirebase !== 'undefined' ? pedidosFirebase : []);
 
-    return info
-      ? {
-          porcentaje: Number(info.valorConfigurado || 0),
-          comisionAcumulada: totalComisionesPedidos || Number(info.comisionAcumulada || 0),
-        }
-      : { porcentaje: 0, comisionAcumulada: 0 };
+    const totalComisionesPedidos = listaPedidos
+      .filter((p) => p.vendedor === vendedorActual || p.vendedorAsignado === vendedorActual)
+      .reduce((acc, p) => acc + (Number(p.total || 0) * (porcentajeConfigurado / 100)), 0);
+
+    return {
+      porcentaje: porcentajeConfigurado,
+      comisionAcumulada: totalComisionesPedidos,
+    };
   };
 
   const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
