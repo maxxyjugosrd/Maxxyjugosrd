@@ -39,7 +39,7 @@ export default function NominaPage() {
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "personal"), (snapshot) => {
-      const lista = snapshot.docs.map((docSnap) => ({ idDoc: docSnap.id, ...docSnap.data() }));
+      const lista = snapshot.docs.map((docSnap) => ({ idDoc: docSnap.id, id: docSnap.id, ...docSnap.data() }));
       setEquipo(lista); 
     });
     return () => unsubscribe();
@@ -142,8 +142,9 @@ export default function NominaPage() {
   // Función para actualizar y guardar cambios directamente en Firestore
   const actualizarYGuardarEquipo = async (colaboradorActualizado) => {
     try {
-      if (!colaboradorActualizado.idDoc) return;
-      const docRef = doc(db, "personal", colaboradorActualizado.idDoc);
+      const idTarget = colaboradorActualizado.idDoc || colaboradorActualizado.id;
+      if (!idTarget) return;
+      const docRef = doc(db, "personal", idTarget);
       await updateDoc(docRef, {
         comisionAcumulada: colaboradorActualizado.comisionAcumulada,
         historialDetalle: colaboradorActualizado.historialDetalle || [],
@@ -168,6 +169,9 @@ export default function NominaPage() {
     };
 
     await actualizarYGuardarEquipo(colaboradorActualizado);
+
+    // Actualiza también el modal activo para que se refleje de inmediato en pantalla
+    setReciboSeleccionado(colaboradorActualizado);
   };
   
   const obtenerInfoNomina = () => {
@@ -202,6 +206,7 @@ export default function NominaPage() {
     };
 
     await actualizarYGuardarEquipo(colaboradorActualizado);
+    setReciboSeleccionado(colaboradorActualizado);
     alert(`¡Pago registrado con éxito en Firebase! El balance de ${colaborador.nombre} se ha reiniciado a 0.`);
   };
 
@@ -334,7 +339,7 @@ export default function NominaPage() {
                 const esPrimero = index === 0 && vendedor.ventasActuales > 0;
                 return (
                   <div 
-                    key={vendedor.id || index}
+                    key={vendedor.idDoc || vendedor.id || index}
                     className={`p-5 rounded-2xl border relative flex flex-col justify-between space-y-4 transition-all ${
                       esPrimero ? "bg-slate-800/90 border-amber-500/50 shadow-lg shadow-amber-500/10" : "bg-slate-800/40 border-slate-800"
                     }`}
@@ -486,10 +491,11 @@ export default function NominaPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {equipoFiltrado.map((colaborador) => {
-            const estaExpandido = mostrarDetalleId === colaborador.idDoc || mostrarDetalleId === colaborador.id;
+            const idColab = colaborador.idDoc || colaborador.id;
+            const estaExpandido = mostrarDetalleId === idColab;
 
             return (
-              <div key={colaborador.idDoc || colaborador.id} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
+              <div key={idColab} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
                 <div className="space-y-4">
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
@@ -522,7 +528,7 @@ export default function NominaPage() {
                   {(colaborador.rol === "Delivery" || colaborador.rol === "Vendedor") && (
                     <div>
                       <button
-                        onClick={() => setMostrarDetalleId(estaExpandido ? null : (colaborador.idDoc || colaborador.id))}
+                        onClick={() => setMostrarDetalleId(estaExpandido ? null : idColab)}
                         className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition"
                       >
                         <span>{estaExpandido ? "Ocultar desglose" : `Auditar cuentas (${colaborador.rol === "Delivery" ? `${colaborador.entregasRealizadas || 0} entregas` : `${colaborador.registrosAsociados?.length || 0} pedidos`})`}</span>
@@ -535,7 +541,6 @@ export default function NominaPage() {
                           {colaborador.registrosAsociados && colaborador.registrosAsociados.length > 0 ? (
                             colaborador.registrosAsociados.map((ped, idx) => {
                               const costoEnvioReal = Number(ped.costoEnvio) || (ped.zonaEnvio && Number(ped.zonaEnvio.costo)) || 100;
-                              // Cálculo estricto de la comisión individual para este registro sin mostrar el monto total de venta empresarial al vendedor
                               const comisionIndividualItem = colaborador.rol === "Delivery" 
                                 ? costoEnvioReal 
                                 : ((Number(ped.subtotal) || 0) * Number(colaborador.valorConfigurado)) / 100;
