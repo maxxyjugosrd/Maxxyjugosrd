@@ -180,19 +180,29 @@ export default function PanelVendedorSeguro() {
 
   const { porcentaje, metaMensual } = obtenerInfoVendedor();
   
-  // Pedidos del vendedor actual filtrados por mes seleccionado (para métricas y barra de meta)
+  // Pedidos del vendedor actual filtrados por mes seleccionado (robustos ante variaciones de estatus)
   const pedidosVendedorMes = pedidosFirebase.filter((p) => {
     const esDelVendedor = p.vendedorAsignado?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase();
     if (!esDelVendedor) return false;
 
-    // Tomar fecha de entrega o de creación para el filtro mensual
-    const fechaRef = p.fechaEntrega || (p.fechaCreacion ? new Date(p.fechaCreacion).toISOString().split("T")[0] : "");
+    /// Tomar fecha de entrega o de creación para el filtro mensual (soportando objetos Timestamp de Firebase o strings)
+    let fechaRef = "";
+    if (p.fechaEntrega) {
+      fechaRef = String(p.fechaEntrega);
+    } else if (p.fechaCreacion) {
+      const fechaObj = typeof p.fechaCreacion === "number" ? new Date(p.fechaCreacion) : p.fechaCreacion.toDate ? p.fechaCreacion.toDate() : new Date(p.fechaCreacion);
+      fechaRef = fechaObj.toISOString().split("T")[0];
+    }
+
     return fechaRef.startsWith(mesSeleccionado);
   });
 
   const ventasTotalesMes = pedidosVendedorMes
-    .filter((p) => p.estado === "Completado")
-    .reduce((sum, p) => sum + Number(p.subtotal || 0), 0);
+    .filter((p) => {
+      const estadoLimpio = p.estado?.trim().toLowerCase() || "";
+      return estadoLimpio === "completado" || estadoLimpio === "completada";
+    })
+    .reduce((sum, p) => sum + Number(p.subtotal || p.total || 0), 0);
 
   const progresoMetaPorcentaje = metaMensual > 0 ? Math.min(Math.round((ventasTotalesMes / metaMensual) * 100), 100) : 0;
 
