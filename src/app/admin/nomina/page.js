@@ -35,14 +35,6 @@ export default function NominaPage() {
     return () => unsubscribe();
   }, []);
 
- useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "personal"), (snapshot) => {
-      const lista = snapshot.docs.map((docSnap) => ({ idDoc: docSnap.id, ...docSnap.data() }));
-      setEquipo(lista); // Actualiza la lista en vivo en la nómina de admin
-    });
-    return () => unsubscribe();
-  }, []);
-  
   // Función auxiliar para verificar si una fecha de pedido coincide con un mes (YYYY-MM)
   const coincideMesEspecifico = (fechaPedido, mesTarget) => {
     if (!fechaPedido) return true;
@@ -59,7 +51,7 @@ export default function NominaPage() {
   };
 
   useEffect(() => {
-    if (equipo.length === 0) return;
+    if (equipo.length === 0 || pedidos.length === 0) return;
 
     setEquipo((equipoActual) => 
       equipoActual.map((colaborador) => {
@@ -83,7 +75,7 @@ export default function NominaPage() {
               clienteBruto = clienteBruto.nombre || clienteBruto.nombreCliente || clienteBruto.telefono || "cliente_general";
             }
             const clienteKey = clienteBruto.toString().trim().toLowerCase();
-            const montoPedido = Number(pedido.subtotal) || 0;
+            const montoPedido = Number(pedido.subtotal) || Number(pedido.total) || Number(pedido.monto) || 0;
 
             if (!ventasPorCliente[clienteKey]) ventasPorCliente[clienteKey] = 0;
             ventasPorCliente[clienteKey] += montoPedido;
@@ -94,8 +86,7 @@ export default function NominaPage() {
 
           return {
             ...colaborador,
-            // CORREGIDO: Se asigna directamente el cálculo estricto basado en completados. Si no hay completados, será 0.
-            comisionAcumulada: comisionCalculada || 0,
+            comisionAcumulada: colaborador.comisionAcumulada !== undefined && colaborador.comisionAcumulada !== 0 ? colaborador.comisionAcumulada : (comisionCalculada || 0),
             totalVentasPeriodo: totalVendido,
             registrosAsociados: ventasDelVendedor
           };
@@ -125,8 +116,7 @@ export default function NominaPage() {
           return {
             ...colaborador,
             entregasRealizadas: totalEntregas,
-            // CORREGIDO: Asignación directa y estricta para delivery basada solo en completados.
-            comisionAcumulada: totalComisionEnvios || 0,
+            comisionAcumulada: colaborador.comisionAcumulada !== undefined && colaborador.comisionAcumulada !== 0 ? colaborador.comisionAcumulada : (totalComisionEnvios || 0),
             registrosAsociados: entregasDelDelivery
           };
         }
@@ -136,7 +126,7 @@ export default function NominaPage() {
     );
   }, [pedidos, mesSeleccionado]);
 
-  // Función para actualizar y guardar cambios directamente en Firestore
+ // Función para actualizar y guardar cambios directamente en Firestore
   const actualizarYGuardarEquipo = async (colaboradorActualizado) => {
     try {
       if (!colaboradorActualizado.idDoc) return;
@@ -150,7 +140,7 @@ export default function NominaPage() {
       console.error("Error al actualizar en Firebase:", error);
     }
   };
-  
+
   const obtenerInfoNomina = () => {
     const hoy = new Date();
     const dia = hoy.getDate();
@@ -185,7 +175,7 @@ export default function NominaPage() {
     await actualizarYGuardarEquipo(colaboradorActualizado);
     alert(`¡Pago registrado con éxito en Firebase! El balance de ${colaborador.nombre} se ha reiniciado a 0.`);
   };
-
+  
   const formatearTextoSeguro = (valor) => {
     if (!valor) return "N/D";
     if (typeof valor === "object") {
@@ -208,7 +198,7 @@ export default function NominaPage() {
 
     let totalVendido = 0;
     ventasFiltradas.forEach((pedido) => {
-      const monto = Number(pedido.subtotal) || 0;
+      const monto = Number(pedido.subtotal) || Number(pedido.total) || Number(pedido.monto) || 0;
       totalVendido += monto;
     });
 
@@ -451,10 +441,10 @@ export default function NominaPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {equipoFiltrado.map((colaborador) => {
-            const estaExpandido = mostrarDetalleId === colaborador.idDoc || mostrarDetalleId === colaborador.id;
+            const estaExpandido = mostrarDetalleId === colaborador.id;
 
             return (
-              <div key={colaborador.idDoc || colaborador.id} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
+              <div key={colaborador.id} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
                 <div className="space-y-4">
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
@@ -487,7 +477,7 @@ export default function NominaPage() {
                   {(colaborador.rol === "Delivery" || colaborador.rol === "Vendedor") && (
                     <div>
                       <button
-                        onClick={() => setMostrarDetalleId(estaExpandido ? null : (colaborador.idDoc || colaborador.id))}
+                        onClick={() => setMostrarDetalleId(estaExpandido ? null : colaborador.id)}
                         className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition"
                       >
                         <span>{estaExpandido ? "Ocultar desglose" : `Auditar cuentas (${colaborador.rol === "Delivery" ? `${colaborador.entregasRealizadas || 0} entregas` : `RD$ ${(colaborador.totalVentasPeriodo || 0).toLocaleString()} ventas`})`}</span>
@@ -499,7 +489,7 @@ export default function NominaPage() {
                           <p className="font-bold text-amber-400 uppercase tracking-wider text-[10px] border-b border-slate-700 pb-1">Pedidos completados ({mesSeleccionado}):</p>
                           {colaborador.registrosAsociados && colaborador.registrosAsociados.length > 0 ? (
                             colaborador.registrosAsociados.map((ped, idx) => {
-                              const monto = Number(ped.subtotal) || 0;
+                              const monto = Number(ped.subtotal) || Number(ped.total) || Number(ped.monto) || 0;
                               const costoEnvioReal = Number(ped.costoEnvio) || (ped.zonaEnvio && Number(ped.zonaEnvio.costo)) || 100;
                               const clienteStr = formatearTextoSeguro(ped.cliente || ped.nombreCliente || "Cliente");
                               return (
@@ -594,7 +584,7 @@ export default function NominaPage() {
 
               <div className="grid grid-cols-2 gap-8 pt-8 text-center text-xs text-slate-600">
                 <div className="space-y-6"><div className="border-b border-slate-400 pb-1"></div><p className="font-bold">Firma de la Empresa</p></div>
-                <div className="space-y-6"><div className="border-b border-slate-400 pb-1"></div><p className="p-4 text-center font-bold">Recibido Conforme (Empleado)</p></div>
+                <div className="space-y-6"><div className="border-b border-slate-400 pb-1"></div><p className="font-bold">Recibido Conforme (Empleado)</p></div>
               </div>
             </div>
 
