@@ -1060,7 +1060,7 @@ export default function PanelVendedorSeguro() {
             </div>
             <div className="pt-3 border-t flex gap-2">
               <button type="button" onClick={() => setModalShotAbierto(false)} className="flex-1 py-2 rounded-xl bg-slate-100 text-xs font-medium">Cancelar</button>
-              <button type="button" onClick={agregarShot personalizado} disabled={ingredientesShot.length === 0} className="flex-1 py-2 rounded-xl text-white bg-amber-500 text-xs font-medium disabled:opacity-40">Agregar</button>
+              <button type="button" onClick={agregarShotpersonalizado} disabled={ingredientesShot.length === 0} className="flex-1 py-2 rounded-xl text-white bg-amber-500 text-xs font-medium disabled:opacity-40">Agregar</button>
             </div>
           </div>
         </div>
