@@ -35,6 +35,14 @@ export default function NominaPage() {
     return () => unsubscribe();
   }, []);
 
+ useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "personal"), (snapshot) => {
+      const lista = snapshot.docs.map((docSnap) => ({ idDoc: docSnap.id, ...docSnap.data() }));
+      setEquipo(lista); // Actualiza la lista en vivo en la nómina de admin
+    });
+    return () => unsubscribe();
+  }, []);
+  
   // Función auxiliar para verificar si una fecha de pedido coincide con un mes (YYYY-MM)
   const coincideMesEspecifico = (fechaPedido, mesTarget) => {
     if (!fechaPedido) return true;
@@ -126,7 +134,7 @@ export default function NominaPage() {
     );
   }, [pedidos, mesSeleccionado]);
 
-    // Función para actualizar y guardar cambios directamente en Firestore
+  // Función para actualizar y guardar cambios directamente en Firestore
 const actualizarYGuardarEquipo = async (colaboradorActualizado) => {
   try {
     if (!colaboradorActualizado.idDoc) return;
@@ -140,7 +148,7 @@ const actualizarYGuardarEquipo = async (colaboradorActualizado) => {
     console.error("Error al actualizar en Firebase:", error);
   }
 };
-
+  
   const obtenerInfoNomina = () => {
     const hoy = new Date();
     const dia = hoy.getDate();
@@ -175,7 +183,7 @@ const registrarPagoNomina = async (colaborador) => {
   await actualizarYGuardarEquipo(colaboradorActualizado);
   alert(`¡Pago registrado con éxito en Firebase! El balance de ${colaborador.nombre} se ha reiniciado a 0.`);
 };
-  
+
   const formatearTextoSeguro = (valor) => {
     if (!valor) return "N/D";
     if (typeof valor === "object") {
@@ -228,7 +236,7 @@ const registrarPagoNomina = async (colaborador) => {
 
     return {
       ...vendedor,
-      ventasActuales: datosActuales.totalVendido,
+      ventasActuales: datosActuales.subtotalVendido,
       pedidosActuales: datosActuales.cantidadPedidos,
       ventasAnteriores: datosAnteriores.totalVendido,
       porcentajeCrecimiento: Number(porcentajeCrecimiento),
