@@ -74,7 +74,7 @@ export default function NominaPage() {
 
         // 1. Si es Vendedor
         if (colaborador.rol?.trim().toLowerCase() === "vendedor" && Number(colaborador.valorConfigurado) > 0) {
-          const ventasDelVendedor = pedidosFirebase.filter((v) => {
+          const ventasDelVendedor = pedidos.filter((v) => {
             const vendedorPedido = (v.vendedor || v.vendedorAsignado || v.usuario || "").toString().trim().toLowerCase();
             const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
             const fechaPedido = v.fecha || v.creadoEn || v.createdAt;
@@ -113,7 +113,7 @@ export default function NominaPage() {
         return colaborador;
       })
     );
-  }, [pedidosFirebase, fechaInicio, fechaFin, equipo.length]);
+  }, [pedidos, fechaInicio, fechaFin, equipo.length]);
   
   // Función para actualizar y guardar cambios directamente en Firestore
  const actualizarYGuardarEquipo = async (colaboradorActualizado) => {
