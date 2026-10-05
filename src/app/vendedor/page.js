@@ -153,34 +153,46 @@ export default function PanelVendedorSeguro() {
     return () => unsubscribe();
   }, []);
 
-  // Lectura robusta de la comisión con conversión a número asegurada
+  // Lectura robusta del porcentaje de comisión del vendedor
   const obtenerComisionVendedor = () => {
     const info = personalFirebase.find(
       (p) => p.nombre?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() && p.rol?.trim().toLowerCase() === "vendedor"
     );
 
     const porcentajeCrudo = info?.comisionPorcentaje ?? info?.valorConfigurado ?? 0;
-    const acumuladoCrudo = info?.comisionAcumulada ?? 0;
 
     return {
       porcentaje: Number(porcentajeCrudo) || 0,
-      comisionAcumulada: Number(acumuladoCrudo) || 0,
     };
   };
 
-  const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
+  const { porcentaje } = obtenerComisionVendedor();
   
-  // Calcular comisiones pendientes basadas en los pedidos creados por este vendedor que están "Pendientes"
+  // Calcular comisiones acumuladas basadas exclusivamente en pedidos COMPLETADOS (usando subtotal)
+  const calcularComisionAcumulada = () => {
+    if (!vendedorActual) return 0;
+    const pedidosCompletados = pedidosFirebase.filter(
+      (p) =>
+        p.vendedorAsignado?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() &&
+        p.estado === "Completado"
+    );
+    const subtotalCompletados = pedidosCompletados.reduce((sum, p) => sum + Number(p.subtotal || 0), 0);
+    return subtotalCompletados * (porcentaje / 100);
+  };
+
+  const comisionAcumulada = calcularComisionAcumulada();
+
+  // Calcular comisiones pendientes basadas en los pedidos creados por este vendedor que están PENDIENTES (usando subtotal)
   const calcularComisionPendiente = () => {
     if (!vendedorActual) return 0;
-    const pedidosDelVendedor = pedidosFirebase.filter(
+    const pedidosPendientes = pedidosFirebase.filter(
       (p) =>
         p.vendedorAsignado?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() &&
         p.estado !== "Completado" &&
         p.estado !== "Cancelado"
     );
-    const totalVentasPendientes = pedidosDelVendedor.reduce((sum, p) => sum + Number(p.total || 0), 0);
-    return totalVentasPendientes * (porcentaje / 100);
+    const subtotalPendientes = pedidosPendientes.reduce((sum, p) => sum + Number(p.subtotal || 0), 0);
+    return subtotalPendientes * (porcentaje / 100);
   };
 
   const comisionPendienteCobro = calcularComisionPendiente();
@@ -364,24 +376,7 @@ export default function PanelVendedorSeguro() {
     const resultado = await crearPedido(objetoPedido);
     
     if (resultado.exito) {
-      // Actualizar la comisión acumulada en el documento de Firebase del vendedor
-      const montoSubtotalVenta = Number(objetoPedido.subtotal || 0);
-      const comisionEstaVenta = montoSubtotalVenta * (porcentaje / 100);
-
-      const infoVendedor = personalFirebase.find(
-        (p) => p.nombre?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() && p.rol === "Vendedor"
-      );
-
-      if (infoVendedor && infoVendedor.id) {
-        const comisionActualPrevia = Number(infoVendedor.comisionAcumulada || 0);
-        const nuevaComisionAcumulada = comisionActualPrevia + comisionEstaVenta;
-
-        await updateDoc(doc(db, "personal", infoVendedor.id), {
-          comisionAcumulada: nuevaComisionAcumulada
-        });
-      }
-
-      setExitoMensaje("¡Pedido registrado y comisión actualizada con éxito! Quedó en estado Pendiente.");
+      setExitoMensaje("¡Pedido registrado con éxito! Quedó en estado Pendiente.");
       setCliente({ nombre: "", telefono: "", direccion: "" });
       setClienteSeleccionadoObj(null);
       setCarrito([]);
@@ -439,14 +434,12 @@ export default function PanelVendedorSeguro() {
   );
 
   const pedidosFiltradosHistorial = pedidosDelVendedorActual.filter((p) => {
-    // Filtro por estado
     const nombreClienteStr = typeof p.cliente === "string" ? p.cliente : p.cliente?.nombre || "";
     const coincideEstado =
       filtroEstado === "todos" ||
       (filtroEstado === "Pendiente" && p.estado !== "Completado" && p.estado !== "Cancelado") ||
       (filtroEstado === "Completado" && p.estado === "Completado");
 
-    // Filtro por barra de búsqueda (nombre de cliente)
     const coincideBusqueda = nombreClienteStr.toLowerCase().includes(busquedaHistorial.toLowerCase());
 
     return coincideEstado && coincideBusqueda;
@@ -559,13 +552,13 @@ export default function PanelVendedorSeguro() {
           </div>
         )}
 
-        {/* Resumen Comisiones Vendedor (Directo de Firebase + Comisiones Pendientes) */}
+        {/* Resumen Comisiones Vendedor (Acumuladas por completados y Pendientes por subtotal) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="bg-gradient-to-br from-amber-500 to-orange-500 text-white p-6 rounded-3xl shadow-md flex justify-between items-center">
             <div>
               <span className="text-xs uppercase tracking-wider opacity-90 font-semibold">Tus Comisiones Acumuladas</span>
               <div className="text-3xl font-black">RD$ {comisionAcumulada.toLocaleString()}</div>
-              <p className="text-xs opacity-80 mt-1">Porcentaje configurado: <strong>{porcentaje}%</strong></p>
+              <p className="text-xs opacity-80 mt-1">Calculado sobre pedidos completados ({porcentaje}%)</p>
             </div>
             <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
               <TrendingUp className="w-8 h-8 text-white" />
@@ -576,7 +569,7 @@ export default function PanelVendedorSeguro() {
             <div>
               <span className="text-xs uppercase tracking-wider opacity-80 font-semibold">Comisiones Pendientes de Cobro</span>
               <div className="text-3xl font-black text-amber-400">RD$ {comisionPendienteCobro.toLocaleString()}</div>
-              <p className="text-xs opacity-70 mt-1">De pedidos aún no completados</p>
+              <p className="text-xs opacity-70 mt-1">Calculado sobre subtotales pendientes</p>
             </div>
             <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm">
               <Clock className="w-8 h-8 text-amber-400" />
@@ -733,7 +726,7 @@ export default function PanelVendedorSeguro() {
                         </div>
                         <div className="text-right shrink-0">
                           <div className="text-sm font-black text-slate-800">RD$ {Number(ped.total || 0).toLocaleString()}</div>
-                          <span className="text-[10px] text-slate-400 block">Comisión est.: RD$ {(Number(ped.total || 0) * (porcentaje / 100)).toLocaleString()}</span>
+                          <span className="text-[10px] text-slate-400 block">Comisión est.: RD$ {(Number(ped.subtotal || 0) * (porcentaje / 100)).toLocaleString()}</span>
                         </div>
                       </div>
                     );
