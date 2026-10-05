@@ -27,6 +27,20 @@ export default function NominaPage() {
   const yaCalculoInicial = useRef(false);
 
   useEffect(() => {
+    const personalGuardado = localStorage.getItem("maxi_personal");
+    if (personalGuardado) {
+      try {
+        const parsed = JSON.parse(personalGuardado);
+        if (Array.isArray(parsed)) {
+          setEquipo(parsed);
+        }
+      } catch (e) {
+        setEquipo([]);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = obtenerPedidosEnVivo((pedidosFirestore) => {
       if (Array.isArray(pedidosFirestore)) {
         setPedidos(pedidosFirestore);
@@ -134,21 +148,11 @@ export default function NominaPage() {
     );
   }, [pedidos, mesSeleccionado]);
 
-  // Función para actualizar y guardar cambios directamente en Firestore
-const actualizarYGuardarEquipo = async (colaboradorActualizado) => {
-  try {
-    if (!colaboradorActualizado.idDoc) return;
-    const docRef = doc(db, "personal", colaboradorActualizado.idDoc);
-    await updateDoc(docRef, {
-      comisionAcumulada: colaboradorActualizado.comisionAcumulada,
-      historialDetalle: colaboradorActualizado.historialDetalle || [],
-      totalVentasPeriodo: colaboradorActualizado.totalVentasPeriodo || 0,
-    });
-  } catch (error) {
-    console.error("Error al actualizar en Firebase:", error);
-  }
-};
-  
+  const actualizarYGuardarEquipo = (nuevoEquipo) => {
+    setEquipo(nuevoEquipo);
+    localStorage.setItem("maxi_personal", JSON.stringify(nuevoEquipo));
+  };
+
   const obtenerInfoNomina = () => {
     const hoy = new Date();
     const dia = hoy.getDate();
@@ -161,28 +165,28 @@ const actualizarYGuardarEquipo = async (colaboradorActualizado) => {
 
   const infoNomina = obtenerInfoNomina();
 
-const registrarPagoNomina = async (colaborador) => {
-  const confirmar = confirm(`¿Confirmas que le has pagado la quincena a ${colaborador.nombre} para el mes ${mesSeleccionado}?\n\nEsto registrará el pago y pondrá su balance pendiente en RD$ 0.`);
-  if (!confirmar) return;
+  const registrarPagoNomina = (colaborador) => {
+    const confirmar = confirm(`¿Confirmas que le has pagado la quincena a ${colaborador.nombre} para el mes ${mesSeleccionado}?\n\nEsto registrará el pago y pondrá su balance pendiente en RD$ 0.`);
+    if (!confirmar) return;
 
-  const nuevoHistorial = [
-    {
-      fecha: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString(),
-      concepto: `Pago Quincenal (${infoNomina.proximoCorte}) [Mes: ${mesSeleccionado}]`,
-      monto: colaborador.comisionAcumulada || 0,
-    },
-    ...(Array.isArray(colaborador.historialDetalle) ? colaborador.historialDetalle : [])
-  ];
+    const equipoActualizado = equipo.map((item) => {
+      if (item.id === colaborador.id) {
+        const nuevoHistorial = [
+          {
+            fecha: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString(),
+            concepto: `Pago Quincenal (${infoNomina.proximoCorte}) [Mes: ${mesSeleccionado}]`,
+            monto: item.comisionAcumulada || 0,
+          },
+          ...(Array.isArray(item.historialDetalle) ? item.historialDetalle : [])
+        ];
+        return { ...item, comisionAcumulada: 0, historialDetalle: nuevoHistorial };
+      }
+      return item;
+    });
 
-  const colaboradorActualizado = {
-    ...colaborador,
-    comisionAcumulada: 0,
-    historialDetalle: nuevoHistorial,
+    actualizarYGuardarEquipo(equipoActualizado);
+    alert(`¡Pago registrado con éxito! El balance de ${colaborador.nombre} se ha reiniciado a 0.`);
   };
-
-  await actualizarYGuardarEquipo(colaboradorActualizado);
-  alert(`¡Pago registrado con éxito en Firebase! El balance de ${colaborador.nombre} se ha reiniciado a 0.`);
-};
 
   const formatearTextoSeguro = (valor) => {
     if (!valor) return "N/D";
