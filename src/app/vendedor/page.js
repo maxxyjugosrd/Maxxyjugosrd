@@ -144,13 +144,13 @@ export default function PanelVendedorSeguro() {
     return info
       ? {
           porcentaje: Number(info.valorConfigurado || 0),
-          comisionAcumulada: Number(info.comisionesAcumuladas || 0),
+          comisionAcumulada: Number(info.comisionesAcumulada || 0),
         }
       : { porcentaje: 0, comisionAcumulada: 0 };
   };
 
   const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
-
+  
   // Manejar PIN del Vendedor
   const handleSeleccionarNombreDropdown = (nombre) => {
     setVendedorSeleccionadoPrevia(nombre);
