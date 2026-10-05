@@ -68,9 +68,10 @@ export default function NominaPage() {
   useEffect(() => {
     if (equipo.length === 0) return;
 
-    setEquipo((equipoActual) => 
+   setEquipo((equipoActual) => 
       equipoActual.map((colaborador) => {
         const nombreColaborador = (colaborador.nombre || "").trim().toLowerCase();
+        const rolColaborador = (colaborador.rol || "").trim().toLowerCase();
 
         // 1. Si es Vendedor
         if (colaborador.rol?.trim().toLowerCase() === "vendedor" && Number(colaborador.valorConfigurado) > 0) {
