@@ -83,7 +83,9 @@ export default function NominaPage() {
               clienteBruto = clienteBruto.nombre || clienteBruto.nombreCliente || clienteBruto.telefono || "cliente_general";
             }
             const clienteKey = clienteBruto.toString().trim().toLowerCase();
-            const montoPedido = Number(pedido.subtotal) || Number(pedido.total) || Number(pedido.monto) || 0;
+            
+            // CORREGIDO: Se toma estrictamente el subtotal para las comisiones del vendedor
+            const montoPedido = Number(pedido.subtotal) || 0;
 
             if (!ventasPorCliente[clienteKey]) ventasPorCliente[clienteKey] = 0;
             ventasPorCliente[clienteKey] += montoPedido;
@@ -135,19 +137,19 @@ export default function NominaPage() {
   }, [pedidos, mesSeleccionado]);
 
   // Función para actualizar y guardar cambios directamente en Firestore
-const actualizarYGuardarEquipo = async (colaboradorActualizado) => {
-  try {
-    if (!colaboradorActualizado.idDoc) return;
-    const docRef = doc(db, "personal", colaboradorActualizado.idDoc);
-    await updateDoc(docRef, {
-      comisionAcumulada: colaboradorActualizado.comisionAcumulada,
-      historialDetalle: colaboradorActualizado.historialDetalle || [],
-      totalVentasPeriodo: colaboradorActualizado.totalVentasPeriodo || 0,
-    });
-  } catch (error) {
-    console.error("Error al actualizar en Firebase:", error);
-  }
-};
+  const actualizarYGuardarEquipo = async (colaboradorActualizado) => {
+    try {
+      if (!colaboradorActualizado.idDoc) return;
+      const docRef = doc(db, "personal", colaboradorActualizado.idDoc);
+      await updateDoc(docRef, {
+        comisionAcumulada: colaboradorActualizado.comisionAcumulada,
+        historialDetalle: colaboradorActualizado.historialDetalle || [],
+        totalVentasPeriodo: colaboradorActualizado.totalVentasPeriodo || 0,
+      });
+    } catch (error) {
+      console.error("Error al actualizar en Firebase:", error);
+    }
+  };
   
   const obtenerInfoNomina = () => {
     const hoy = new Date();
@@ -161,28 +163,28 @@ const actualizarYGuardarEquipo = async (colaboradorActualizado) => {
 
   const infoNomina = obtenerInfoNomina();
 
-const registrarPagoNomina = async (colaborador) => {
-  const confirmar = confirm(`¿Confirmas que le has pagado la quincena a ${colaborador.nombre} para el mes ${mesSeleccionado}?\n\nEsto registrará el pago y pondrá su balance pendiente en RD$ 0.`);
-  if (!confirmar) return;
+  const registrarPagoNomina = async (colaborador) => {
+    const confirmar = confirm(`¿Confirmas que le has pagado la quincena a ${colaborador.nombre} para el mes ${mesSeleccionado}?\n\nEsto registrará el pago y pondrá su balance pendiente en RD$ 0.`);
+    if (!confirmar) return;
 
-  const nuevoHistorial = [
-    {
-      fecha: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString(),
-      concepto: `Pago Quincenal (${infoNomina.proximoCorte}) [Mes: ${mesSeleccionado}]`,
-      monto: colaborador.comisionAcumulada || 0,
-    },
-    ...(Array.isArray(colaborador.historialDetalle) ? colaborador.historialDetalle : [])
-  ];
+    const nuevoHistorial = [
+      {
+        fecha: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString(),
+        concepto: `Pago Quincenal (${infoNomina.proximoCorte}) [Mes: ${mesSeleccionado}]`,
+        monto: colaborador.comisionAcumulada || 0,
+      },
+      ...(Array.isArray(colaborador.historialDetalle) ? colaborador.historialDetalle : [])
+    ];
 
-  const colaboradorActualizado = {
-    ...colaborador,
-    comisionAcumulada: 0,
-    historialDetalle: nuevoHistorial,
+    const colaboradorActualizado = {
+      ...colaborador,
+      comisionAcumulada: 0,
+      historialDetalle: nuevoHistorial,
+    };
+
+    await actualizarYGuardarEquipo(colaboradorActualizado);
+    alert(`¡Pago registrado con éxito en Firebase! El balance de ${colaborador.nombre} se ha reiniciado a 0.`);
   };
-
-  await actualizarYGuardarEquipo(colaboradorActualizado);
-  alert(`¡Pago registrado con éxito en Firebase! El balance de ${colaborador.nombre} se ha reiniciado a 0.`);
-};
 
   const formatearTextoSeguro = (valor) => {
     if (!valor) return "N/D";
@@ -206,7 +208,8 @@ const registrarPagoNomina = async (colaborador) => {
 
     let totalVendido = 0;
     ventasFiltradas.forEach((pedido) => {
-      const monto = Number(pedido.subtotal) || Number(pedido.total) || Number(pedido.monto) || 0;
+      // CORREGIDO: Se toma estrictamente el subtotal
+      const monto = Number(pedido.subtotal) || 0;
       totalVendido += monto;
     });
 
@@ -236,7 +239,7 @@ const registrarPagoNomina = async (colaborador) => {
 
     return {
       ...vendedor,
-      ventasActuales: datosActuales.subtotalVendido,
+      ventasActuales: datosActuales.totalVendido,
       pedidosActuales: datosActuales.cantidadPedidos,
       ventasAnteriores: datosAnteriores.totalVendido,
       porcentajeCrecimiento: Number(porcentajeCrecimiento),
@@ -497,7 +500,7 @@ const registrarPagoNomina = async (colaborador) => {
                           <p className="font-bold text-amber-400 uppercase tracking-wider text-[10px] border-b border-slate-700 pb-1">Pedidos completados ({mesSeleccionado}):</p>
                           {colaborador.registrosAsociados && colaborador.registrosAsociados.length > 0 ? (
                             colaborador.registrosAsociados.map((ped, idx) => {
-                              const monto = Number(ped.subtotal) || Number(ped.total) || Number(ped.monto) || 0;
+                              const monto = Number(ped.subtotal) || 0;
                               const costoEnvioReal = Number(ped.costoEnvio) || (ped.zonaEnvio && Number(ped.zonaEnvio.costo)) || 100;
                               const clienteStr = formatearTextoSeguro(ped.cliente || ped.nombreCliente || "Cliente");
                               return (
