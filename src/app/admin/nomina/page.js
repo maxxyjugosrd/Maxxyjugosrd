@@ -196,7 +196,7 @@ const registrarPagoNomina = async (colaborador) => {
     const nombreClean = (nombreVendedor || "").trim().toLowerCase();
     const ventasFiltradas = pedidos.filter((v) => {
       const vendedorPedido = (v.vendedor || v.vendedorAsignado || v.usuario || "").toString().trim().toLowerCase();
-      const estadoPedido = (v.estado || "completado").toString().trim().toLowerCase();
+      const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
       const fechaPedido = v.fecha || v.creadoEn || v.createdAt;
 
       return vendedorPedido.includes(nombreClean) && 
