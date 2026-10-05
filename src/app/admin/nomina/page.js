@@ -153,29 +153,29 @@ const actualizarYGuardarEquipo = async (colaboradorActualizado) => {
 
   const infoNomina = obtenerInfoNomina();
 
-  const registrarPagoNomina = (colaborador) => {
-    const confirmar = confirm(`¿Confirmas que le has pagado la quincena a ${colaborador.nombre} para el mes ${mesSeleccionado}?\n\nEsto registrará el pago y pondrá su balance pendiente en RD$ 0.`);
-    if (!confirmar) return;
+const registrarPagoNomina = async (colaborador) => {
+  const confirmar = confirm(`¿Confirmas que le has pagado la quincena a ${colaborador.nombre} para el mes ${mesSeleccionado}?\n\nEsto registrará el pago y pondrá su balance pendiente en RD$ 0.`);
+  if (!confirmar) return;
 
-    const equipoActualizado = equipo.map((item) => {
-      if (item.id === colaborador.id) {
-        const nuevoHistorial = [
-          {
-            fecha: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString(),
-            concepto: `Pago Quincenal (${infoNomina.proximoCorte}) [Mes: ${mesSeleccionado}]`,
-            monto: item.comisionAcumulada || 0,
-          },
-          ...(Array.isArray(item.historialDetalle) ? item.historialDetalle : [])
-        ];
-        return { ...item, comisionAcumulada: 0, historialDetalle: nuevoHistorial };
-      }
-      return item;
-    });
+  const nuevoHistorial = [
+    {
+      fecha: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString(),
+      concepto: `Pago Quincenal (${infoNomina.proximoCorte}) [Mes: ${mesSeleccionado}]`,
+      monto: colaborador.comisionAcumulada || 0,
+    },
+    ...(Array.isArray(colaborador.historialDetalle) ? colaborador.historialDetalle : [])
+  ];
 
-    actualizarYGuardarEquipo(equipoActualizado);
-    alert(`¡Pago registrado con éxito! El balance de ${colaborador.nombre} se ha reiniciado a 0.`);
+  const colaboradorActualizado = {
+    ...colaborador,
+    comisionAcumulada: 0,
+    historialDetalle: nuevoHistorial,
   };
 
+  await actualizarYGuardarEquipo(colaboradorActualizado);
+  alert(`¡Pago registrado con éxito en Firebase! El balance de ${colaborador.nombre} se ha reiniciado a 0.`);
+};
+  
   const formatearTextoSeguro = (valor) => {
     if (!valor) return "N/D";
     if (typeof valor === "object") {
