@@ -27,20 +27,6 @@ export default function NominaPage() {
   const yaCalculoInicial = useRef(false);
 
   useEffect(() => {
-    const personalGuardado = localStorage.getItem("maxi_personal");
-    if (personalGuardado) {
-      try {
-        const parsed = JSON.parse(personalGuardado);
-        if (Array.isArray(parsed)) {
-          setEquipo(parsed);
-        }
-      } catch (e) {
-        setEquipo([]);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
     const unsubscribe = obtenerPedidosEnVivo((pedidosFirestore) => {
       if (Array.isArray(pedidosFirestore)) {
         setPedidos(pedidosFirestore);
