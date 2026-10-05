@@ -6,6 +6,7 @@ import { obtenerPedidosEnVivo } from "@/services/pedidosService";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc } from "firebase/firestore";
 
+
 export default function NominaPage() {
   const [equipo, setEquipo] = useState([]);
   const [pedidos, setPedidos] = useState([]);
@@ -49,14 +50,6 @@ export default function NominaPage() {
     return () => unsubscribe();
   }, []);
 
- useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "personal"), (snapshot) => {
-      const lista = snapshot.docs.map((docSnap) => ({ idDoc: docSnap.id, ...docSnap.data() }));
-      setEquipo(lista); // Actualiza la lista en vivo en la nómina de admin
-    });
-    return () => unsubscribe();
-  }, []);
-  
   // Función auxiliar para verificar si una fecha de pedido coincide con un mes (YYYY-MM)
   const coincideMesEspecifico = (fechaPedido, mesTarget) => {
     if (!fechaPedido) return true;
