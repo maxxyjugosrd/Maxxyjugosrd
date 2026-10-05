@@ -331,6 +331,34 @@ const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
     const resultado = await crearPedido(objetoPedido);
     setGuardando(false);
 
+    const montoTotalVenta = Number(nuevoPedido.total || 0);
+      const comisionEstaVenta = montoTotalVenta * (porcentaje / 100);
+
+      const infoVendedor = personalFirebase.find(
+        (p) => p.nombre?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() && p.rol === "Vendedor"
+      );
+
+      if (infoVendedor && infoVendedor.id) {
+        const comisionActualPrevia = Number(infoVendedor.comisionAcumulada || 0);
+        const nuevaComisionAcumulada = comisionActualPrevia + comisionEstaVenta;
+
+        await updateDoc(doc(db, "personal", infoVendedor.id), {
+          comisionAcumulada: nuevaComisionAcumulada
+        });
+      }
+      // =========================================================================
+
+      alert("¡Pedido guardado con éxito!");
+      setExitoMensaje("Pedido registrado correctamente.");
+      // Limpiar carrito o estados si lo requieres...
+
+    } catch (error) {
+      console.error("Error al guardar el pedido:", error);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
     if (resultado.exito) {
       setExitoMensaje("¡Pedido registrado con éxito! Quedó en estado Pendiente para aprobación.");
       setCliente({ nombre: "", telefono: "", direccion: "" });
