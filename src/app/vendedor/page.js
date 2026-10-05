@@ -29,6 +29,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowLeft,
+  Filter,
 } from "lucide-react";
 
 // Importación de servicios oficiales de tu proyecto y Firebase
@@ -95,6 +96,15 @@ export default function PanelVendedorSeguro() {
   // Estados para Historial y Filtros del Vendedor
   const [filtroEstado, setFiltroEstado] = useState("todos"); // "todos", "Pendiente", "Completado"
   const [busquedaHistorial, setBusquedaHistorial] = useState("");
+
+  // NUEVOS ESTADOS: Filtro mes por mes, metas y calendario de comisiones por fechas
+  const [mesSeleccionadoFiltro, setMesSeleccionadoFiltro] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [metaMensualInput] = useState(100000); // Meta por defecto de ejemplo en RD$
+  const [fechaInicioComision, setFechaInicioComision] = useState("");
+  const [fechaFinComision, setFechaFinComision] = useState("");
 
   // Modales de personalización
   const [modalVerdeAbierto, setModalVerdeAbierto] = useState(false);
@@ -171,29 +181,65 @@ export default function PanelVendedorSeguro() {
   };
 
   const { porcentaje } = obtenerComisionVendedor();
-  
-  // Calcular comisiones acumuladas basadas exclusivamente en pedidos COMPLETADOS (usando subtotal)
-  const calcularComisionAcumulada = () => {
+
+  // Filtrar pedidos del vendedor actual
+  const pedidosDelVendedorActual = pedidosFirebase.filter(
+    (p) => p.vendedorAsignado?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase()
+  );
+
+  // Filtrar pedidos por el mes seleccionado en el filtro principal
+  const pedidosDelMesSeleccionado = pedidosDelVendedorActual.filter((p) => {
+    const fechaRef = p.fechaEntrega || (p.fechaCreacion ? new Date(p.fechaCreacion).toISOString().split("T")[0] : "");
+    if (!fechaRef) return false;
+    return fechaRef.startsWith(mesSeleccionadoFiltro);
+  });
+
+  // Calcular comisiones y métricas basadas en el mes seleccionado
+  const calcularComisionAcumuladaMes = () => {
     if (!vendedorActual) return 0;
-    const pedidosCompletados = pedidosFirebase.filter(
-      (p) =>
-        p.vendedorAsignado?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() &&
-        p.estado === "Completado"
-    );
-    const subtotalCompletados = pedidosCompletados.reduce((sum, p) => sum + Number(p.subtotal || 0), 0);
-    return subtotalCompletados * (porcentaje / 100);
+    const completadosMes = pedidosDelMesSeleccionado.filter((p) => p.estado === "Completado");
+    const subtotalMes = completadosMes.reduce((sum, p) => sum + Number(p.subtotal || 0), 0);
+    return subtotalMes * (porcentaje / 100);
   };
 
-  const comisionAcumulada = calcularComisionAcumulada();
+  const comisionAcumuladaMes = calcularComisionAcumuladaMes();
 
-  // Calcular comisiones pendientes basadas en los pedidos creados por este vendedor que están PENDIENTES (usando subtotal)
+  // Total de ventas completadas en el mes (para la barra de meta)
+  const ventasTotalesMesCompletadas = pedidosDelMesSeleccionado
+    .filter((p) => p.estado === "Completado")
+    .reduce((sum, p) => sum + Number(p.total || 0), 0);
+
+  const porcentajeMetaAlcanzado = Math.min(Math.round((ventasTotalesMesCompletadas / metaMensualInput) * 100), 100);
+
+  // Cálculo de comisiones personalizadas por rango de fechas de calendario
+  const calcularComisionPorFechas = () => {
+    if (!vendedorActual) return { comisionRango: 0, totalVentasRango: 0 };
+    
+    const filtradosRango = pedidosDelVendedorActual.filter((p) => {
+      const fechaRef = p.fechaEntrega || (p.fechaCreacion ? new Date(p.fechaCreacion).toISOString().split("T")[0] : "");
+      if (!fechaRef) return false;
+      if (fechaInicioComision && fechaRef < fechaInicioComision) return false;
+      if (fechaFinComision && fechaRef > fechaFinComision) return false;
+      return p.estado === "Completado";
+    });
+
+    const subtotalRango = filtradosRango.reduce((sum, p) => sum + Number(p.subtotal || 0), 0);
+    const totalVentasRango = filtradosRango.reduce((sum, p) => sum + Number(p.total || 0), 0);
+    
+    return {
+      comisionRango: subtotalRango * (porcentaje / 100),
+      totalVentasRango,
+      cantidadPedidosRango: filtradosRango.length
+    };
+  };
+
+  const datosComisionRango = calcularComisionPorFechas();
+
+  // Calcular comisiones pendientes basadas en los pedidos creados por este vendedor que están PENDIENTES
   const calcularComisionPendiente = () => {
     if (!vendedorActual) return 0;
-    const pedidosPendientes = pedidosFirebase.filter(
-      (p) =>
-        p.vendedorAsignado?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() &&
-        p.estado !== "Completado" &&
-        p.estado !== "Cancelado"
+    const pedidosPendientes = pedidosDelVendedorActual.filter(
+      (p) => p.estado !== "Completado" && p.estado !== "Cancelado"
     );
     const subtotalPendientes = pedidosPendientes.reduce((sum, p) => sum + Number(p.subtotal || 0), 0);
     return subtotalPendientes * (porcentaje / 100);
@@ -387,7 +433,6 @@ export default function PanelVendedorSeguro() {
       setDeliveryAsignado("");
       setZonaSeleccionadaId("");
       setTimeout(() => setExitoMensaje(""), 5000);
-      // Regresar a la página principal de historial tras confirmar pedido con éxito
       setVistaActual("principal");
     } else {
       alert("Error al guardar el pedido en Firestore.");
@@ -434,12 +479,8 @@ export default function PanelVendedorSeguro() {
     }
   };
 
-  // Filtrar pedidos del historial del vendedor actual
-  const pedidosDelVendedorActual = pedidosFirebase.filter(
-    (p) => p.vendedorAsignado?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase()
-  );
-
-  const pedidosFiltradosHistorial = pedidosDelVendedorActual.filter((p) => {
+  // Filtrar pedidos del historial del vendedor actual basado en el mes seleccionado y filtros de estado/búsqueda
+  const pedidosFiltradosHistorial = pedidosDelMesSeleccionado.filter((p) => {
     const nombreClienteStr = typeof p.cliente === "string" ? p.cliente : p.cliente?.nombre || "";
     const coincideEstado =
       filtroEstado === "todos" ||
@@ -569,17 +610,59 @@ export default function PanelVendedorSeguro() {
         )}
 
         {/* ------------------------------------------------------------- */}
-        {/* VISTA 1: PÁGINA PRINCIPAL (Historial, Comisiones y Botón Nuevo Pedido) */}
+        {/* VISTA 1: PÁGINA PRINCIPAL (Métricas, Filtro Mes, Meta, Calendario) */}
         {/* ------------------------------------------------------------- */}
         {vistaActual === "principal" && (
           <div className="space-y-6">
-            {/* Resumen Comisiones Vendedor */}
+            
+            {/* Barra de Filtro de Mes Global */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Filter className="w-5 h-5 text-amber-500" />
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Filtrar Métricas y Pedidos por Mes</h3>
+                  <p className="text-xs text-slate-500">Selecciona el mes para revisar tu rendimiento</p>
+                </div>
+              </div>
+              <input
+                type="month"
+                value={mesSeleccionadoFiltro}
+                onChange={(e) => setMesSeleccionadoFiltro(e.target.value)}
+                className="px-4 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
+            {/* Tarjeta de Meta y Barra de Progreso */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="font-extrabold text-slate-800 text-base flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-amber-500" /> Meta de Ventas del Mes
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Ventas completadas: <strong className="text-slate-800">RD$ {ventasTotalesMesCompletadas.toLocaleString()}</strong> / Meta: <strong className="text-amber-600">RD$ {metaMensualInput.toLocaleString()}</strong>
+                  </p>
+                </div>
+                <span className="text-sm font-black bg-amber-100 text-amber-800 px-3 py-1 rounded-full">
+                  {porcentajeMetaAlcanzado}% Completado
+                </span>
+              </div>
+              {/* Barra de progreso */}
+              <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden p-0.5 border border-slate-200">
+                <div
+                  className="bg-gradient-to-r from-amber-500 to-orange-500 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${porcentajeMetaAlcanzado}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Resumen Comisiones del Mes y Pendientes */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-gradient-to-br from-amber-500 to-orange-500 text-white p-6 rounded-3xl shadow-md flex justify-between items-center">
                 <div>
-                  <span className="text-xs uppercase tracking-wider opacity-90 font-semibold">Tus Comisiones Acumuladas</span>
-                  <div className="text-3xl font-black">RD$ {comisionAcumulada.toLocaleString()}</div>
-                  <p className="text-xs opacity-80 mt-1">Calculado sobre pedidos completados ({porcentaje}%)</p>
+                  <span className="text-xs uppercase tracking-wider opacity-90 font-semibold">Comisiones del Mes ({mesSeleccionadoFiltro})</span>
+                  <div className="text-3xl font-black">RD$ {comisionAcumuladaMes.toLocaleString()}</div>
+                  <p className="text-xs opacity-80 mt-1">Completados en el mes ({porcentaje}%)</p>
                 </div>
                 <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
                   <TrendingUp className="w-8 h-8 text-white" />
@@ -594,6 +677,51 @@ export default function PanelVendedorSeguro() {
                 </div>
                 <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm">
                   <Clock className="w-8 h-8 text-amber-400" />
+                </div>
+              </div>
+            </div>
+
+            {/* NUEVA SECCIÓN: Calendario de Comisión por Fechas Personalizadas */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 border-b pb-3">
+                <Calendar className="w-5 h-5 text-teal-600" />
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">Calculadora de Comisión por Rango de Fechas</h3>
+                  <p className="text-xs text-slate-500">Selecciona un período de tiempo para consultar tus comisiones y ventas</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">Desde la fecha:</label>
+                  <input
+                    type="date"
+                    value={fechaInicioComision}
+                    onChange={(e) => setFechaInicioComision(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">Hasta la fecha:</label>
+                  <input
+                    type="date"
+                    value={fechaFinComision}
+                    onChange={(e) => setFechaFinComision(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-teal-50 border border-teal-200 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div>
+                  <p className="text-xs font-bold text-teal-900 uppercase">Resultado del Rango Seleccionado:</p>
+                  <p className="text-xs text-teal-700 mt-0.5">
+                    Pedidos completados: <strong>{datosComisionRango.cantidadPedidosRango}</strong> | Ventas totales: <strong>RD$ {datosComisionRango.totalVentasRango.toLocaleString()}</strong>
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-teal-600 block">Comisión en Rango:</span>
+                  <span className="text-2xl font-black text-teal-900">RD$ {datosComisionRango.comisionRango.toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -618,9 +746,9 @@ export default function PanelVendedorSeguro() {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-4">
                 <div>
                   <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                    <Package className="w-5 h-5 text-amber-500" /> Historial de Mis Pedidos
+                    <Package className="w-5 h-5 text-amber-500" /> Historial de Mis Pedidos ({mesSeleccionadoFiltro})
                   </h2>
-                  <p className="text-xs text-slate-500">Monitorea el estatus de tus clientes</p>
+                  <p className="text-xs text-slate-500">Monitorea el estatus de tus clientes en este mes</p>
                 </div>
 
                 {/* Filtro por Estado */}
@@ -664,7 +792,7 @@ export default function PanelVendedorSeguro() {
               {/* Lista de Pedidos Filtrados */}
               <div className="space-y-3 max-h-[500px] overflow-y-auto">
                 {pedidosFiltradosHistorial.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-10 italic">No se encontraron pedidos con estos criterios.</p>
+                  <p className="text-xs text-slate-400 text-center py-10 italic">No se encontraron pedidos en este mes con estos criterios.</p>
                 ) : (
                   pedidosFiltradosHistorial.map((ped) => {
                     const nombreCliente = typeof ped.cliente === "string" ? ped.cliente : ped.cliente?.nombre || "Cliente";
@@ -1060,7 +1188,7 @@ export default function PanelVendedorSeguro() {
             </div>
             <div className="pt-3 border-t flex gap-2">
               <button type="button" onClick={() => setModalShotAbierto(false)} className="flex-1 py-2 rounded-xl bg-slate-100 text-xs font-medium">Cancelar</button>
-              <button type="button" onClick={agregarShotpersonalizado} disabled={ingredientesShot.length === 0} className="flex-1 py-2 rounded-xl text-white bg-amber-500 text-xs font-medium disabled:opacity-40">Agregar</button>
+              <button type="button" onClick={agregarShotPersonalizado} disabled={ingredientesShot.length === 0} className="flex-1 py-2 rounded-xl text-white bg-amber-500 text-xs font-medium disabled:opacity-40">Agregar</button>
             </div>
           </div>
         </div>
