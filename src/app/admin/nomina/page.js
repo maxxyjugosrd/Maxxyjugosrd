@@ -26,11 +26,19 @@ export default function NominaPage() {
 
   const yaCalculoInicial = useRef(false);
 
-  useEffect(() => {
+ useEffect(() => {
     const unsubscribe = obtenerPedidosEnVivo((pedidosFirestore) => {
       if (Array.isArray(pedidosFirestore)) {
         setPedidos(pedidosFirestore);
       }
+    });
+    return () => unsubscribe();
+  }, []);
+
+ useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "personal"), (snapshot) => {
+      const lista = snapshot.docs.map((docSnap) => ({ idDoc: docSnap.id, ...docSnap.data() }));
+      setEquipo(lista); // Actualiza la lista en vivo en la nómina de admin
     });
     return () => unsubscribe();
   }, []);
