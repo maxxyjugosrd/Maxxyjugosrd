@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { FileText, DollarSign, Bike, Calendar, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Download, Search, Filter, Users, Wallet, Trophy, TrendingUp, TrendingDown, Target, Flame, X } from "lucide-react";
+import { FileText, DollarSign, Bike, Calendar, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Download, Search, Filter, Users, Wallet, Trophy, TrendingUp, TrendingDown, Target, Flame, X, Trash2 } from "lucide-react";
 import { obtenerPedidosEnVivo } from "@/services/pedidosService";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc } from "firebase/firestore";
@@ -76,25 +76,17 @@ export default function NominaPage() {
                    coincideMesEspecifico(fechaPedido, mesSeleccionado);
           });
           
-          const ventasPorCliente = {};
-          ventasDelVendedor.forEach((pedido) => {
-            let clienteBruto = pedido.cliente || pedido.nombreCliente || pedido.telefonoCliente || "cliente_general";
-            if (typeof clienteBruto === "object" && clienteBruto !== null) {
-              clienteBruto = clienteBruto.nombre || clienteBruto.nombreCliente || clienteBruto.telefono || "cliente_general";
-            }
-            const clienteKey = clienteBruto.toString().trim().toLowerCase();
-            const montoPedido = Number(pedido.subtotal) || 0;
+          const comisionCalculada = ventasDelVendedor.reduce((acc, pedido) => {
+            const montoComisionPedido = Number(pedido.comisionVendedor) || (Number(pedido.subtotal) * Number(colaborador.valorConfigurado) / 100) || 0;
+            return acc + montoComisionPedido;
+          }, 0);
 
-            if (!ventasPorCliente[clienteKey]) ventasPorCliente[clienteKey] = 0;
-            ventasPorCliente[clienteKey] += montoPedido;
-          });
-
-          const totalVendido = Object.values(ventasPorCliente).reduce((acc, curr) => acc + curr, 0);
-          const comisionCalculada = (totalVendido * Number(colaborador.valorConfigurado)) / 100;
+          const totalVendido = ventasDelVendedor.reduce((acc, pedido) => {
+            return acc + (Number(pedido.subtotal) || 0);
+          }, 0);
 
           return {
             ...colaborador,
-            // CORREGIDO: Se asigna directamente el cálculo estricto basado en completados. Si no hay completados, será 0.
             comisionAcumulada: comisionCalculada || 0,
             totalVentasPeriodo: totalVendido,
             registrosAsociados: ventasDelVendedor
@@ -125,7 +117,6 @@ export default function NominaPage() {
           return {
             ...colaborador,
             entregasRealizadas: totalEntregas,
-            // CORREGIDO: Asignación directa y estricta para delivery basada solo en completados.
             comisionAcumulada: totalComisionEnvios || 0,
             registrosAsociados: entregasDelDelivery
           };
@@ -184,6 +175,21 @@ export default function NominaPage() {
 
     await actualizarYGuardarEquipo(colaboradorActualizado);
     alert(`¡Pago registrado con éxito en Firebase! El balance de ${colaborador.nombre} se ha reiniciado a 0.`);
+  };
+
+  // Función para eliminar un elemento específico del historial (papelera)
+  const eliminarItemHistorial = async (colaborador, indexAEliminar) => {
+    const confirmar = confirm("¿Estás seguro de que deseas eliminar este registro de prueba del historial?");
+    if (!confirmar) return;
+
+    const historialActualizado = (colaborador.historialDetalle || []).filter((_, idx) => idx !== indexAEliminar);
+
+    const colaboradorActualizado = {
+      ...colaborador,
+      historialDetalle: historialActualizado,
+    };
+
+    await actualizarYGuardarEquipo(colaboradorActualizado);
   };
 
   const formatearTextoSeguro = (valor) => {
@@ -437,8 +443,13 @@ export default function NominaPage() {
           <input
             type="month"
             value={mesSeleccionado}
+            onClick={(e) => {
+              if (typeof e.target.showPicker === "function") {
+                e.target.showPicker();
+              }
+            }}
             onChange={(e) => setMesSeleccionado(e.target.value)}
-            className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-medium focus:outline-none focus:border-amber-500"
+            className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-medium focus:outline-none focus:border-amber-500 cursor-pointer"
           />
         </div>
       </div>
@@ -499,7 +510,7 @@ export default function NominaPage() {
                           <p className="font-bold text-amber-400 uppercase tracking-wider text-[10px] border-b border-slate-700 pb-1">Pedidos completados ({mesSeleccionado}):</p>
                           {colaborador.registrosAsociados && colaborador.registrosAsociados.length > 0 ? (
                             colaborador.registrosAsociados.map((ped, idx) => {
-                              const monto = Number(ped.subtotal) || 0;
+                              const comisionPedido = Number(ped.comisionVendedor) || (Number(ped.subtotal) * Number(colaborador.valorConfigurado || 0) / 100) || 0;
                               const costoEnvioReal = Number(ped.costoEnvio) || (ped.zonaEnvio && Number(ped.zonaEnvio.costo)) || 100;
                               const clienteStr = formatearTextoSeguro(ped.cliente || ped.nombreCliente || "Cliente");
                               return (
@@ -512,7 +523,7 @@ export default function NominaPage() {
                                     {colaborador.rol === "Delivery" ? (
                                       <span className="font-bold text-amber-400">+ RD$ {costoEnvioReal.toLocaleString()}</span>
                                     ) : (
-                                      <span className="font-bold text-emerald-400">RD$ {monto.toLocaleString()}</span>
+                                      <span className="font-bold text-emerald-400">+ RD$ {comisionPedido.toLocaleString()} <span className="text-[9px] text-slate-400 block">(Comisión)</span></span>
                                     )}
                                   </div>
                                 </div>
@@ -572,15 +583,34 @@ export default function NominaPage() {
                 <div className="border rounded-2xl overflow-hidden text-xs">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="bg-slate-100 text-slate-600 border-b"><th className="p-3">Concepto</th><th className="p-3 text-right">Monto</th></tr>
+                      <tr className="bg-slate-100 text-slate-600 border-b">
+                        <th className="p-3">Concepto</th>
+                        <th className="p-3 text-right">Monto</th>
+                        <th className="p-3 text-center print:hidden">Acción</th>
+                      </tr>
                     </thead>
                     <tbody>
                       {Array.isArray(reciboSeleccionado.historialDetalle) && reciboSeleccionado.historialDetalle.length > 0 ? (
                         reciboSeleccionado.historialDetalle.map((h, i) => (
-                          <tr key={i} className="border-b"><td className="p-3">{formatearTextoSeguro(h.concepto)}<br/><span className="text-[10px] text-slate-400">{formatearTextoSeguro(h.fecha)}</span></td><td className="p-3 text-right font-bold">RD$ {(h.monto || 0).toLocaleString()}</td></tr>
+                          <tr key={i} className="border-b">
+                            <td className="p-3">
+                              {formatearTextoSeguro(h.concepto)}<br/>
+                              <span className="text-[10px] text-slate-400">{formatearTextoSeguro(h.fecha)}</span>
+                            </td>
+                            <td className="p-3 text-right font-bold">RD$ {(h.monto || 0).toLocaleString()}</td>
+                            <td className="p-3 text-center print:hidden">
+                              <button 
+                                onClick={() => eliminarItemHistorial(reciboSeleccionado, i)}
+                                title="Eliminar registro de prueba"
+                                className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
                         ))
                       ) : (
-                        <tr><td colSpan="2" className="p-4 text-center text-slate-400 italic">No hay pagos anteriores registrados.</td></tr>
+                        <tr><td colSpan="3" className="p-4 text-center text-slate-400 italic">No hay pagos anteriores registrados.</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -588,7 +618,7 @@ export default function NominaPage() {
               </div>
 
               <div className="bg-slate-900 text-white p-4 rounded-2xl flex justify-between items-center">
-                <span className="font-medium text-sm">Balance Actual Pendiente ({mesSeleccionado}):</span>
+                <span className="font-medium text-sm">Comisión Acumulada del Período ({mesSeleccionado}):</span>
                 <span className="text-xl font-black text-amber-400">RD$ {(reciboSeleccionado.comisionAcumulada || 0).toLocaleString()}</span>
               </div>
 
@@ -599,10 +629,10 @@ export default function NominaPage() {
             </div>
 
             <div className="pt-4 border-t flex gap-3 print:hidden">
-              <button onClick={() => window.print()} className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm">
+              <button onClick={() => window.print()} className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-2xl flex items-center justify-center gap-2 text-sm shadow-md">
                 <Download className="w-4 h-4" /> Imprimir Comprobante
               </button>
-              <button onClick={() => setReciboSeleccionado(null)} className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-3 rounded-xl text-sm">Cerrar</button>
+              <button onClick={() => setReciboSeleccionado(null)} className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-3 rounded-2xl text-sm transition">Cerrar</button>
             </div>
           </div>
         </div>
