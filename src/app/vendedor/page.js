@@ -331,7 +331,8 @@ const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
     const resultado = await crearPedido(objetoPedido);
     setGuardando(false);
 
-    const montoTotalVenta = Number(nuevoPedido.total || 0);
+    // Actualizar la comisión acumulada en el documento de Firebase del vendedor
+      const montoTotalVenta = Number(nuevoPedido.total || 0);
       const comisionEstaVenta = montoTotalVenta * (porcentaje / 100);
 
       const infoVendedor = personalFirebase.find(
@@ -346,19 +347,15 @@ const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
           comisionAcumulada: nuevaComisionAcumulada
         });
       }
-      // =========================================================================
 
-      alert("¡Pedido guardado con éxito!");
-      setExitoMensaje("Pedido registrado correctamente.");
-      // Limpiar carrito o estados si lo requieres...
-
+      setExitoMensaje("¡Pedido registrado y comisión actualizada con éxito!");
+      setGuardando(false);
+      
     } catch (error) {
       console.error("Error al guardar el pedido:", error);
-    } finally {
       setGuardando(false);
     }
-  };
-
+  
     if (resultado.exito) {
       setExitoMensaje("¡Pedido registrado con éxito! Quedó en estado Pendiente para aprobación.");
       setCliente({ nombre: "", telefono: "", direccion: "" });
