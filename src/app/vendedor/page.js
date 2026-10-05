@@ -365,8 +365,8 @@ export default function PanelVendedorSeguro() {
     
     if (resultado.exito) {
       // Actualizar la comisión acumulada en el documento de Firebase del vendedor
-      const montoTotalVenta = Number(objetoPedido.subtotal || 0);
-      const comisionEstaVenta = montoTotalVenta * (porcentaje / 100);
+      const montoSubtotalVenta = Number(objetoPedido.subtotal || 0);
+      const comisionEstaVenta = montoSubtotalVenta * (porcentaje / 100);
 
       const infoVendedor = personalFirebase.find(
         (p) => p.nombre?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() && p.rol === "Vendedor"
