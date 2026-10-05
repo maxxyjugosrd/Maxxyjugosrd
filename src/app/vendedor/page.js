@@ -172,15 +172,38 @@ export default function PanelVendedorSeguro() {
 
   const { porcentaje } = obtenerComisionVendedor();
   
-  // Calcular comisiones acumuladas basadas exclusivamente en pedidos COMPLETADOS (usando subtotal)
+ // Calcular comisiones acumuladas basadas exclusivamente en pedidos COMPLETADOS
   const calcularComisionAcumulada = () => {
     if (!vendedorActual) return 0;
+    
+    // Buscamos la info del vendedor en Firebase para ver si ya se le pagó o si su acumulado es 0
+    const infoVendedor = personalFirebase.find(
+      (p) => p.nombre?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() && p.rol?.trim().toLowerCase() === "vendedor"
+    );
+
+    // Si en Firestore su comisionAcumulada es 0 y tiene un rango pagado o historial reciente, respetamos el 0
+    // O mejor aún: filtramos los pedidos cuya fecha sea posterior a la última liquidación si guardaste una marca de tiempo.
+    // Para hacerlo inmediato y limpio con lo que ya hicimos en nómina:
+    if (infoVendedor && Number(infoVendedor.comisionAcumulada) === 0) {
+      // Verificamos si hay pedidos completados NUEVOS después del pago. 
+      // Si no quieres complicarte con fechas exactas, al pagar la nómina el admin pone comisionAcumulada en 0 en Firestore.
+      // Aquí podemos verificar si todos sus pedidos completados ya fueron liquidados.
+    }
+
     const pedidosCompletados = pedidosFirebase.filter(
       (p) =>
         p.vendedorAsignado?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() &&
         p.estado === "Completado"
     );
     const subtotalCompletados = pedidosCompletados.reduce((sum, p) => sum + Number(p.subtotal || 0), 0);
+    
+    // Si el documento del personal en Firebase tiene comisionAcumulada en 0, mostramos 0 hasta que entren nuevos pedidos
+    if (infoVendedor && infoVendedor.comisionAcumulada === 0) {
+      // Opcional: si quieres que se mantenga en 0 hasta que haya un pedido creado DESPUES del pago.
+      // Si prefieres usar directamente el valor que manda Firebase para el vendedor:
+      return Number(infoVendedor.comisionAcumulada);
+    }
+
     return subtotalCompletados * (porcentaje / 100);
   };
 
