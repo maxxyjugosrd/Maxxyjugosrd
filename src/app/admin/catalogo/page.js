@@ -455,6 +455,7 @@ export default function CatalogoPage() {
                 <option value="Botella 12 oz">Botella 12 oz</option>
                 <option value="Galones">Galones</option>
                 <option value="Saludables & Shots">Saludables & Shots</option>
+                <option value="Picaderas & Bakery">Picaderas & Bakery</option>
               </select>
             </div>
 
