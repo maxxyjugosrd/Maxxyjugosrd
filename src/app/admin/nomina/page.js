@@ -12,6 +12,9 @@ export default function NominaPage() {
   const [mostrarDetalleId, setMostrarDetalleId] = useState(null);
   const [reciboSeleccionado, setReciboSeleccionado] = useState(null);
   
+  // Estado para la fecha personalizada a mostrar/imprimir en el comprobante
+  const [fechaReciboFiltro, setFechaReciboFiltro] = useState(() => new Date().toISOString().slice(0, 10));
+  
   // Estado para abrir/cerrar el panel de competencias
   const [mostrarCompetencia, setMostrarCompetencia] = useState(false);
   const [metaMensualDefault] = useState(150000); // Meta por defecto en RD$
@@ -94,7 +97,6 @@ export default function NominaPage() {
 
           return {
             ...colaborador,
-            // CORREGIDO: Se asigna directamente el cálculo estricto basado en completados. Si no hay completados, será 0.
             comisionAcumulada: comisionCalculada || 0,
             totalVentasPeriodo: totalVendido,
             registrosAsociados: ventasDelVendedor
@@ -125,7 +127,6 @@ export default function NominaPage() {
           return {
             ...colaborador,
             entregasRealizadas: totalEntregas,
-            // CORREGIDO: Asignación directa y estricta para delivery basada solo en completados.
             comisionAcumulada: totalComisionEnvios || 0,
             registrosAsociados: entregasDelDelivery
           };
@@ -136,7 +137,6 @@ export default function NominaPage() {
     );
   }, [pedidos, mesSeleccionado]);
 
-  // Función para actualizar y guardar cambios directamente en Firestore
   const actualizarYGuardarEquipo = async (colaboradorActualizado) => {
     try {
       if (!colaboradorActualizado.idDoc) return;
@@ -544,6 +544,20 @@ export default function NominaPage() {
       {reciboSeleccionado && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-3xl p-8 max-w-xl w-full space-y-6 shadow-2xl border my-8">
+            
+            {/* Controles de filtro de fecha específicos para el comprobante (ocultos al imprimir) */}
+            <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 print:hidden">
+              <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+                <Calendar className="w-4 h-4 text-amber-600" /> Fecha del Comprobante / Pago:
+              </div>
+              <input
+                type="date"
+                value={fechaReciboFiltro}
+                onChange={(e) => setFechaReciboFiltro(e.target.value)}
+                className="px-3 py-1.5 bg-white border border-amber-300 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
             <div id="seccion-recibo-impresion" className="space-y-6 bg-white p-2">
               <div className="flex justify-between items-center border-b pb-4">
                 <div className="flex items-center gap-3">
@@ -554,7 +568,7 @@ export default function NominaPage() {
                   </div>
                 </div>
                 <div className="text-right text-xs text-slate-500">
-                  <p><span className="font-bold">Fecha:</span> {new Date().toLocaleDateString()}</p>
+                  <p><span className="font-bold">Fecha de Pago:</span> {fechaReciboFiltro}</p>
                   <p><span className="font-bold">Mes Evaluado:</span> {mesSeleccionado}</p>
                 </div>
               </div>
@@ -588,7 +602,7 @@ export default function NominaPage() {
               </div>
 
               <div className="bg-slate-900 text-white p-4 rounded-2xl flex justify-between items-center">
-                <span className="font-medium text-sm">Balance Actual Pendiente ({mesSeleccionado}):</span>
+                <span className="font-medium text-sm">Balance Actual Pagado / Pendiente ({mesSeleccionado}):</span>
                 <span className="text-xl font-black text-amber-400">RD$ {(reciboSeleccionado.comisionAcumulada || 0).toLocaleString()}</span>
               </div>
 
