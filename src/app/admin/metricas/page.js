@@ -63,13 +63,16 @@ export default function MetricasPage() {
         const mesP = isNaN(fechaPedido.getTime()) ? mesActualIndex : fechaPedido.getMonth();
         const anioP = isNaN(fechaPedido.getTime()) ? anioActual : fechaPedido.getFullYear();
         
-        const totalP = Number(pedido.total || pedido.montoTotal || pedido.monto || 0);
+        // Uso estricto del subtotal para ignorar el delivery en las ventas del negocio
+        const subtotalP = Number(pedido.subtotal || 0);
+        // Si por alguna razón antigua no existiera subtotal en algún pedido específico, respaldamos con el total limpio
+        const ventaEfectivaP = subtotalP > 0 ? subtotalP : Number(pedido.total || pedido.montoTotal || pedido.monto || 0);
 
         if (mesP === mesActualIndex && anioP === anioActual) {
-          ventasActual += totalP;
+          ventasActual += ventaEfectivaP;
           pedidosActual += 1;
         } else {
-          ventasAnterior += totalP;
+          ventasAnterior += ventaEfectivaP;
           pedidosAnterior += 1;
         }
 
@@ -80,13 +83,13 @@ export default function MetricasPage() {
             const nombreJugo = item.nombre || item.producto || item.titulo || "Jugo Natural";
             const cant = Number(item.cantidad || item.qty || 1);
             const precioItem = Number(item.precio || item.price || 0);
-            const subtotal = precioItem > 0 ? precioItem * cant : Number(item.subtotal || 0);
+            const subtotalItem = precioItem > 0 ? precioItem * cant : Number(item.subtotal || 0);
 
             if (!conteoJugos[nombreJugo]) {
               conteoJugos[nombreJugo] = { unidades: 0, total: 0 };
             }
             conteoJugos[nombreJugo].unidades += cant;
-            conteoJugos[nombreJugo].total += (subtotal > 0 ? subtotal : precioItem * cant);
+            conteoJugos[nombreJugo].total += (subtotalItem > 0 ? subtotalItem : precioItem * cant);
           });
         }
 
@@ -122,12 +125,12 @@ export default function MetricasPage() {
 
       const totalGastosYPagos = totalGastosContabilidad + totalPagosPersonal;
 
-      // Ganancia neta real unificada (Ventas totales menos todos los gastos y pagos reales)
+      // Ganancia neta real unificada (Ventas totales por subtotal menos todos los gastos y pagos reales)
       const ventasTotalesGlobal = ventasActual + ventasAnterior;
       const gananciaNetaRealGlobal = ventasTotalesGlobal - totalGastosYPagos;
       
-      // Para mantener la lógica mensual aproximada de la vista:
-      const gananciaActual = ventasActual - totalGastosYPagos; // O ajustado proporcionalmente
+      // Para mantener la lógica mensual de la vista:
+      const gananciaActual = ventasActual - totalGastosYPagos; 
       const gananciaAnterior = ventasAnterior;
 
       const calcDif = (actual, anterior) => {
@@ -141,7 +144,7 @@ export default function MetricasPage() {
 
       setComparativa({
         mesAnterior: { ventas: Math.round(ventasAnterior), pedidos: Math.round(pedidosAnterior), ganancia: Math.round(gananciaAnterior) },
-        mesActual: { ventas: Math.round(ventasActual), pedidos: Math.round(pedidosActual), ganancia: Math.round(gananciaNetaRealGlobal) },
+        mesActual: { ventas: Math.round(ventasActual), pedidos: Math.round(pedidosActual), ganancia: Math.round(gananciaActual) },
       });
 
       const totalUnidadesGlobal = Object.values(conteoJugos).reduce((acc, curr) => acc + curr.unidades, 0);
@@ -222,7 +225,7 @@ export default function MetricasPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
           <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-wider">
-            <span>Ventas Brutas</span>
+            <span>Ventas Netas (Subtotal)</span>
             <span className="flex items-center gap-1 text-slate-500"><Calendar className="w-3.5 h-3.5" /> Mes Actual</span>
           </div>
           <div className="flex items-baseline justify-between">
@@ -231,7 +234,7 @@ export default function MetricasPage() {
               <TrendingUp className="w-3.5 h-3.5" /> +{difVentas}%
             </span>
           </div>
-          <p className="text-xs text-slate-400">Mes anterior: RD$ {comparativa.mesAnterior.ventas.toLocaleString()}</p>
+          <p className="text-xs text-slate-400">Sin incluir delivery. Mes anterior: RD$ {comparativa.mesAnterior.ventas.toLocaleString()}</p>
         </div>
 
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
@@ -259,7 +262,7 @@ export default function MetricasPage() {
               <TrendingUp className="w-3.5 h-3.5" /> +{difGanancia}%
             </span>
           </div>
-          <p className="text-xs text-slate-400">Descontando insumos y pagos reales</p>
+          <p className="text-xs text-slate-400">Ventas (subtotal) menos insumos y pagos</p>
         </div>
       </div>
 
