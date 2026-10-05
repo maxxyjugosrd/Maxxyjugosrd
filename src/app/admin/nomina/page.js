@@ -110,6 +110,32 @@ export default function NominaPage() {
           };
         }
 
+        // 2. Si es Delivery
+        if (rolColaborador === "delivery") {
+          const entregasDelDelivery = pedidos.filter((v) => {
+            const deliveryPedido = (v.delivery || v.deliveryAsignado || "").toString().trim().toLowerCase();
+            const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
+            const fechaPedido = v.fecha || v.creadoEn || v.createdAt;
+
+            return deliveryPedido.includes(nombreColaborador) &&
+                   estadoPedido === "completado" &&
+                   coincideRangoFechas(fechaPedido, fechaInicio, fechaFin);
+          });
+
+          let comisionTotalDelivery = 0;
+          entregasDelDelivery.forEach((ped) => {
+            const costoEnvioReal = Number(ped.costoEnvio) || (ped.zonaEnvio && Number(ped.zonaEnvio.costo)) || 100;
+            comisionTotalDelivery += costoEnvioReal;
+          });
+
+          return {
+            ...colaborador,
+            comisionAcumulada: comisionTotalDelivery || 0,
+            entregasRealizadas: entregasDelDelivery.length,
+            registrosAsociados: entregasDelDelivery
+          };
+        }
+
         return colaborador;
       })
     );
