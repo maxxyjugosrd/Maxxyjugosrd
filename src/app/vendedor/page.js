@@ -72,13 +72,15 @@ export default function PanelVendedor() {
   const [clienteSeleccionadoObj, setClienteSeleccionadoObj] = useState(null);
   const [carrito, setCarrito] = useState([]);
 
-  // Estado para modal de contraseña de supervisora (para reasignar clientes de otro vendedor)
+  // Estado para modal de contraseña de supervisora
   const [modalPasswordAbierto, setModalPasswordAbierto] = useState(false);
   const [passwordSupervisorInput, setPasswordSupervisorInput] = useState("");
   const [pedidoPendienteGuardar, setPedidoPendienteGuardar] = useState(null);
 
-  // Cargar personal y clientes del CRM desde localStorage al iniciar
+  // Cargar personal y clientes de manera segura para evitar errores de SSR en Vercel
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const personalGuardado = localStorage.getItem("maxi_personal");
     if (personalGuardado) {
       try {
@@ -118,31 +120,27 @@ export default function PanelVendedor() {
     return () => desuscribir && desuscribir();
   }, []);
 
-  // Manejar selección inicial del vendedor en el selector
   const handleSeleccionarNombreDropdown = (nombre) => {
     setVendedorSeleccionadoPrevia(nombre);
     setPinIngresado("");
     setNuevoPinInput("");
 
-    if (!nombre) {
+    if (!nombre || typeof window === "undefined") {
       setRequiereCrearPin(false);
       return;
     }
 
-    // Revisar si este vendedor ya tiene un PIN guardado en localStorage
     const pinesGuardados = JSON.parse(localStorage.getItem("maxi_vendedores_pines") || "{}");
     if (!pinesGuardados[nombre]) {
-      // Si no tiene PIN, le exigimos crear uno nuevo
       setRequiereCrearPin(true);
     } else {
       setRequiereCrearPin(false);
     }
   };
 
-  // Validar PIN de acceso del vendedor
   const handleLoginVendedor = (e) => {
     e.preventDefault();
-    if (!vendedorSeleccionadoPrevia) return;
+    if (!vendedorSeleccionadoPrevia || typeof window === "undefined") return;
 
     const pinesGuardados = JSON.parse(localStorage.getItem("maxi_vendedores_pines") || "{}");
 
@@ -151,7 +149,6 @@ export default function PanelVendedor() {
         alert("El PIN debe tener al menos 4 dígitos.");
         return;
       }
-      // Guardar el nuevo PIN
       pinesGuardados[vendedorSeleccionadoPrevia] = nuevoPinInput;
       localStorage.setItem("maxi_vendedores_pines", JSON.stringify(pinesGuardados));
       setVendedorActual(vendedorSeleccionadoPrevia);
@@ -165,7 +162,6 @@ export default function PanelVendedor() {
     }
   };
 
-  // Seleccionar un cliente desde el CRM
   const seleccionarClienteCRM = (cliente) => {
     setNombreCliente(cliente.nombre);
     setTelefonoCliente(cliente.telefono || "");
@@ -224,7 +220,7 @@ export default function PanelVendedor() {
 
       await addDoc(collection(db, "pedidos"), nuevoPedidoData);
 
-      if (clienteSeleccionadoObj && !clienteSeleccionadoObj.vendedorAsignado) {
+      if (clienteSeleccionadoObj && !clienteSeleccionadoObj.vendedorAsignado && typeof window !== "undefined") {
         const crmActualizado = clientesCRM.map((c) =>
           c.id === clienteSeleccionadoObj.id
             ? { ...c, vendedorAsignado: vendedorFinalAsignado }
@@ -286,7 +282,7 @@ export default function PanelVendedor() {
   const handleVerificarPasswordSupervisor = (e) => {
     e.preventDefault();
     const PASSWORD_SUPERVISORA_CORRECTA = "maxxy2026";
-    const passwordGuardadaLocal = localStorage.getItem("maxi_admin_pass") || PASSWORD_SUPERVISORA_CORRECTA;
+    const passwordGuardadaLocal = typeof window !== "undefined" ? localStorage.getItem("maxi_admin_pass") || PASSWORD_SUPERVISORA_CORRECTA : PASSWORD_SUPERVISORA_CORRECTA;
 
     if (passwordSupervisorInput === passwordGuardadaLocal) {
       alert("Contraseña correcta. Autorizado por supervisión.");
@@ -301,6 +297,7 @@ export default function PanelVendedor() {
   );
 
   const obtenerDatosVendedorLocal = () => {
+    if (typeof window === "undefined") return { porcentaje: 0, comisionAcumulada: 0 };
     const personalGuardado = localStorage.getItem("maxi_personal");
     if (!personalGuardado) return { porcentaje: 0, comisionAcumulada: 0 };
     try {
@@ -324,7 +321,6 @@ export default function PanelVendedor() {
     c.nombre.toLowerCase().includes(busquedaCliente.toLowerCase())
   );
 
-  // Pantalla de Inicio / Autenticación por PIN del Vendedor
   if (!vendedorActual) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
@@ -357,7 +353,7 @@ export default function PanelVendedor() {
             </div>
 
             {vendedorSeleccionadoPrevia && requiereCrearPin && (
-              <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl space-y-2 animate-fade-in">
+              <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl space-y-2">
                 <p className="text-xs font-bold text-amber-900">
                   Es tu primera vez ingresando. Crea tu PIN de 4 dígitos o contraseña:
                 </p>
@@ -373,7 +369,7 @@ export default function PanelVendedor() {
             )}
 
             {vendedorSeleccionadoPrevia && !requiereCrearPin && (
-              <div className="space-y-2 animate-fade-in">
+              <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700 block uppercase tracking-wider">
                   Ingresa tu PIN o Contraseña:
                 </label>
