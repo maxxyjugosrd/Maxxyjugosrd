@@ -14,12 +14,12 @@ export default function NominaPage() {
   
   // Estados para el rango de fechas personalizado (Ej: del 1 al 15 de octubre)
   const hoyStr = new Date().toISOString().slice(0, 10);
-  const [fechaInicioFiltro, setFechaInicioFiltro] = useState(hoyStr.slice(0, 8) + "01"); // Inicio de mes por defecto
-  const [fechaFinFiltro, setFechaFinFiltro] = useState(hoyStr); // Día actual por defecto
+  const [fechaInicioFiltro, setFechaInicioFiltro] = useState(hoyStr.slice(0, 8) + "01");
+  const [fechaFinFiltro, setFechaFinFiltro] = useState(hoyStr);
 
   // Estado para abrir/cerrar el panel de competencias
   const [mostrarCompetencia, setMostrarCompetencia] = useState(false);
-  const [metaMensualDefault] = useState(150000); // Meta por defecto en RD$
+  const [metaMensualDefault] = useState(150000);
 
   // Estados para filtros de búsqueda y posición
   const [busqueda, setBusqueda] = useState("");
@@ -42,7 +42,6 @@ export default function NominaPage() {
     return () => unsubscribe();
   }, []);
   
-  // Función auxiliar para verificar si la fecha del pedido cae exactamente dentro del rango seleccionado
   const coincideRangoFechas = (fechaPedido, inicioStr, finStr) => {
     if (!fechaPedido) return true;
     let fechaStr = "";
@@ -142,7 +141,6 @@ export default function NominaPage() {
         historialDetalle: colaboradorActualizado.historialDetalle || [],
         totalVentasPeriodo: colaboradorActualizado.totalVentasPeriodo || 0,
       });
-      // Actualizar estado local inmediato para reflejar el cambio (ej. borrar historial)
       setEquipo(prev => prev.map(c => c.idDoc === colaboradorActualizado.idDoc ? colaboradorActualizado : c));
       if (reciboSeleccionado && (reciboSeleccionado.idDoc === colaboradorActualizado.idDoc || reciboSeleccionado.id === colaboradorActualizado.id)) {
         setReciboSeleccionado(colaboradorActualizado);
@@ -188,7 +186,6 @@ export default function NominaPage() {
     alert(`¡Pago registrado con éxito! El balance se ha reiniciado a 0.`);
   };
 
-  // Función para borrar un elemento del historial de pagos (borrar pruebas)
   const eliminarItemHistorial = async (colaborador, indexItem) => {
     const confirmar = confirm("¿Estás seguro de eliminar este registro de pago de prueba?");
     if (!confirmar) return;
@@ -371,7 +368,7 @@ export default function NominaPage() {
         </div>
       )}
 
-      {/* Panel de Filtro de Fechas (Rango Personalizado) */}
+      {/* Panel de Filtro de Fechas (Rango Personalizado con interacción optimizada) */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row gap-4 items-center justify-between">
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
@@ -381,7 +378,8 @@ export default function NominaPage() {
             type="date"
             value={fechaInicioFiltro}
             onChange={(e) => setFechaInicioFiltro(e.target.value)}
-            className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-amber-500"
+            onClick={(e) => e.target.showPicker && e.target.showPicker()}
+            className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-amber-500 cursor-pointer"
           />
 
           <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
@@ -391,7 +389,8 @@ export default function NominaPage() {
             type="date"
             value={fechaFinFiltro}
             onChange={(e) => setFechaFinFiltro(e.target.value)}
-            className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-amber-500"
+            onClick={(e) => e.target.showPicker && e.target.showPicker()}
+            className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-amber-500 cursor-pointer"
           />
         </div>
 
