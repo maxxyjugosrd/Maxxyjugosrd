@@ -138,17 +138,20 @@ export default function PanelVendedorSeguro() {
     return () => unsubscribe();
   }, []);
 
-// Obtener comisiones de forma segura sin romper el build
+// Obtener comisiones de forma infalible buscando en todos los campos posibles de pedidos
   const obtenerComisionVendedor = () => {
-    const info = personalFirebase.find((p) => p.nombre === vendedorActual && p.rol === "Vendedor");
+    const info = personalFirebase.find((p) => p.nombre?.trim().toLowerCase() === vendedorActual?.trim().toLowerCase() && p.rol === "Vendedor");
     const porcentajeConfigurado = Number(info?.valorConfigurado || info?.comisionPorcentaje || 0);
     
-    // Usamos el arreglo de pedidos disponible (asegúrate de que en tu archivo se llame pedidos o pedidosFirebase)
     const listaPedidos = typeof pedidos !== 'undefined' ? pedidos : (typeof pedidosFirebase !== 'undefined' ? pedidosFirebase : []);
 
     const totalComisionesPedidos = listaPedidos
-      .filter((p) => p.vendedor === vendedorActual || p.vendedorAsignado === vendedorActual)
-      .reduce((acc, p) => acc + (Number(p.total || 0) * (porcentajeConfigurado / 100)), 0);
+      .filter((p) => {
+        const vendedorPedido = (p.vendedor || p.vendedorAsignado || p.nombreVendedor || "").trim().toLowerCase();
+        const vendedorActualL = (vendedorActual || "").trim().toLowerCase();
+        return vendedorPedido === vendedorActualL;
+      })
+      .reduce((acc, p) => acc + (Number(p.total || p.subtotal || 0) * (porcentajeConfigurado / 100)), 0);
 
     return {
       porcentaje: porcentajeConfigurado,
