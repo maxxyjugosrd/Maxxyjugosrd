@@ -26,10 +26,12 @@ import {
   KeyRound,
 } from "lucide-react";
 
-// Importación de servicios oficiales de tu proyecto
+// Importación de servicios oficiales de tu proyecto y Firebase
 import { crearPedido } from "@/services/pedidosService";
 import { obtenerProductosEnVivo, obtenerIngredientesEnVivo } from "@/services/catalogoService";
 import { obtenerClientesEnVivo } from "@/services/clientesService";
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot } from "firebase/firestore";
 
 // Listas de Zonas de Envío configuradas
 const ZONAS_ENVIO = [
@@ -50,8 +52,8 @@ const ZONAS_ENVIO = [
 ];
 
 export default function PanelVendedorSeguro() {
-  // Autenticación por PIN del Vendedor
-  const [vendedoresDisponibles, setVendedoresDisponibles] = useState(["Juan Pérez", "María Gómez", "Carlos Ruiz"]);
+  // Autenticación por PIN del Vendedor (dinámico desde Firebase)
+  const [vendedoresDisponibles, setVendedoresDisponibles] = useState([]);
   const [vendedorSeleccionadoPrevia, setVendedorSeleccionadoPrevia] = useState("");
   const [pinIngresado, setPinIngresado] = useState("");
   const [requiereCrearPin, setRequiereCrearPin] = useState(false);
@@ -65,6 +67,7 @@ export default function PanelVendedorSeguro() {
   const [listaDeliveries, setListaDeliveries] = useState([]);
   const [listaIngredientesVerdes, setListaIngredientesVerdes] = useState([]);
   const [listaIngredientesShots, setListaIngredientesShots] = useState([]);
+  const [personalFirebase, setPersonalFirebase] = useState([]);
 
   // Formulario del pedido
   const [cliente, setCliente] = useState({ nombre: "", telefono: "", direccion: "" });
@@ -94,7 +97,7 @@ export default function PanelVendedorSeguro() {
   const [passwordSupervisorInput, setPasswordSupervisorInput] = useState("");
   const [pedidoPendienteGuardar, setPedidoPendienteGuardar] = useState(null);
 
-  // Cargar datos en vivo (Firestore y LocalStorage)
+  // 1. Cargar Catálogo, Clientes e Ingredientes en vivo desde Firebase
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -112,24 +115,41 @@ export default function PanelVendedorSeguro() {
       setListaIngredientesShots(datos.filter((i) => i.tipo === "shot" && i.disponible !== false));
     });
 
-    const personalGuardado = localStorage.getItem("maxi_personal");
-    if (personalGuardado) {
-      try {
-        const personalArr = JSON.parse(personalGuardado);
-        setListaDeliveries(personalArr.filter((p) => p.rol === "Delivery"));
-        const soloVendedores = personalArr.filter((p) => p.rol === "Vendedor").map((p) => p.nombre);
-        if (soloVendedores.length > 0) setVendedoresDisponibles(soloVendedores);
-      } catch (e) {
-        console.error("Error al cargar personal:", e);
-      }
-    }
-
     return () => {
       desuscribirProductos && desuscribirProductos();
       desuscribirClientes && desuscribirClientes();
       desuscribirIngredientes && desuscribirIngredientes();
     };
   }, []);
+
+  // 2. Cargar Personal, Vendedores, Deliveries y Comisiones en vivo desde la colección "personal" de Firebase
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "personal"), (snapshot) => {
+      const lista = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      setPersonalFirebase(lista);
+
+      // Filtrar deliveries para el formulario de pedidos
+      setListaDeliveries(lista.filter((p) => p.rol === "Delivery"));
+
+      // Extraer nombres reales de vendedores para el login por PIN
+      const soloVendedores = lista.filter((p) => p.rol === "Vendedor").map((p) => p.nombre);
+      setVendedoresDisponibles(soloVendedores);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Obtener comisiones y porcentaje directamente desde Firebase según el vendedor logueado
+  const obtenerComisionVendedor = () => {
+    const info = personalFirebase.find((p) => p.nombre === vendedorActual && p.rol === "Vendedor");
+    return info
+      ? {
+          porcentaje: Number(info.valorConfigurado || 0),
+          comisionAcumulada: Number(info.comisionesAcumuladas || 0),
+        }
+      : { porcentaje: 0, comisionAcumulada: 0 };
+  };
+
+  const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
 
   // Manejar PIN del Vendedor
   const handleSeleccionarNombreDropdown = (nombre) => {
@@ -336,7 +356,6 @@ export default function PanelVendedorSeguro() {
       return;
     }
 
-    // Verificar si el cliente en CRM tiene otro vendedor asignado
     if (
       clienteSeleccionadoObj &&
       clienteSeleccionadoObj.vendedorAsignado &&
@@ -362,30 +381,14 @@ export default function PanelVendedorSeguro() {
     }
   };
 
-  // Obtener comisiones del vendedor logueado
-  const obtenerComisionVendedor = () => {
-    if (typeof window === "undefined") return { porcentaje: 0, comisionAcumulada: 0 };
-    const personalGuardado = localStorage.getItem("maxi_personal");
-    if (!personalGuardado) return { porcentaje: 0, comisionAcumulada: 0 };
-    try {
-      const parsed = JSON.parse(personalGuardado);
-      const info = parsed.find((p) => p.nombre === vendedorActual && p.rol === "Vendedor");
-      return info ? { porcentaje: Number(info.valorConfigurado || 0), comisionAcumulada: Number(info.comisionesAcumuladas || 0) } : { porcentaje: 0, comisionAcumulada: 0 };
-    } catch (e) {
-      return { porcentaje: 0, comisionAcumulada: 0 };
-    }
-  };
-
-  const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
-
   // Pantalla de Autenticación por PIN del Vendedor
   if (!vendedorActual) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6">
           <div className="text-center">
-            <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner mb-3">
-              <KeyRound className="w-8 h-8" />
+            <div className="w-20 h-20 rounded-2xl overflow-hidden mx-auto shadow-md mb-3 border border-slate-100">
+              <img src="/logo.JPG" alt="Maxxy Jugos" className="w-full h-full object-cover" />
             </div>
             <h1 className="text-2xl font-black text-slate-800">Maxxy Jugos</h1>
             <p className="text-sm text-slate-500 mt-1">Acceso Seguro de Vendedores</p>
@@ -402,9 +405,13 @@ export default function PanelVendedorSeguro() {
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-medium outline-none focus:border-amber-500"
               >
                 <option value="">-- Selecciona quién eres --</option>
-                {vendedoresDisponibles.map((v, idx) => (
-                  <option key={idx} value={v}>{v}</option>
-                ))}
+                {vendedoresDisponibles.length === 0 ? (
+                  <option disabled value="">Cargando vendedores desde Firebase...</option>
+                ) : (
+                  vendedoresDisponibles.map((v, idx) => (
+                    <option key={idx} value={v}>{v}</option>
+                  ))
+                )}
               </select>
             </div>
 
@@ -454,10 +461,12 @@ export default function PanelVendedorSeguro() {
 
   return (
     <div className="min-h-screen bg-slate-100 pb-12">
-      {/* Barra superior */}
+      {/* Barra superior con Logo corporativo */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 px-6 py-4 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center font-black">MJ</div>
+          <div className="w-10 h-10 rounded-xl overflow-hidden shadow-sm border">
+            <img src="/logo.JPG" alt="Maxxy Jugos" className="w-full h-full object-cover" />
+          </div>
           <div>
             <h1 className="font-bold text-slate-800 text-base">Panel de Ventas Seguro</h1>
             <p className="text-xs text-slate-500">Vendedor: <strong className="text-amber-600">{vendedorActual}</strong></p>
@@ -479,7 +488,7 @@ export default function PanelVendedorSeguro() {
           </div>
         )}
 
-        {/* Resumen Comisiones Vendedor */}
+        {/* Resumen Comisiones Vendedor (Directo de Firebase) */}
         <div className="bg-gradient-to-br from-amber-500 to-orange-500 text-white p-6 rounded-3xl shadow-md flex justify-between items-center">
           <div>
             <span className="text-xs uppercase tracking-wider opacity-90 font-semibold">Tus Comisiones Acumuladas</span>
@@ -529,7 +538,7 @@ export default function PanelVendedorSeguro() {
             </div>
 
             <div>
-              <h2 className="text-lg font-semibold text-slate-700 mb-3">Catálogo en Vivo (Firestore)[cite: 4]</h2>
+              <h2 className="text-lg font-semibold text-slate-700 mb-3">Catálogo en Vivo (Firestore)</h2>
               {cargandoProductos ? (
                 <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2 bg-white rounded-2xl border">
                   <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
@@ -577,7 +586,7 @@ export default function PanelVendedorSeguro() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200/60">
                 <label className="text-xs font-semibold text-amber-900 flex items-center gap-1 mb-1">
-                  <UserCheck className="w-3.5 h-3.5 text-amber-600" /> Seleccionar Cliente (CRM)[cite: 4]
+                  <UserCheck className="w-3.5 h-3.5 text-amber-600" /> Seleccionar Cliente (CRM)
                 </label>
                 <select
                   onChange={handleSeleccionarClienteExistente}
@@ -634,7 +643,7 @@ export default function PanelVendedorSeguro() {
 
               <div>
                 <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
-                  <Calendar className="w-3.5 h-3.5 text-amber-600" /> Fecha de Entrega *[cite: 4]
+                  <Calendar className="w-3.5 h-3.5 text-amber-600" /> Fecha de Entrega *
                 </label>
                 <input
                   type="date"
@@ -656,12 +665,12 @@ export default function PanelVendedorSeguro() {
                   className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
                 >
                   <option value="">-- Seleccionar Zona --</option>
-                  <optgroup label="Provincias (Camión)[cite: 4]">
+                  <optgroup label="Provincias (Camión)">
                     {ZONAS_ENVIO.filter(z => z.tipo === "camion").map((zona) => (
                       <option key={zona.id} value={zona.id}>{zona.nombre}</option>
                     ))}
                   </optgroup>
-                  <optgroup label="Santo Domingo (Local)[cite: 4]">
+                  <optgroup label="Santo Domingo (Local)">
                     {ZONAS_ENVIO.filter(z => z.tipo === "local").map((zona) => (
                       <option key={zona.id} value={zona.id}>{zona.nombre} (RD$ {zona.costo})</option>
                     ))}
@@ -670,7 +679,7 @@ export default function PanelVendedorSeguro() {
 
                 {zonaActual && zonaActual.tipo === "camion" && (
                   <div className="bg-slate-50 p-3 rounded-xl border space-y-2">
-                    <label className="text-xs font-semibold text-slate-600 block">Tarifa Camión[cite: 4]:</label>
+                    <label className="text-xs font-semibold text-slate-600 block">Tarifa Camión:</label>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
@@ -782,7 +791,7 @@ export default function PanelVendedorSeguro() {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl p-6 max-w-lg w-full space-y-5 shadow-xl max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
-              <Sparkles className="text-emerald-500 w-5 h-5" /> Armar Jugo Verde[cite: 4]
+              <Sparkles className="text-emerald-500 w-5 h-5" /> Armar Jugo Verde
             </h3>
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -829,7 +838,7 @@ export default function PanelVendedorSeguro() {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl p-6 max-w-lg w-full space-y-5 shadow-xl max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
-              <Zap className="text-amber-500 w-5 h-5" /> Armar Shot Funcional[cite: 4]
+              <Zap className="text-amber-500 w-5 h-5" /> Armar Shot Funcional
             </h3>
             <div className="grid grid-cols-2 gap-2">
               {listaIngredientesShots.map((ing) => {
