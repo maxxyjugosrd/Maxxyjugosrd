@@ -20,13 +20,15 @@ export default function NominaPage() {
   const [busqueda, setBusqueda] = useState("");
   const [filtroPosicion, setFiltroPosicion] = useState("Todos");
   
-  // Filtros de Rango de Fechas Interactivo (Por defecto el mes actual completo)
+  // Filtros de Rango de Fechas Interactivo (Desde / Hasta)
   const fechaActualObj = new Date();
   const anioActual = fechaActualObj.getFullYear();
   const mesActualNum = String(fechaActualObj.getMonth() + 1).padStart(2, '0');
   
   const [fechaInicio, setFechaInicio] = useState(`${anioActual}-${mesActualNum}-01`);
   const [fechaFin, setFechaFin] = useState(fechaActualObj.toISOString().slice(0, 10));
+
+  const yaCalculoInicial = useRef(false);
 
   useEffect(() => {
     const unsubscribe = obtenerPedidosEnVivo((pedidosFirestore) => {
@@ -39,8 +41,8 @@ export default function NominaPage() {
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "personal"), (snapshot) => {
-      const lista = snapshot.docs.map((docSnap) => ({ idDoc: docSnap.id, id: docSnap.id, ...docSnap.data() }));
-      setEquipo(lista); 
+      const lista = snapshot.docs.map((docSnap) => ({ idDoc: docSnap.id, ...docSnap.data() }));
+      setEquipo(lista); // Actualiza la lista en vivo en la nómina de admin
     });
     return () => unsubscribe();
   }, []);
@@ -169,8 +171,6 @@ export default function NominaPage() {
     };
 
     await actualizarYGuardarEquipo(colaboradorActualizado);
-
-    // Actualiza también el modal activo para que se refleje de inmediato en pantalla
     setReciboSeleccionado(colaboradorActualizado);
   };
   
@@ -237,7 +237,8 @@ export default function NominaPage() {
 
     let totalVendido = 0;
     ventasFiltradas.forEach((pedido) => {
-      totalVendido += Number(pedido.subtotal) || 0;
+      const monto = Number(pedido.subtotal) || 0;
+      totalVendido += monto;
     });
 
     return { totalVendido, cantidadPedidos: ventasFiltradas.length };
@@ -454,13 +455,12 @@ export default function NominaPage() {
             onChange={(e) => setFiltroPosicion(e.target.value)}
             className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-medium focus:outline-none focus:border-amber-500"
           >
-            <option value="Todos">Todas</option>
+            <option value="Todos">Todas las posiciones</option>
             <option value="Delivery">Delivery</option>
             <option value="Vendedor">Vendedor</option>
             <option value="Colaborador / Empleado">Empleado Fijo</option>
           </select>
 
-          {/* Calendarios interactivos Desde / Hasta */}
           <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold px-1">
             Desde:
           </div>
@@ -531,7 +531,7 @@ export default function NominaPage() {
                         onClick={() => setMostrarDetalleId(estaExpandido ? null : idColab)}
                         className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition"
                       >
-                        <span>{estaExpandido ? "Ocultar desglose" : `Auditar cuentas (${colaborador.rol === "Delivery" ? `${colaborador.entregasRealizadas || 0} entregas` : `${colaborador.registrosAsociados?.length || 0} pedidos`})`}</span>
+                        <span>{estaExpandido ? "Ocultar desglose" : `Auditar cuentas (${colaborador.rol === "Delivery" ? `${colaborador.entregasRealizadas || 0} entregas` : `RD$ ${(colaborador.totalVentasPeriodo || 0).toLocaleString()} ventas`})`}</span>
                         {estaExpandido ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
 
@@ -540,10 +540,11 @@ export default function NominaPage() {
                           <p className="font-bold text-amber-400 uppercase tracking-wider text-[10px] border-b border-slate-700 pb-1">Operaciones en el rango:</p>
                           {colaborador.registrosAsociados && colaborador.registrosAsociados.length > 0 ? (
                             colaborador.registrosAsociados.map((ped, idx) => {
+                              const monto = Number(ped.subtotal) || 0;
                               const costoEnvioReal = Number(ped.costoEnvio) || (ped.zonaEnvio && Number(ped.zonaEnvio.costo)) || 100;
                               const comisionIndividualItem = colaborador.rol === "Delivery" 
                                 ? costoEnvioReal 
-                                : ((Number(ped.subtotal) || 0) * Number(colaborador.valorConfigurado)) / 100;
+                                : (monto * Number(colaborador.valorConfigurado)) / 100;
 
                               const clienteStr = formatearTextoSeguro(ped.cliente || ped.nombreCliente || "Cliente");
                               return (
@@ -613,7 +614,11 @@ export default function NominaPage() {
                 <div className="border rounded-2xl overflow-hidden text-xs">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="bg-slate-100 text-slate-600 border-b"><th className="p-3">Concepto</th><th className="p-3 text-right">Monto</th><th className="p-3 text-center print:hidden">Acción</th></tr>
+                      <tr className="bg-slate-100 text-slate-600 border-b">
+                        <th className="p-3">Concepto</th>
+                        <th className="p-3 text-right">Monto</th>
+                        <th className="p-3 text-center print:hidden">Acción</th>
+                      </tr>
                     </thead>
                     <tbody>
                       {Array.isArray(reciboSeleccionado.historialDetalle) && reciboSeleccionado.historialDetalle.length > 0 ? (
