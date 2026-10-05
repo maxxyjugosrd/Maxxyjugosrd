@@ -65,8 +65,7 @@ export default function PanelVendedorSeguro() {
   const [listaDeliveries, setListaDeliveries] = useState([]);
   const [listaIngredientesVerdes, setListaIngredientesVerdes] = useState([]);
   const [listaIngredientesShots, setListaIngredientesShots] = useState([]);
-  const [personalFirebase, setPersonalFirebase] = useState([]);
-  
+
   // Formulario del pedido
   const [cliente, setCliente] = useState({ nombre: "", telefono: "", direccion: "" });
   const [clienteSeleccionadoObj, setClienteSeleccionadoObj] = useState(null);
@@ -103,30 +102,6 @@ export default function PanelVendedorSeguro() {
       setProductosDisponibles(datos);
       setCargandoProductos(false);
     });
-
-    useEffect(() => {
-  const unsubscribe = onSnapshot(collection(db, "personal"), (snapshot) => {
-    const lista = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    setPersonalFirebase(lista);
-
-    // Extraer nombres de vendedores para el login por PIN
-    const soloVendedores = lista.filter(p => p.rol === "Vendedor").map(p => p.nombre);
-    if (soloVendedores.length > 0) {
-      setVendedoresDisponibles(soloVendedores);
-    }
-  });
-  return () => unsubscribe();
-}, []);
-
-    const obtenerComisionVendedor = () => {
-  const info = personalFirebase.find((p) => p.nombre === vendedorActual && p.rol === "Vendedor");
-  return info ? { 
-    porcentaje: Number(info.valorConfigurado || 0), 
-    comisionAcumulada: Number(info.comisionesAcumuladas || 0) 
-  } : { porcentaje: 0, comisionAcumulada: 0 };
-};
-
-const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
 
     const desuscribirClientes = obtenerClientesEnVivo((datos) => {
       setListaClientesCRM(datos);
