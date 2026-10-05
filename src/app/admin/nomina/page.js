@@ -226,10 +226,10 @@ const registrarPagoNomina = async (colaborador) => {
     const datosActuales = calcularVentasMesEspecifico(vendedor.nombre, mesSeleccionado);
     const datosAnteriores = calcularVentasMesEspecifico(vendedor.nombre, mesAnteriorStr);
 
-    const diferenciaMonto = datosActuales.subtotalVendido - datosAnteriores.subtotalVendido;
-    const porcentajeCrecimiento = datosAnteriores.subtotalVendido > 0 
-      ? ((diferenciaMonto / datosAnteriores.subtotalVendido) * 100).toFixed(1) 
-      : datosActuales.subtotalVendido > 0 ? 100 : 0;
+    const diferenciaMonto = datosActuales.totalVendido - datosAnteriores.totalVendido;
+    const porcentajeCrecimiento = datosAnteriores.totalVendido > 0 
+      ? ((diferenciaMonto / datosAnteriores.totalVendido) * 100).toFixed(1) 
+      : datosActuales.totalVendido > 0 ? 100 : 0;
 
     const metaVendedor = Number(vendedor.metaMensual) || metaMensualDefault;
     const porcentajeCumplimientoMeta = metaVendedor > 0 ? Math.min(Math.round((datosActuales.totalVendido / metaVendedor) * 100), 100) : 0;
