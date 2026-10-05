@@ -28,6 +28,7 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
+  ArrowLeft,
 } from "lucide-react";
 
 // Importación de servicios oficiales de tu proyecto y Firebase
@@ -63,6 +64,9 @@ export default function PanelVendedorSeguro() {
   const [requiereCrearPin, setRequiereCrearPin] = useState(false);
   const [nuevoPinInput, setNuevoPinInput] = useState("");
   const [vendedorActual, setVendedorActual] = useState("");
+
+  // Control de Vistas / Páginas divididas ("principal" o "nuevo_pedido")
+  const [vistaActual, setVistaActual] = useState("principal");
 
   // Datos de Firestore en vivo
   const [productosDisponibles, setProductosDisponibles] = useState([]);
@@ -383,6 +387,8 @@ export default function PanelVendedorSeguro() {
       setDeliveryAsignado("");
       setZonaSeleccionadaId("");
       setTimeout(() => setExitoMensaje(""), 5000);
+      // Regresar a la página principal de historial tras confirmar pedido con éxito
+      setVistaActual("principal");
     } else {
       alert("Error al guardar el pedido en Firestore.");
     }
@@ -536,12 +542,22 @@ export default function PanelVendedorSeguro() {
             <p className="text-xs text-slate-500">Vendedor: <strong className="text-amber-600">{vendedorActual}</strong></p>
           </div>
         </div>
-        <button
-          onClick={() => { setVendedorActual(""); setVendedorSeleccionadoPrevia(""); }}
-          className="flex items-center gap-1.5 text-xs text-rose-600 hover:text-rose-800 bg-rose-50 px-3 py-2 rounded-xl font-semibold transition"
-        >
-          <LogOut className="w-4 h-4" /> Cerrar Sesión
-        </button>
+        <div className="flex items-center gap-3">
+          {vistaActual === "nuevo_pedido" && (
+            <button
+              onClick={() => setVistaActual("principal")}
+              className="flex items-center gap-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl font-semibold transition"
+            >
+              <ArrowLeft className="w-4 h-4" /> Volver al Historial
+            </button>
+          )}
+          <button
+            onClick={() => { setVendedorActual(""); setVendedorSeleccionadoPrevia(""); setVistaActual("principal"); }}
+            className="flex items-center gap-1.5 text-xs text-rose-600 hover:text-rose-800 bg-rose-50 px-3 py-2 rounded-xl font-semibold transition"
+          >
+            <LogOut className="w-4 h-4" /> Cerrar Sesión
+          </button>
+        </div>
       </header>
 
       <main className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
@@ -552,115 +568,59 @@ export default function PanelVendedorSeguro() {
           </div>
         )}
 
-        {/* Resumen Comisiones Vendedor (Acumuladas por completados y Pendientes por subtotal) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-gradient-to-br from-amber-500 to-orange-500 text-white p-6 rounded-3xl shadow-md flex justify-between items-center">
-            <div>
-              <span className="text-xs uppercase tracking-wider opacity-90 font-semibold">Tus Comisiones Acumuladas</span>
-              <div className="text-3xl font-black">RD$ {comisionAcumulada.toLocaleString()}</div>
-              <p className="text-xs opacity-80 mt-1">Calculado sobre pedidos completados ({porcentaje}%)</p>
-            </div>
-            <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
-              <TrendingUp className="w-8 h-8 text-white" />
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 rounded-3xl shadow-md flex justify-between items-center">
-            <div>
-              <span className="text-xs uppercase tracking-wider opacity-80 font-semibold">Comisiones Pendientes de Cobro</span>
-              <div className="text-3xl font-black text-amber-400">RD$ {comisionPendienteCobro.toLocaleString()}</div>
-              <p className="text-xs opacity-70 mt-1">Calculado sobre subtotales pendientes</p>
-            </div>
-            <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm">
-              <Clock className="w-8 h-8 text-amber-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Catálogo y Opciones Personalizadas */}
-          <div className="lg:col-span-2 space-y-5">
+        {/* ------------------------------------------------------------- */}
+        {/* VISTA 1: PÁGINA PRINCIPAL (Historial, Comisiones y Botón Nuevo Pedido) */}
+        {/* ------------------------------------------------------------- */}
+        {vistaActual === "principal" && (
+          <div className="space-y-6">
+            {/* Resumen Comisiones Vendedor */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-gradient-to-r from-emerald-500 to-teal-600 p-4 rounded-2xl text-white shadow-sm flex flex-col justify-between gap-3">
+              <div className="bg-gradient-to-br from-amber-500 to-orange-500 text-white p-6 rounded-3xl shadow-md flex justify-between items-center">
                 <div>
-                  <h3 className="font-bold text-base flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4" /> Jugo Verde Personalizado
-                  </h3>
-                  <p className="text-[11px] text-emerald-100 mt-0.5">Mínimo 4 ingredientes.</p>
+                  <span className="text-xs uppercase tracking-wider opacity-90 font-semibold">Tus Comisiones Acumuladas</span>
+                  <div className="text-3xl font-black">RD$ {comisionAcumulada.toLocaleString()}</div>
+                  <p className="text-xs opacity-80 mt-1">Calculado sobre pedidos completados ({porcentaje}%)</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setModalVerdeAbierto(true)}
-                  className="bg-white text-emerald-700 hover:bg-emerald-50 font-bold px-3 py-2 rounded-xl text-xs transition shadow-sm w-full text-center"
-                >
-                  Armar Jugo Verde
-                </button>
+                <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
+                  <TrendingUp className="w-8 h-8 text-white" />
+                </div>
               </div>
 
-              <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-4 rounded-2xl text-white shadow-sm flex flex-col justify-between gap-3">
+              <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 rounded-3xl shadow-md flex justify-between items-center">
                 <div>
-                  <h3 className="font-bold text-base flex items-center gap-1.5">
-                    <Zap className="w-4 h-4" /> Shot Funcional Personalizado
-                  </h3>
-                  <p className="text-[11px] text-amber-100 mt-0.5">Mezcla extractos naturales.</p>
+                  <span className="text-xs uppercase tracking-wider opacity-80 font-semibold">Comisiones Pendientes de Cobro</span>
+                  <div className="text-3xl font-black text-amber-400">RD$ {comisionPendienteCobro.toLocaleString()}</div>
+                  <p className="text-xs opacity-70 mt-1">Calculado sobre subtotales pendientes</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setModalShotAbierto(true)}
-                  className="bg-white text-amber-800 hover:bg-amber-50 font-bold px-3 py-2 rounded-xl text-xs transition shadow-sm w-full text-center"
-                >
-                  Armar Shot
-                </button>
+                <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm">
+                  <Clock className="w-8 h-8 text-amber-400" />
+                </div>
               </div>
             </div>
 
-            <div>
-              <h2 className="text-lg font-semibold text-slate-700 mb-3">Catálogo en Vivo (Firestore)</h2>
-              {cargandoProductos ? (
-                <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2 bg-white rounded-2xl border">
-                  <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
-                  <span>Cargando productos...</span>
-                </div>
-              ) : productosDisponibles.length === 0 ? (
-                <div className="p-8 text-center text-slate-400 bg-white rounded-2xl border">
-                  No hay productos en el catálogo.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {productosDisponibles.map((jugo) => (
-                    <div key={jugo.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-amber-400 transition">
-                      <div>
-                        <div className="flex justify-between items-start gap-2">
-                          <h3 className="font-semibold text-slate-800 text-sm">{jugo.nombre}</h3>
-                          <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full shrink-0">
-                            {jugo.tamano || jugo.presentacion || "16 oz"}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center mt-4 pt-3 border-t">
-                        <span className="text-amber-600 font-bold text-sm">RD$ {Number(jugo.precio || 0).toLocaleString()}</span>
-                        <button
-                          type="button"
-                          onClick={() => agregarAlCarrito(jugo)}
-                          className="bg-amber-100 hover:bg-amber-200 text-amber-800 px-3 py-1.5 rounded-xl flex items-center gap-1 font-semibold text-xs transition"
-                        >
-                          <Plus className="w-3.5 h-3.5" /> Agregar
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            {/* Botón de Acción Principal para ir a Tomar Nuevo Pedido */}
+            <div className="bg-gradient-to-r from-amber-500 to-amber-600 p-6 rounded-3xl text-white shadow-lg flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div>
+                <h2 className="text-xl font-black">¿Listo para registrar un nuevo pedido?</h2>
+                <p className="text-xs text-amber-100 mt-1">Accede al catálogo completo, jugos personalizados y opciones de envío.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVistaActual("nuevo_pedido")}
+                className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3.5 rounded-2xl font-extrabold text-sm transition shadow-md flex items-center gap-2 shrink-0"
+              >
+                <Plus className="w-5 h-5 text-amber-400" /> Nuevo Pedido y Catálogo
+              </button>
             </div>
 
-            {/* HISTORIAL DE PEDIDOS Y FILTROS PARA EL VENDEDOR */}
+            {/* HISTORIAL DE PEDIDOS Y FILTROS DEL VENDEDOR */}
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-4">
                 <div>
                   <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                     <Package className="w-5 h-5 text-amber-500" /> Historial de Mis Pedidos
                   </h2>
-                  <p className="text-xs text-slate-500">Monitorea el estatus de tus clientes (Cambiable solo en el panel principal)</p>
+                  <p className="text-xs text-slate-500">Monitorea el estatus de tus clientes</p>
                 </div>
 
                 {/* Filtro por Estado */}
@@ -702,9 +662,9 @@ export default function PanelVendedorSeguro() {
               </div>
 
               {/* Lista de Pedidos Filtrados */}
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-3 max-h-[500px] overflow-y-auto">
                 {pedidosFiltradosHistorial.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-6 italic">No se encontraron pedidos con estos criterios.</p>
+                  <p className="text-xs text-slate-400 text-center py-10 italic">No se encontraron pedidos con estos criterios.</p>
                 ) : (
                   pedidosFiltradosHistorial.map((ped) => {
                     const nombreCliente = typeof ped.cliente === "string" ? ped.cliente : ped.cliente?.nombre || "Cliente";
@@ -735,214 +695,297 @@ export default function PanelVendedorSeguro() {
               </div>
             </div>
           </div>
+        )}
 
-          {/* Formulario de Pedido y CRM */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5 h-fit">
-            <h2 className="text-lg font-bold text-slate-800 border-b pb-3 flex items-center gap-2">
-              <ShoppingCart className="w-5 h-5 text-amber-500" /> Registrar Pedido
-            </h2>
+        {/* ------------------------------------------------------------- */}
+        {/* VISTA 2: NUEVO PEDIDO Y CATÁLOGO (Pantalla dedicada dividida) */}
+        {/* ------------------------------------------------------------- */}
+        {vistaActual === "nuevo_pedido" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Catálogo y Opciones Personalizadas */}
+            <div className="lg:col-span-2 space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-gradient-to-r from-emerald-500 to-teal-600 p-4 rounded-2xl text-white shadow-sm flex flex-col justify-between gap-3">
+                  <div>
+                    <h3 className="font-bold text-base flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4" /> Jugo Verde Personalizado
+                    </h3>
+                    <p className="text-[11px] text-emerald-100 mt-0.5">Mínimo 4 ingredientes.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setModalVerdeAbierto(true)}
+                    className="bg-white text-emerald-700 hover:bg-emerald-50 font-bold px-3 py-2 rounded-xl text-xs transition shadow-sm w-full text-center"
+                  >
+                    Armar Jugo Verde
+                  </button>
+                </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200/60">
-                <label className="text-xs font-semibold text-amber-900 flex items-center gap-1 mb-1">
-                  <UserCheck className="w-3.5 h-3.5 text-amber-600" /> Seleccionar Cliente (CRM)
-                </label>
-                <select
-                  onChange={handleSeleccionarClienteExistente}
-                  className="w-full px-3 py-2 border border-amber-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white text-slate-800"
-                >
-                  <option value="">-- Nuevo cliente o manual --</option>
-                  {listaClientesCRM.map((c) => (
-                    <option key={c.idDoc || c.id} value={c.idDoc || c.id}>
-                      {c.nombre} {c.telefono ? `(${c.telefono})` : ""} {c.vendedorAsignado ? `[Asignado a: ${c.vendedorAsignado}]` : ""}
-                    </option>
-                  ))}
-                </select>
+                <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-4 rounded-2xl text-white shadow-sm flex flex-col justify-between gap-3">
+                  <div>
+                    <h3 className="font-bold text-base flex items-center gap-1.5">
+                      <Zap className="w-4 h-4" /> Shot Funcional Personalizado
+                    </h3>
+                    <p className="text-[11px] text-amber-100 mt-0.5">Mezcla extractos naturales.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setModalShotAbierto(true)}
+                    className="bg-white text-amber-800 hover:bg-amber-50 font-bold px-3 py-2 rounded-xl text-xs transition shadow-sm w-full text-center"
+                  >
+                    Armar Shot
+                  </button>
+                </div>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
-                  <User className="w-3.5 h-3.5" /> Nombre del Cliente *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. Colmado El Pana"
-                  value={cliente.nombre}
-                  onChange={(e) => setCliente({ ...cliente, nombre: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
-                  <Phone className="w-3.5 h-3.5" /> Teléfono
-                </label>
-                <input
-                  type="text"
-                  placeholder="809-000-0000"
-                  value={cliente.telefono}
-                  onChange={(e) => setCliente({ ...cliente, telefono: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
-                  <MapPin className="w-3.5 h-3.5" /> Dirección
-                </label>
-                <input
-                  type="text"
-                  placeholder="Sector / Calle"
-                  value={cliente.direccion}
-                  onChange={(e) => setCliente({ ...cliente, direccion: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
-                  <Calendar className="w-3.5 h-3.5 text-amber-600" /> Fecha de Entrega *
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={fechaEntrega}
-                  onChange={(e) => setFechaEntrega(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-                />
-              </div>
-
-              {/* Zona de Envío */}
-              <div className="space-y-3 border-t pt-3">
-                <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
-                  <Truck className="w-3.5 h-3.5 text-teal-600" /> Zona de Envío
-                </label>
-                <select
-                  value={zonaSeleccionadaId}
-                  onChange={(e) => setZonaSeleccionadaId(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-                >
-                  <option value="">-- Seleccionar Zona --</option>
-                  <optgroup label="Provincias (Camión)">
-                    {ZONAS_ENVIO.filter(z => z.tipo === "camion").map((zona) => (
-                      <option key={zona.id} value={zona.id}>{zona.nombre}</option>
+                <h2 className="text-lg font-semibold text-slate-700 mb-3">Catálogo en Vivo (Firestore)</h2>
+                {cargandoProductos ? (
+                  <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2 bg-white rounded-2xl border">
+                    <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
+                    <span>Cargando productos...</span>
+                  </div>
+                ) : productosDisponibles.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 bg-white rounded-2xl border">
+                    No hay productos en el catálogo.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {productosDisponibles.map((jugo) => (
+                      <div key={jugo.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-amber-400 transition">
+                        <div>
+                          <div className="flex justify-between items-start gap-2">
+                            <h3 className="font-semibold text-slate-800 text-sm">{jugo.nombre}</h3>
+                            <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full shrink-0">
+                              {jugo.tamano || jugo.presentacion || "16 oz"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center mt-4 pt-3 border-t">
+                          <span className="text-amber-600 font-bold text-sm">RD$ {Number(jugo.precio || 0).toLocaleString()}</span>
+                          <button
+                            type="button"
+                            onClick={() => agregarAlCarrito(jugo)}
+                            className="bg-amber-100 hover:bg-amber-200 text-amber-800 px-3 py-1.5 rounded-xl flex items-center gap-1 font-semibold text-xs transition"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Agregar
+                          </button>
+                        </div>
+                      </div>
                     ))}
-                  </optgroup>
-                  <optgroup label="Santo Domingo (Local)">
-                    {ZONAS_ENVIO.filter(z => z.tipo === "local").map((zona) => (
-                      <option key={zona.id} value={zona.id}>{zona.nombre} (RD$ {zona.costo})</option>
-                    ))}
-                  </optgroup>
-                </select>
-
-                {zonaActual && zonaActual.tipo === "camion" && (
-                  <div className="bg-slate-50 p-3 rounded-xl border space-y-2">
-                    <label className="text-xs font-semibold text-slate-600 block">Tarifa Camión:</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setTipoCostoCamion("costoNormal")}
-                        className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition ${tipoCostoCamion === "costoNormal" ? "bg-teal-600 text-white" : "bg-white text-slate-700"}`}
-                      >
-                        Normal (RD$ {zonaActual.costoNormal})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTipoCostoCamion("costoFrio")}
-                        className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition ${tipoCostoCamion === "costoFrio" ? "bg-teal-600 text-white" : "bg-white text-slate-700"}`}
-                      >
-                        Frío (RD$ {zonaActual.costoFrio})
-                      </button>
-                    </div>
                   </div>
                 )}
               </div>
+            </div>
 
-              {/* Carrito Resumen */}
-              <div className="space-y-2 border-t pt-3 max-h-48 overflow-y-auto">
-                <p className="text-xs font-semibold text-slate-600">Productos Seleccionados:</p>
-                {carrito.length === 0 ? (
-                  <p className="text-sm text-slate-400 italic text-center py-2">Carrito vacío.</p>
-                ) : (
-                  carrito.map((item) => (
-                    <div key={item.id} className="flex justify-between items-start text-xs border-b pb-2 gap-2">
-                      <div>
-                        <p className="font-semibold text-slate-800">{item.cantidad}x {item.nombre}</p>
-                        {item.detallesPersonalizacion && (
-                          <p className="text-[10px] text-emerald-600">Ingredientes: {item.detallesPersonalizacion}</p>
-                        )}
-                        <p className="text-amber-600 font-bold">RD$ {(Number(item.precio || 0) * item.cantidad).toLocaleString()}</p>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
-                          <button type="button" onClick={() => cambiarCantidad(item.id, -1)} className="p-1"><Minus className="w-3 h-3" /></button>
-                          <span className="font-bold px-1.5">{item.cantidad}</span>
-                          <button type="button" onClick={() => cambiarCantidad(item.id, 1)} className="p-1"><Plus className="w-3 h-3" /></button>
-                        </div>
-                        <button type="button" onClick={() => eliminarDelCarrito(item.id)} className="text-rose-400 p-1"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+            {/* Formulario de Pedido y CRM */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5 h-fit">
+              <h2 className="text-lg font-bold text-slate-800 border-b pb-3 flex items-center gap-2">
+                <ShoppingCart className="w-5 h-5 text-amber-500" /> Registrar Pedido
+              </h2>
 
-              {/* Asignar Delivery y Pago */}
-              <div className="space-y-3 border-t pt-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
-                    <Bike className="w-3.5 h-3.5" /> Asignar Delivery
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200/60">
+                  <label className="text-xs font-semibold text-amber-900 flex items-center gap-1 mb-1">
+                    <UserCheck className="w-3.5 h-3.5 text-amber-600" /> Seleccionar Cliente (CRM)
                   </label>
                   <select
-                    value={deliveryAsignado}
-                    onChange={(e) => setDeliveryAsignado(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-xl text-sm bg-white"
+                    onChange={handleSeleccionarClienteExistente}
+                    className="w-full px-3 py-2 border border-amber-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white text-slate-800"
                   >
-                    <option value="">-- Seleccionar --</option>
-                    {listaDeliveries.map((del) => (
-                      <option key={del.id} value={del.nombre}>{del.nombre}</option>
+                    <option value="">-- Nuevo cliente o manual --</option>
+                    {listaClientesCRM.map((c) => (
+                      <option key={c.idDoc || c.id} value={c.idDoc || c.id}>
+                        {c.nombre} {c.telefono ? `(${c.telefono})` : ""} {c.vendedorAsignado ? `[Asignado a: ${c.vendedorAsignado}]` : ""}
+                      </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 mb-1 block">Método de Pago</label>
+                  <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
+                    <User className="w-3.5 h-3.5" /> Nombre del Cliente *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Colmado El Pana"
+                    value={cliente.nombre}
+                    onChange={(e) => setCliente({ ...cliente, nombre: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
+                    <Phone className="w-3.5 h-3.5" /> Teléfono
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="809-000-0000"
+                    value={cliente.telefono}
+                    onChange={(e) => setCliente({ ...cliente, telefono: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
+                    <MapPin className="w-3.5 h-3.5" /> Dirección
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Sector / Calle"
+                    value={cliente.direccion}
+                    onChange={(e) => setCliente({ ...cliente, direccion: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
+                    <Calendar className="w-3.5 h-3.5 text-amber-600" /> Fecha de Entrega *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={fechaEntrega}
+                    onChange={(e) => setFechaEntrega(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                  />
+                </div>
+
+                {/* Zona de Envío */}
+                <div className="space-y-3 border-t pt-3">
+                  <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
+                    <Truck className="w-3.5 h-3.5 text-teal-600" /> Zona de Envío
+                  </label>
                   <select
-                    value={metodoPago}
-                    onChange={(e) => setMetodoPago(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-xl text-sm bg-white"
+                    value={zonaSeleccionadaId}
+                    onChange={(e) => setZonaSeleccionadaId(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
                   >
-                    <option value="Efectivo">Efectivo</option>
-                    <option value="Transferencia">Transferencia Bancaria</option>
+                    <option value="">-- Seleccionar Zona --</option>
+                    <optgroup label="Provincias (Camión)">
+                      {ZONAS_ENVIO.filter(z => z.tipo === "camion").map((zona) => (
+                        <option key={zona.id} value={zona.id}>{zona.nombre}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Santo Domingo (Local)">
+                      {ZONAS_ENVIO.filter(z => z.tipo === "local").map((zona) => (
+                        <option key={zona.id} value={zona.id}>{zona.nombre} (RD$ {zona.costo})</option>
+                      ))}
+                    </optgroup>
                   </select>
-                </div>
-              </div>
 
-              <div className="border-t pt-3 space-y-2">
-                <div className="flex justify-between items-center text-xs text-slate-500">
-                  <span>Subtotal:</span>
-                  <span>RD$ {subtotalProductos.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center text-xs text-slate-500">
-                  <span>Envío:</span>
-                  <span>RD$ {costoEnvio.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center text-lg font-extrabold text-slate-800 pt-1 border-t">
-                  <span>Total:</span>
-                  <span className="text-amber-600">RD$ {totalPedido.toLocaleString()}</span>
+                  {zonaActual && zonaActual.tipo === "camion" && (
+                    <div className="bg-slate-50 p-3 rounded-xl border space-y-2">
+                      <label className="text-xs font-semibold text-slate-600 block">Tarifa Camión:</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTipoCostoCamion("costoNormal")}
+                          className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition ${tipoCostoCamion === "costoNormal" ? "bg-teal-600 text-white" : "bg-white text-slate-700"}`}
+                        >
+                          Normal (RD$ {zonaActual.costoNormal})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTipoCostoCamion("costoFrio")}
+                          className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition ${tipoCostoCamion === "costoFrio" ? "bg-teal-600 text-white" : "bg-white text-slate-700"}`}
+                        >
+                          Frío (RD$ {zonaActual.costoFrio})
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={guardando}
-                  className="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-sm disabled:opacity-50 mt-2"
-                >
-                  {guardando ? <><Loader2 className="w-4 h-4 animate-spin" /> Guardando...</> : <><Send className="w-4 h-4" /> Confirmar Pedido</>}
-                </button>
-              </div>
-            </form>
+                {/* Carrito Resumen */}
+                <div className="space-y-2 border-t pt-3 max-h-48 overflow-y-auto">
+                  <p className="text-xs font-semibold text-slate-600">Productos Seleccionados:</p>
+                  {carrito.length === 0 ? (
+                    <p className="text-sm text-slate-400 italic text-center py-2">Carrito vacío.</p>
+                  ) : (
+                    carrito.map((item) => (
+                      <div key={item.id} className="flex justify-between items-start text-xs border-b pb-2 gap-2">
+                        <div>
+                          <p className="font-semibold text-slate-800">{item.cantidad}x {item.nombre}</p>
+                          {item.detallesPersonalizacion && (
+                            <p className="text-[10px] text-emerald-600">Ingredientes: {item.detallesPersonalizacion}</p>
+                          )}
+                          <p className="text-amber-600 font-bold">RD$ {(Number(item.precio || 0) * item.cantidad).toLocaleString()}</p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
+                            <button type="button" onClick={() => cambiarCantidad(item.id, -1)} className="p-1"><Minus className="w-3 h-3" /></button>
+                            <span className="font-bold px-1.5">{item.cantidad}</span>
+                            <button type="button" onClick={() => cambiarCantidad(item.id, 1)} className="p-1"><Plus className="w-3 h-3" /></button>
+                          </div>
+                          <button type="button" onClick={() => eliminarDelCarrito(item.id)} className="text-rose-400 p-1"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Asignar Delivery y Pago */}
+                <div className="space-y-3 border-t pt-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
+                      <Bike className="w-3.5 h-3.5" /> Asignar Delivery
+                    </label>
+                    <select
+                      value={deliveryAsignado}
+                      onChange={(e) => setDeliveryAsignado(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-xl text-sm bg-white"
+                    >
+                      <option value="">-- Seleccionar --</option>
+                      {listaDeliveries.map((del) => (
+                        <option key={del.id} value={del.nombre}>{del.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Método de Pago</label>
+                    <select
+                      value={metodoPago}
+                      onChange={(e) => setMetodoPago(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-xl text-sm bg-white"
+                    >
+                      <option value="Efectivo">Efectivo</option>
+                      <option value="Transferencia">Transferencia Bancaria</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="border-t pt-3 space-y-2">
+                  <div className="flex justify-between items-center text-xs text-slate-500">
+                    <span>Subtotal:</span>
+                    <span>RD$ {subtotalProductos.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-slate-500">
+                    <span>Envío:</span>
+                    <span>RD$ {costoEnvio.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-lg font-extrabold text-slate-800 pt-1 border-t">
+                    <span>Total:</span>
+                    <span className="text-amber-600">RD$ {totalPedido.toLocaleString()}</span>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={guardando}
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-sm disabled:opacity-50 mt-2"
+                  >
+                    {guardando ? <><Loader2 className="w-4 h-4 animate-spin" /> Guardando...</> : <><Send className="w-4 h-4" /> Confirmar Pedido</>}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        )}
       </main>
 
       {/* MODAL JUGOS VERDES */}
@@ -1017,7 +1060,7 @@ export default function PanelVendedorSeguro() {
             </div>
             <div className="pt-3 border-t flex gap-2">
               <button type="button" onClick={() => setModalShotAbierto(false)} className="flex-1 py-2 rounded-xl bg-slate-100 text-xs font-medium">Cancelar</button>
-              <button type="button" onClick={agregarShotPersonalizado} disabled={ingredientesShot.length === 0} className="flex-1 py-2 rounded-xl text-white bg-amber-500 text-xs font-medium disabled:opacity-40">Agregar</button>
+              <button type="button" onClick={agregarShot personalizado} disabled={ingredientesShot.length === 0} className="flex-1 py-2 rounded-xl text-white bg-amber-500 text-xs font-medium disabled:opacity-40">Agregar</button>
             </div>
           </div>
         </div>
