@@ -114,12 +114,20 @@ export default function NominaPage() {
         // 2. Si es Delivery
         if (rolColaborador === "delivery") {
           const entregasDelDelivery = pedidos.filter((v) => {
-            const deliveryPedido = (v.delivery || v.deliveryAsignado || "").toString().trim().toLowerCase();
+            // Extraemos de forma segura el texto del delivery sin importar cómo venga estructurado
+            let deliveryBruto = v.delivery || v.deliveryAsignado || "";
+            if (typeof deliveryBruto === "object" && deliveryBruto !== null) {
+              deliveryBruto = deliveryBruto.nombre || deliveryBruto.nombres || JSON.stringify(deliveryBruto);
+            }
+            const deliveryPedido = deliveryBruto.toString().trim().toLowerCase();
+
+            // Normalizamos el estado a minúsculas para evitar problemas de mayúsculas ("Completado")
             const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
             const fechaPedido = v.fecha || v.creadoEn || v.createdAt;
 
-            return deliveryPedido.includes(nombreColaborador) &&
-                   estadoPedido === "completado" &&
+            // Verificamos si coincide el nombre, si está completado y si entra en el rango de fechas
+            return (deliveryPedido.includes(nombreColaborador) || nombreColaborador.includes(deliveryPedido)) &&
+                   (estadoPedido === "completado" || estadoPedido === "entregado") &&
                    coincideRangoFechas(fechaPedido, fechaInicio, fechaFin);
           });
 
@@ -136,7 +144,6 @@ export default function NominaPage() {
             registrosAsociados: entregasDelDelivery
           };
         }
-
         return colaborador;
       })
     );
