@@ -65,16 +65,16 @@ export default function NominaPage() {
     return true;
   };
 
-  useEffect(() => {
+ useEffect(() => {
     if (equipo.length === 0) return;
 
-   setEquipo((equipoActual) => 
+    setEquipo((equipoActual) => 
       equipoActual.map((colaborador) => {
         const nombreColaborador = (colaborador.nombre || "").trim().toLowerCase();
         const rolColaborador = (colaborador.rol || "").trim().toLowerCase();
 
         // 1. Si es Vendedor
-        if (colaborador.rol?.trim().toLowerCase() === "vendedor" && Number(colaborador.valorConfigurado) > 0) {
+        if (rolColaborador === "vendedor" && Number(colaborador.valorConfigurado) > 0) {
           const ventasDelVendedor = pedidos.filter((v) => {
             const vendedorPedido = (v.vendedor || v.vendedorAsignado || v.usuario || "").toString().trim().toLowerCase();
             const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
@@ -113,22 +113,25 @@ export default function NominaPage() {
 
         // 2. Si es Delivery
         if (rolColaborador === "delivery") {
+          console.log(`--- Evaluando delivery: ${colaborador.nombre} (Buscando: "${nombreColaborador}") ---`);
+          
           const entregasDelDelivery = pedidos.filter((v) => {
-            // Extraemos de forma segura el texto del delivery sin importar cómo venga estructurado
-            let deliveryBruto = v.delivery || v.deliveryAsignado || "";
+            let deliveryBruto = v.deliveryAsignado || v.delivery || "";
             if (typeof deliveryBruto === "object" && deliveryBruto !== null) {
               deliveryBruto = deliveryBruto.nombre || deliveryBruto.nombres || JSON.stringify(deliveryBruto);
             }
             const deliveryPedido = deliveryBruto.toString().trim().toLowerCase();
-
-            // Normalizamos el estado a minúsculas para evitar problemas de mayúsculas ("Completado")
             const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
+            
+            // Probamos la fecha del pedido
             const fechaPedido = v.fecha || v.creadoEn || v.createdAt;
+            const pasaFecha = coincideRangoFechas(fechaPedido, fechaInicio, fechaFin);
 
-            // Verificamos si coincide el nombre, si está completado y si entra en el rango de fechas
-            return (deliveryPedido.includes(nombreColaborador) || nombreColaborador.includes(deliveryPedido)) &&
+            console.log(`Pedido ID: ${v.id || 'sin_id'} | Delivery en pedido: "${deliveryPedido}" | Estado: "${estadoPedido}" | Pasa Fecha: ${pasaFecha}`);
+
+            return deliveryPedido.includes(nombreColaborador) &&
                    (estadoPedido === "completado" || estadoPedido === "entregado") &&
-                   coincideRangoFechas(fechaPedido, fechaInicio, fechaFin);
+                   pasaFecha;
           });
 
           let comisionTotalDelivery = 0;
@@ -137,6 +140,8 @@ export default function NominaPage() {
             comisionTotalDelivery += costoEnvioReal;
           });
 
+          console.log(`Entregas encontradas para ${colaborador.nombre}:`, entregasDelDelivery.length);
+
           return {
             ...colaborador,
             comisionAcumulada: comisionTotalDelivery || 0,
@@ -144,6 +149,7 @@ export default function NominaPage() {
             registrosAsociados: entregasDelDelivery
           };
         }
+
         return colaborador;
       })
     );
