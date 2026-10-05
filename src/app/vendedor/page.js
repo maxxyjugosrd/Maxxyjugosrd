@@ -138,18 +138,21 @@ export default function PanelVendedorSeguro() {
     return () => unsubscribe();
   }, []);
 
-// Obtener comisiones de forma infalible buscando en todos los campos posibles de pedidos
+// Obtener comisiones leyendo el porcentaje de Firebase y sumando los pedidos del vendedor
   const obtenerComisionVendedor = () => {
-    const info = personalFirebase.find((p) => p.nombre?.trim().toLowerCase() === vendedorActual?.trim().toLowerCase() && p.rol === "Vendedor");
-    const porcentajeConfigurado = Number(info?.valorConfigurado || info?.comisionPorcentaje || 0);
+    const info = personalFirebase.find((p) => p.nombre?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() && p.rol === "Vendedor");
+    
+    // Tomamos el porcentaje configurado (ya sea comisionPorcentaje o valorConfigurado)
+    const porcentajeConfigurado = Number(info?.comisionPorcentaje || info?.valorConfigurado || 0);
     
     const listaPedidos = typeof pedidos !== 'undefined' ? pedidos : (typeof pedidosFirebase !== 'undefined' ? pedidosFirebase : []);
 
+    // Sumamos los totales de los pedidos donde figure este vendedor
     const totalComisionesPedidos = listaPedidos
       .filter((p) => {
-        const vendedorPedido = (p.vendedor || p.vendedorAsignado || p.nombreVendedor || "").trim().toLowerCase();
-        const vendedorActualL = (vendedorActual || "").trim().toLowerCase();
-        return vendedorPedido === vendedorActualL;
+        const vPed = (p.vendedor || p.vendedorAsignado || "").trim().toUpperCase();
+        const vAct = (vendedorActual || "").trim().toUpperCase();
+        return vPed === vAct;
       })
       .reduce((acc, p) => acc + (Number(p.total || p.subtotal || 0) * (porcentajeConfigurado / 100)), 0);
 
