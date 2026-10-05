@@ -180,12 +180,12 @@ export default function PanelVendedorSeguro() {
 
   const { porcentaje, metaMensual } = obtenerInfoVendedor();
   
-  // Pedidos del vendedor actual filtrados por mes seleccionado (robustos ante variaciones de estatus)
+  /// Pedidos del vendedor actual filtrados por mes seleccionado (sumando estrictamente el subtotal)
   const pedidosVendedorMes = pedidosFirebase.filter((p) => {
     const esDelVendedor = p.vendedorAsignado?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase();
     if (!esDelVendedor) return false;
 
-    /// Tomar fecha de entrega o de creación para el filtro mensual (soportando objetos Timestamp de Firebase o strings)
+    // Tomar fecha de entrega o de creación para el filtro mensual
     let fechaRef = "";
     if (p.fechaEntrega) {
       fechaRef = String(p.fechaEntrega);
@@ -202,7 +202,7 @@ export default function PanelVendedorSeguro() {
       const estadoLimpio = p.estado?.trim().toLowerCase() || "";
       return estadoLimpio === "completado" || estadoLimpio === "completada";
     })
-    .reduce((sum, p) => sum + Number(p.subtotal || p.total || 0), 0);
+    .reduce((sum, p) => sum + Number(p.subtotal || 0), 0);
 
   const progresoMetaPorcentaje = metaMensual > 0 ? Math.min(Math.round((ventasTotalesMes / metaMensual) * 100), 100) : 0;
 
