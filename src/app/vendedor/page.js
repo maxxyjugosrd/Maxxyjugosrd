@@ -138,15 +138,19 @@ export default function PanelVendedorSeguro() {
     return () => unsubscribe();
   }, []);
 
-  // Obtener comisiones y porcentaje directamente desde Firebase según el vendedor logueado
+// Obtener comisiones calculando directamente de los pedidos del vendedor
   const obtenerComisionVendedor = () => {
     const info = personalFirebase.find((p) => p.nombre === vendedorActual && p.rol === "Vendedor");
-    return info
-      ? {
-          porcentaje: Number(info.valorConfigurado || 0),
-          comisionAcumulada: Number(info.comisionesAcumulada || 0),
-        }
-      : { porcentaje: 0, comisionAcumulada: 0 };
+    const porcentajeConfigurado = Number(info?.valorConfigurado || info?.comisionPorcentaje || 0);
+    
+    const totalComisionesPedidos = pedidos
+      .filter((p) => p.vendedor === vendedorActual || p.vendedorAsignado === vendedorActual)
+      .reduce((acc, p) => acc + (Number(p.total || 0) * (porcentajeConfigurado / 100)), 0);
+
+    return {
+      porcentaje: porcentajeConfigurado,
+      comisionAcumulada: totalComisionesPedidos,
+    };
   };
 
   const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
