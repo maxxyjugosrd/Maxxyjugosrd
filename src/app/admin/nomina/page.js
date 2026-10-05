@@ -59,7 +59,7 @@ export default function NominaPage() {
   };
 
   useEffect(() => {
-    if (equipo.length === 0 || pedidos.length === 0) return;
+    if (equipo.length === 0) return;
 
     setEquipo((equipoActual) => 
       equipoActual.map((colaborador) => {
@@ -83,8 +83,6 @@ export default function NominaPage() {
               clienteBruto = clienteBruto.nombre || clienteBruto.nombreCliente || clienteBruto.telefono || "cliente_general";
             }
             const clienteKey = clienteBruto.toString().trim().toLowerCase();
-            
-            // CORREGIDO: Se toma estrictamente el subtotal para las comisiones del vendedor
             const montoPedido = Number(pedido.subtotal) || 0;
 
             if (!ventasPorCliente[clienteKey]) ventasPorCliente[clienteKey] = 0;
@@ -96,7 +94,8 @@ export default function NominaPage() {
 
           return {
             ...colaborador,
-            comisionAcumulada: colaborador.comisionAcumulada !== undefined && colaborador.comisionAcumulada !== 0 ? colaborador.comisionAcumulada : (comisionCalculada || 0),
+            // CORREGIDO: Se asigna directamente el cálculo estricto basado en completados. Si no hay completados, será 0.
+            comisionAcumulada: comisionCalculada || 0,
             totalVentasPeriodo: totalVendido,
             registrosAsociados: ventasDelVendedor
           };
@@ -126,7 +125,8 @@ export default function NominaPage() {
           return {
             ...colaborador,
             entregasRealizadas: totalEntregas,
-            comisionAcumulada: colaborador.comisionAcumulada !== undefined && colaborador.comisionAcumulada !== 0 ? colaborador.comisionAcumulada : (totalComisionEnvios || 0),
+            // CORREGIDO: Asignación directa y estricta para delivery basada solo en completados.
+            comisionAcumulada: totalComisionEnvios || 0,
             registrosAsociados: entregasDelDelivery
           };
         }
@@ -208,7 +208,6 @@ export default function NominaPage() {
 
     let totalVendido = 0;
     ventasFiltradas.forEach((pedido) => {
-      // CORREGIDO: Se toma estrictamente el subtotal
       const monto = Number(pedido.subtotal) || 0;
       totalVendido += monto;
     });
@@ -452,10 +451,10 @@ export default function NominaPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {equipoFiltrado.map((colaborador) => {
-            const estaExpandido = mostrarDetalleId === colaborador.id;
+            const estaExpandido = mostrarDetalleId === colaborador.idDoc || mostrarDetalleId === colaborador.id;
 
             return (
-              <div key={colaborador.id} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
+              <div key={colaborador.idDoc || colaborador.id} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
                 <div className="space-y-4">
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
@@ -488,7 +487,7 @@ export default function NominaPage() {
                   {(colaborador.rol === "Delivery" || colaborador.rol === "Vendedor") && (
                     <div>
                       <button
-                        onClick={() => setMostrarDetalleId(estaExpandido ? null : colaborador.id)}
+                        onClick={() => setMostrarDetalleId(estaExpandido ? null : (colaborador.idDoc || colaborador.id))}
                         className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition"
                       >
                         <span>{estaExpandido ? "Ocultar desglose" : `Auditar cuentas (${colaborador.rol === "Delivery" ? `${colaborador.entregasRealizadas || 0} entregas` : `RD$ ${(colaborador.totalVentasPeriodo || 0).toLocaleString()} ventas`})`}</span>
@@ -595,7 +594,7 @@ export default function NominaPage() {
 
               <div className="grid grid-cols-2 gap-8 pt-8 text-center text-xs text-slate-600">
                 <div className="space-y-6"><div className="border-b border-slate-400 pb-1"></div><p className="font-bold">Firma de la Empresa</p></div>
-                <div className="space-y-6"><div className="border-b border-slate-400 pb-1"></div><p className="font-bold">Recibido Conforme (Empleado)</p></div>
+                <div className="space-y-6"><div className="border-b border-slate-400 pb-1"></div><p className="p-4 text-center font-bold">Recibido Conforme (Empleado)</p></div>
               </div>
             </div>
 
