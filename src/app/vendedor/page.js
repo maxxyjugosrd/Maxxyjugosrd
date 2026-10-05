@@ -138,31 +138,19 @@ export default function PanelVendedorSeguro() {
     return () => unsubscribe();
   }, []);
 
-// Obtener comisiones leyendo el porcentaje de Firebase y sumando los pedidos del vendedor
-  const obtenerComisionVendedor = () => {
-    const info = personalFirebase.find((p) => p.nombre?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() && p.rol === "Vendedor");
-    
-    // Tomamos el porcentaje configurado (ya sea comisionPorcentaje o valorConfigurado)
-    const porcentajeConfigurado = Number(info?.comisionPorcentaje || info?.valorConfigurado || 0);
-    
-    const listaPedidos = typeof pedidos !== 'undefined' ? pedidos : (typeof pedidosFirebase !== 'undefined' ? pedidosFirebase : []);
+// Leer directamente la comisión acumulada y el porcentaje del documento en Firebase del vendedor
+const obtenerComisionVendedor = () => {
+  const info = personalFirebase.find(
+    (p) => p.nombre?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() && p.rol === "Vendedor"
+  );
 
-    // Sumamos los totales de los pedidos donde figure este vendedor
-    const totalComisionesPedidos = listaPedidos
-      .filter((p) => {
-        const vPed = (p.vendedor || p.vendedorAsignado || "").trim().toUpperCase();
-        const vAct = (vendedorActual || "").trim().toUpperCase();
-        return vPed === vAct;
-      })
-      .reduce((acc, p) => acc + (Number(p.total || p.subtotal || 0) * (porcentajeConfigurado / 100)), 0);
-
-    return {
-      porcentaje: porcentajeConfigurado,
-      comisionAcumulada: totalComisionesPedidos,
-    };
+  return {
+    porcentaje: Number(info?.comisionPorcentaje || info?.valorConfigurado || 0),
+    comisionAcumulada: Number(info?.comisionAcumulada || 0),
   };
+};
 
-  const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
+const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
   
   // Manejar PIN del Vendedor
   const handleSeleccionarNombreDropdown = (nombre) => {
