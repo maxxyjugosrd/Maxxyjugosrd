@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { Users, Plus, Bike, DollarSign, UserCheck, Trash2, Edit, CreditCard, FileSpreadsheet, Search } from "lucide-react";
 import Link from "next/link";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc } from "firebase/firestore";
 
 export default function PersonalPage() {
   const [equipo, setEquipo] = useState([]);
@@ -26,24 +28,14 @@ export default function PersonalPage() {
     metaMensual: "",
   });
 
+  // Cargar personal en tiempo real desde Firestore
   useEffect(() => {
-    const personalGuardado = localStorage.getItem("maxi_personal");
-    if (personalGuardado) {
-      try {
-        const parsed = JSON.parse(personalGuardado);
-        if (Array.isArray(parsed)) {
-          setEquipo(parsed);
-        }
-      } catch (e) {
-        setEquipo([]);
-      }
-    }
+    const unsubscribe = onSnapshot(collection(db, "personal"), (snapshot) => {
+      const lista = snapshot.docs.map((docSnap) => ({ idDoc: docSnap.id, ...docSnap.data() }));
+      setEquipo(lista);
+    });
+    return () => unsubscribe();
   }, []);
-
-  const actualizarYGuardarEquipo = (nuevoEquipo) => {
-    setEquipo(nuevoEquipo);
-    localStorage.setItem("maxi_personal", JSON.stringify(nuevoEquipo));
-  };
 
   const abrirModalCrear = () => {
     setModoEdicion(false);
@@ -57,7 +49,7 @@ export default function PersonalPage() {
 
   const abrirModalEditar = (colaborador) => {
     setModoEdicion(true);
-    setIdEditando(colaborador.id);
+    setIdEditando(colaborador.idDoc);
     let porcentaje = colaborador.rol === "Vendedor" ? colaborador.valorConfigurado || "" : "";
     let sueldo = colaborador.rol === "Colaborador / Empleado" ? colaborador.valorConfigurado || "" : "";
 
@@ -77,7 +69,7 @@ export default function PersonalPage() {
     setMostrarModal(true);
   };
 
-  const guardarEmpleado = (e) => {
+  const guardarEmpleado = async (e) => {
     e.preventDefault();
     if (!nuevoEmpleado.nombre) return;
 
@@ -92,31 +84,39 @@ export default function PersonalPage() {
       valorAsignado = Number(nuevoEmpleado.sueldoFijo) || 0;
     }
 
-    if (modoEdicion) {
-      const equipoActualizado = equipo.map((item) =>
-        item.id === idEditando ? { ...item, ...nuevoEmpleado, tipoPago, valorConfigurado: valorAsignado } : item
-      );
-      actualizarYGuardarEquipo(equipoActualizado);
-    } else {
-      const equipoActualizado = [
-        ...equipo,
-        {
-          id: Date.now(),
+    try {
+      if (modoEdicion && idEditando) {
+        const docRef = doc(db, "personal", idEditando);
+        await updateDoc(docRef, {
+          ...nuevoEmpleado,
+          tipoPago,
+          valorConfigurado: valorAsignado,
+        });
+      } else {
+        await addDoc(collection(db, "personal"), {
           ...nuevoEmpleado,
           tipoPago,
           valorConfigurado: valorAsignado,
           comisionAcumulada: 0,
           historialDetalle: [],
-        },
-      ];
-      actualizarYGuardarEquipo(equipoActualizado);
+          fechaCreacion: Date.now(),
+        });
+      }
+      setMostrarModal(false);
+    } catch (error) {
+      console.error("Error al guardar empleado en Firebase:", error);
+      alert("Hubo un error al guardar los datos.");
     }
-    setMostrarModal(false);
   };
 
-  const eliminarEmpleado = (id) => {
-    if (confirm("¿Estás seguro de eliminar este colaborador?")) {
-      actualizarYGuardarEquipo(equipo.filter((item) => item.id !== id));
+  const eliminarEmpleado = async (idDoc) => {
+    if (confirm("¿Estás seguro de eliminar este colaborador de Firebase?")) {
+      try {
+        await deleteDoc(doc(db, "personal", idDoc));
+      } catch (error) {
+        console.error("Error al eliminar:", error);
+        alert("No se pudo eliminar el colaborador.");
+      }
     }
   };
 
@@ -147,7 +147,7 @@ export default function PersonalPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Directorio de Personal & Expedientes</h1>
-          <p className="text-slate-500 text-sm">Gestiona la información de contacto, cédulas y cuentas bancarias del equipo.</p>
+          <p className="text-slate-500 text-sm">Gestiona la información de contacto, cédulas y cuentas bancarias del equipo en Firebase.</p>
         </div>
         
         <div className="flex items-center gap-3">
@@ -196,7 +196,7 @@ export default function PersonalPage() {
       {/* Cuadrícula de personal */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {equipoFiltrado.map((colaborador) => (
-          <div key={colaborador.id} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
+          <div key={colaborador.idDoc} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
             <div className="space-y-4">
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3">
@@ -210,7 +210,7 @@ export default function PersonalPage() {
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => abrirModalEditar(colaborador)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition" title="Editar"><Edit className="w-4 h-4" /></button>
-                  <button onClick={() => eliminarEmpleado(colaborador.id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
+                  <button onClick={() => eliminarEmpleado(colaborador.idDoc)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
 
@@ -304,7 +304,7 @@ export default function PersonalPage() {
               </div>
             </div>
             <div className="flex gap-3 pt-2">
-              <button type="submit" className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl text-sm">Guardar</button>
+              <button type="submit" className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl text-sm">Guardar en Firebase</button>
               <button type="button" onClick={() => setMostrarModal(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-3 rounded-xl text-sm">Cancelar</button>
             </div>
           </form>
