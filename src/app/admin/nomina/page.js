@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { FileText, DollarSign, Bike, Calendar, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Download, Search, Filter, Users, Wallet, Trophy, TrendingUp, TrendingDown, Target, Flame, X } from "lucide-react";
+import { FileText, DollarSign, Bike, Calendar, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Download, Search, Filter, Users, Wallet, Trophy, TrendingUp, TrendingDown, Target, Flame, X, Trash2 } from "lucide-react";
 import { obtenerPedidosEnVivo } from "@/services/pedidosService";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc } from "firebase/firestore";
@@ -20,13 +20,17 @@ export default function NominaPage() {
   const [busqueda, setBusqueda] = useState("");
   const [filtroPosicion, setFiltroPosicion] = useState("Todos");
   
-  // Filtro por mes (por defecto el mes actual en formato YYYY-MM)
-  const fechaActualStr = new Date().toISOString().slice(0, 7);
-  const [mesSeleccionado, setMesSeleccionado] = useState(fechaActualStr);
+  // Filtros de Rango de Fechas Interactivo (Desde / Hasta)
+  const fechaActualObj = new Date();
+  const anioActual = fechaActualObj.getFullYear();
+  const mesActualNum = String(fechaActualObj.getMonth() + 1).padStart(2, '0');
+  
+  const [fechaInicio, setFechaInicio] = useState(`${anioActual}-${mesActualNum}-01`);
+  const [fechaFin, setFechaFin] = useState(fechaActualObj.toISOString().slice(0, 10));
 
   const yaCalculoInicial = useRef(false);
 
- useEffect(() => {
+  useEffect(() => {
     const unsubscribe = obtenerPedidosEnVivo((pedidosFirestore) => {
       if (Array.isArray(pedidosFirestore)) {
         setPedidos(pedidosFirestore);
@@ -35,36 +39,48 @@ export default function NominaPage() {
     return () => unsubscribe();
   }, []);
 
- useEffect(() => {
+  useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "personal"), (snapshot) => {
       const lista = snapshot.docs.map((docSnap) => ({ idDoc: docSnap.id, ...docSnap.data() }));
       setEquipo(lista); // Actualiza la lista en vivo en la nómina de admin
     });
     return () => unsubscribe();
   }, []);
-
-  // Función auxiliar para verificar si una fecha de pedido coincide con un mes (YYYY-MM)
-  const coincideMesEspecifico = (fechaPedido, mesTarget) => {
+  
+  // Función auxiliar para verificar si la fecha de un pedido se encuentra dentro del rango seleccionado (Desde / Hasta)
+  const coincideRangoFechas = (fechaPedido, inicioStr, finStr) => {
     if (!fechaPedido) return true;
     let fechaStr = "";
     if (typeof fechaPedido.toDate === "function") {
-      fechaStr = fechaPedido.toDate().toISOString().slice(0, 7);
+      fechaStr = fechaPedido.toDate().toISOString().slice(0, 10);
     } else if (typeof fechaPedido === "string") {
-      fechaStr = fechaPedido.slice(0, 7);
+      fechaStr = fechaPedido.slice(0, 10);
     } else if (fechaPedido instanceof Date) {
-      fechaStr = fechaPedido.toISOString().slice(0, 7);
+      fechaStr = fechaPedido.toISOString().slice(0, 10);
     }
     if (!fechaStr) return true;
-    return fechaStr === mesTarget;
+    
+    if (inicioStr && fechaStr < inicioStr) return false;
+    if (finStr && fechaStr > finStr) return false;
+    return true;
   };
 
   useEffect(() => {
-    if (equipo.length === 0 || pedidos.length === 0) return;
+    if (equipo.length === 0) return;
 
     setEquipo((equipoActual) => 
       equipoActual.map((colaborador) => {
-        const nombreColaborador = (colaborador.nombre || "").trim().toLowerCase();
+        // SI ESTE RANGO YA FUE PAGADO, MANTENEMOS EL 0 Y NO CALCULAMOS DE NUEVO
+        const rangoActualStr = `${fechaInicio}_${fechaFin}`;
+        if (colaborador.rangoPagadoKey === rangoActualStr) {
+          return {
+            ...colaborador,
+            comisionAcumulada: 0
+          };
+        }
 
+        const nombreColaborador = (colaborador.nombre || "").trim().toLowerCase();
+        // ... (el resto de tu código de cálculo sigue exactamente igual aquí abajo)
         if (colaborador.rol === "Vendedor" && Number(colaborador.valorConfigurado) > 0) {
           const ventasDelVendedor = pedidos.filter((v) => {
             const vendedorPedido = (v.vendedor || v.vendedorAsignado || v.usuario || "").toString().trim().toLowerCase();
@@ -73,7 +89,7 @@ export default function NominaPage() {
 
             return vendedorPedido.includes(nombreColaborador) && 
                    estadoPedido === "completado" && 
-                   coincideMesEspecifico(fechaPedido, mesSeleccionado);
+                   coincideRangoFechas(fechaPedido, fechaInicio, fechaFin);
           });
           
           const ventasPorCliente = {};
@@ -83,7 +99,7 @@ export default function NominaPage() {
               clienteBruto = clienteBruto.nombre || clienteBruto.nombreCliente || clienteBruto.telefono || "cliente_general";
             }
             const clienteKey = clienteBruto.toString().trim().toLowerCase();
-            const montoPedido = Number(pedido.subtotal) || Number(pedido.total) || Number(pedido.monto) || 0;
+            const montoPedido = Number(pedido.subtotal) || 0;
 
             if (!ventasPorCliente[clienteKey]) ventasPorCliente[clienteKey] = 0;
             ventasPorCliente[clienteKey] += montoPedido;
@@ -94,7 +110,7 @@ export default function NominaPage() {
 
           return {
             ...colaborador,
-            comisionAcumulada: colaborador.comisionAcumulada !== undefined && colaborador.comisionAcumulada !== 0 ? colaborador.comisionAcumulada : (comisionCalculada || 0),
+            comisionAcumulada: comisionCalculada || 0,
             totalVentasPeriodo: totalVendido,
             registrosAsociados: ventasDelVendedor
           };
@@ -112,7 +128,7 @@ export default function NominaPage() {
 
             return deliveryPedido.includes(nombreColaborador) && 
                    estadoPedido === "completado" &&
-                   coincideMesEspecifico(fechaPedido, mesSeleccionado);
+                   coincideRangoFechas(fechaPedido, fechaInicio, fechaFin);
           });
 
           const totalEntregas = entregasDelDelivery.length;
@@ -124,7 +140,7 @@ export default function NominaPage() {
           return {
             ...colaborador,
             entregasRealizadas: totalEntregas,
-            comisionAcumulada: colaborador.comisionAcumulada !== undefined && colaborador.comisionAcumulada !== 0 ? colaborador.comisionAcumulada : (totalComisionEnvios || 0),
+            comisionAcumulada: totalComisionEnvios || 0,
             registrosAsociados: entregasDelDelivery
           };
         }
@@ -132,15 +148,17 @@ export default function NominaPage() {
         return colaborador;
       })
     );
-  }, [pedidos, mesSeleccionado]);
+  }, [pedidos, fechaInicio, fechaFin]);
 
- // Función para actualizar y guardar cambios directamente en Firestore
-  const actualizarYGuardarEquipo = async (colaboradorActualizado) => {
+  // Función para actualizar y guardar cambios directamente en Firestore
+ const actualizarYGuardarEquipo = async (colaboradorActualizado) => {
     try {
-      if (!colaboradorActualizado.idDoc) return;
-      const docRef = doc(db, "personal", colaboradorActualizado.idDoc);
+      const idTarget = colaboradorActualizado.idDoc || colaboradorActualizado.id;
+      if (!idTarget) return;
+      const docRef = doc(db, "personal", idTarget);
       await updateDoc(docRef, {
         comisionAcumulada: colaboradorActualizado.comisionAcumulada,
+        rangoPagadoKey: colaboradorActualizado.rangoPagadoKey || "",
         historialDetalle: colaboradorActualizado.historialDetalle || [],
         totalVentasPeriodo: colaboradorActualizado.totalVentasPeriodo || 0,
       });
@@ -149,6 +167,23 @@ export default function NominaPage() {
     }
   };
 
+  // Función para eliminar un elemento específico del historial (Papelera)
+  const eliminarItemHistorial = async (colaborador, indexItem) => {
+    const confirmar = confirm("¿Deseas eliminar este registro del historial?");
+    if (!confirmar) return;
+
+    const nuevoHistorial = [...(colaborador.historialDetalle || [])];
+    nuevoHistorial.splice(indexItem, 1);
+
+    const colaboradorActualizado = {
+      ...colaborador,
+      historialDetalle: nuevoHistorial,
+    };
+
+    await actualizarYGuardarEquipo(colaboradorActualizado);
+    setReciboSeleccionado(colaboradorActualizado);
+  };
+  
   const obtenerInfoNomina = () => {
     const hoy = new Date();
     const dia = hoy.getDate();
@@ -161,14 +196,14 @@ export default function NominaPage() {
 
   const infoNomina = obtenerInfoNomina();
 
-  const registrarPagoNomina = async (colaborador) => {
-    const confirmar = confirm(`¿Confirmas que le has pagado la quincena a ${colaborador.nombre} para el mes ${mesSeleccionado}?\n\nEsto registrará el pago y pondrá su balance pendiente en RD$ 0.`);
+ const registrarPagoNomina = async (colaborador) => {
+    const confirmar = confirm(`¿Confirmas que le has pagado la quincena a ${colaborador.nombre} para el rango ${fechaInicio} al ${fechaFin}?\n\nEsto registrará el pago y pondrá su balance pendiente en RD$ 0.`);
     if (!confirmar) return;
 
     const nuevoHistorial = [
       {
         fecha: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString(),
-        concepto: `Pago Quincenal (${infoNomina.proximoCorte}) [Mes: ${mesSeleccionado}]`,
+        concepto: `Pago Quincenal (${infoNomina.proximoCorte}) [Rango: ${fechaInicio} al ${fechaFin}]`,
         monto: colaborador.comisionAcumulada || 0,
       },
       ...(Array.isArray(colaborador.historialDetalle) ? colaborador.historialDetalle : [])
@@ -177,13 +212,15 @@ export default function NominaPage() {
     const colaboradorActualizado = {
       ...colaborador,
       comisionAcumulada: 0,
+      rangoPagadoKey: `${fechaInicio}_${fechaFin}`, // Guardamos exactamente qué rango se pagó
       historialDetalle: nuevoHistorial,
     };
 
     await actualizarYGuardarEquipo(colaboradorActualizado);
+    setReciboSeleccionado(colaboradorActualizado);
     alert(`¡Pago registrado con éxito en Firebase! El balance de ${colaborador.nombre} se ha reiniciado a 0.`);
   };
-  
+
   const formatearTextoSeguro = (valor) => {
     if (!valor) return "N/D";
     if (typeof valor === "object") {
@@ -199,31 +236,37 @@ export default function NominaPage() {
       const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
       const fechaPedido = v.fecha || v.creadoEn || v.createdAt;
 
+      let fechaStr = "";
+      if (typeof fechaPedido?.toDate === "function") fechaStr = fechaPedido.toDate().toISOString().slice(0, 7);
+      else if (typeof fechaPedido === "string") fechaStr = fechaPedido.slice(0, 7);
+      else if (fechaPedido instanceof Date) fechaStr = fechaPedido.toISOString().slice(0, 7);
+
       return vendedorPedido.includes(nombreClean) && 
              estadoPedido === "completado" && 
-             coincideMesEspecifico(fechaPedido, mesAnio);
+             fechaStr === mesAnio;
     });
 
     let totalVendido = 0;
     ventasFiltradas.forEach((pedido) => {
-      const monto = Number(pedido.subtotal) || Number(pedido.total) || Number(pedido.monto) || 0;
+      const monto = Number(pedido.subtotal) || 0;
       totalVendido += monto;
     });
 
     return { totalVendido, cantidadPedidos: ventasFiltradas.length };
   };
 
+  const mesSeleccionadoStr = fechaInicio.slice(0, 7);
   const obtenerMesAnterior = (mesStr) => {
     const [anio, mes] = mesStr.split("-").map(Number);
     let d = new Date(anio, mes - 2, 1);
     return d.toISOString().slice(0, 7);
   };
 
-  const mesAnteriorStr = obtenerMesAnterior(mesSeleccionado);
+  const mesAnteriorStr = obtenerMesAnterior(mesSeleccionadoStr);
 
   const vendedoresList = equipo.filter(c => c.rol === "Vendedor");
   const rankingVendedores = vendedoresList.map((vendedor) => {
-    const datosActuales = calcularVentasMesEspecifico(vendedor.nombre, mesSeleccionado);
+    const datosActuales = calcularVentasMesEspecifico(vendedor.nombre, mesSeleccionadoStr);
     const datosAnteriores = calcularVentasMesEspecifico(vendedor.nombre, mesAnteriorStr);
 
     const diferenciaMonto = datosActuales.totalVendido - datosAnteriores.totalVendido;
@@ -288,7 +331,7 @@ export default function NominaPage() {
               <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
                 <Flame className="w-4 h-4" /> Competencia Comercial Interna
               </div>
-              <h2 className="text-lg font-black text-white">Ranking y KPIs de Vendedores ({mesSeleccionado})</h2>
+              <h2 className="text-lg font-black text-white">Ranking y KPIs de Vendedores (Mes: {mesSeleccionadoStr})</h2>
             </div>
             <button 
               onClick={() => setMostrarCompetencia(false)}
@@ -308,7 +351,7 @@ export default function NominaPage() {
                 const esPrimero = index === 0 && vendedor.ventasActuales > 0;
                 return (
                   <div 
-                    key={vendedor.id || index}
+                    key={vendedor.idDoc || vendedor.id || index}
                     className={`p-5 rounded-2xl border relative flex flex-col justify-between space-y-4 transition-all ${
                       esPrimero ? "bg-slate-800/90 border-amber-500/50 shadow-lg shadow-amber-500/10" : "bg-slate-800/40 border-slate-800"
                     }`}
@@ -397,13 +440,13 @@ export default function NominaPage() {
           </div>
           <div>
             <h2 className="text-2xl font-black text-slate-900">RD$ {totalNominaMes.toLocaleString()}</h2>
-            <p className="text-[11px] text-slate-400">Filtrado para el mes: {mesSeleccionado}</p>
+            <p className="text-[11px] text-slate-400">Rango: {fechaInicio} al {fechaFin}</p>
           </div>
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full md:w-96">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row gap-3 items-center justify-between">
+        <div className="relative w-full lg:w-72">
           <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
           <input
             type="text"
@@ -414,8 +457,8 @@ export default function NominaPage() {
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold px-2">
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold px-1">
             <Filter className="w-3.5 h-3.5" /> Posición:
           </div>
           <select
@@ -429,14 +472,24 @@ export default function NominaPage() {
             <option value="Colaborador / Empleado">Empleado Fijo</option>
           </select>
 
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold px-2">
-            Mes:
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold px-1">
+            Desde:
           </div>
           <input
-            type="month"
-            value={mesSeleccionado}
-            onChange={(e) => setMesSeleccionado(e.target.value)}
-            className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-medium focus:outline-none focus:border-amber-500"
+            type="date"
+            value={fechaInicio}
+            onChange={(e) => setFechaInicio(e.target.value)}
+            className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-medium focus:outline-none focus:border-amber-500 cursor-pointer"
+          />
+
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold px-1">
+            Hasta:
+          </div>
+          <input
+            type="date"
+            value={fechaFin}
+            onChange={(e) => setFechaFin(e.target.value)}
+            className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-medium focus:outline-none focus:border-amber-500 cursor-pointer"
           />
         </div>
       </div>
@@ -449,10 +502,11 @@ export default function NominaPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {equipoFiltrado.map((colaborador) => {
-            const estaExpandido = mostrarDetalleId === colaborador.id;
+            const idColab = colaborador.idDoc || colaborador.id;
+            const estaExpandido = mostrarDetalleId === idColab;
 
             return (
-              <div key={colaborador.id} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
+              <div key={idColab} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
                 <div className="space-y-4">
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
@@ -478,14 +532,14 @@ export default function NominaPage() {
                   </div>
 
                   <div className="border-t border-b py-3 flex justify-between items-center text-sm">
-                    <span className="text-slate-500 font-medium">Total Pendiente ({mesSeleccionado}):</span>
+                    <span className="text-slate-500 font-medium">Comisión Pendiente en Rango:</span>
                     <span className="font-extrabold text-slate-900 text-xl text-emerald-600">RD$ {(colaborador.comisionAcumulada || 0).toLocaleString()}</span>
                   </div>
 
                   {(colaborador.rol === "Delivery" || colaborador.rol === "Vendedor") && (
                     <div>
                       <button
-                        onClick={() => setMostrarDetalleId(estaExpandido ? null : colaborador.id)}
+                        onClick={() => setMostrarDetalleId(estaExpandido ? null : idColab)}
                         className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition"
                       >
                         <span>{estaExpandido ? "Ocultar desglose" : `Auditar cuentas (${colaborador.rol === "Delivery" ? `${colaborador.entregasRealizadas || 0} entregas` : `RD$ ${(colaborador.totalVentasPeriodo || 0).toLocaleString()} ventas`})`}</span>
@@ -494,11 +548,15 @@ export default function NominaPage() {
 
                       {estaExpandido && (
                         <div className="mt-3 p-3 bg-slate-900 text-white rounded-xl space-y-2 text-xs max-h-60 overflow-y-auto">
-                          <p className="font-bold text-amber-400 uppercase tracking-wider text-[10px] border-b border-slate-700 pb-1">Pedidos completados ({mesSeleccionado}):</p>
+                          <p className="font-bold text-amber-400 uppercase tracking-wider text-[10px] border-b border-slate-700 pb-1">Operaciones en el rango:</p>
                           {colaborador.registrosAsociados && colaborador.registrosAsociados.length > 0 ? (
                             colaborador.registrosAsociados.map((ped, idx) => {
-                              const monto = Number(ped.subtotal) || Number(ped.total) || Number(ped.monto) || 0;
+                              const monto = Number(ped.subtotal) || 0;
                               const costoEnvioReal = Number(ped.costoEnvio) || (ped.zonaEnvio && Number(ped.zonaEnvio.costo)) || 100;
+                              const comisionIndividualItem = colaborador.rol === "Delivery" 
+                                ? costoEnvioReal 
+                                : (monto * Number(colaborador.valorConfigurado)) / 100;
+
                               const clienteStr = formatearTextoSeguro(ped.cliente || ped.nombreCliente || "Cliente");
                               return (
                                 <div key={idx} className="flex justify-between items-center border-b border-slate-800 pb-1.5 pt-1">
@@ -507,17 +565,14 @@ export default function NominaPage() {
                                     <span className="text-[10px] text-slate-400">ID: {ped.id ? String(ped.id).slice(-6) : "N/A"} {ped.zonaEnvio ? `• ${ped.zonaEnvio.nombre}` : ""}</span>
                                   </div>
                                   <div className="text-right">
-                                    {colaborador.rol === "Delivery" ? (
-                                      <span className="font-bold text-amber-400">+ RD$ {costoEnvioReal.toLocaleString()}</span>
-                                    ) : (
-                                      <span className="font-bold text-emerald-400">RD$ {monto.toLocaleString()}</span>
-                                    )}
+                                    <span className="font-bold text-emerald-400">+ RD$ {comisionIndividualItem.toLocaleString()}</span>
+                                    <span className="block text-[9px] text-slate-500">Comisión generada</span>
                                   </div>
                                 </div>
                               );
                             })
                           ) : (
-                            <p className="text-slate-400 italic text-center py-2">No hay registros completados en este mes.</p>
+                            <p className="text-slate-400 italic text-center py-2">No hay registros completados en este rango de fechas.</p>
                           )}
                         </div>
                       )}
@@ -552,8 +607,8 @@ export default function NominaPage() {
                   </div>
                 </div>
                 <div className="text-right text-xs text-slate-500">
-                  <p><span className="font-bold">Fecha:</span> {new Date().toLocaleDateString()}</p>
-                  <p><span className="font-bold">Mes Evaluado:</span> {mesSeleccionado}</p>
+                  <p><span className="font-bold">Fecha Emisión:</span> {new Date().toLocaleDateString()}</p>
+                  <p><span className="font-bold">Período:</span> {fechaInicio} al {fechaFin}</p>
                 </div>
               </div>
 
@@ -566,19 +621,35 @@ export default function NominaPage() {
               </div>
 
               <div className="space-y-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Historial de Pagos Anteriores</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Historial de Pagos y Registros</h4>
                 <div className="border rounded-2xl overflow-hidden text-xs">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="bg-slate-100 text-slate-600 border-b"><th className="p-3">Concepto</th><th className="p-3 text-right">Monto</th></tr>
+                      <tr className="bg-slate-100 text-slate-600 border-b">
+                        <th className="p-3">Concepto</th>
+                        <th className="p-3 text-right">Monto</th>
+                        <th className="p-3 text-center print:hidden">Acción</th>
+                      </tr>
                     </thead>
                     <tbody>
                       {Array.isArray(reciboSeleccionado.historialDetalle) && reciboSeleccionado.historialDetalle.length > 0 ? (
                         reciboSeleccionado.historialDetalle.map((h, i) => (
-                          <tr key={i} className="border-b"><td className="p-3">{formatearTextoSeguro(h.concepto)}<br/><span className="text-[10px] text-slate-400">{formatearTextoSeguro(h.fecha)}</span></td><td className="p-3 text-right font-bold">RD$ {(h.monto || 0).toLocaleString()}</td></tr>
+                          <tr key={i} className="border-b">
+                            <td className="p-3">{formatearTextoSeguro(h.concepto)}<br/><span className="text-[10px] text-slate-400">{formatearTextoSeguro(h.fecha)}</span></td>
+                            <td className="p-3 text-right font-bold">RD$ {(h.monto || 0).toLocaleString()}</td>
+                            <td className="p-3 text-center print:hidden">
+                              <button 
+                                onClick={() => eliminarItemHistorial(reciboSeleccionado, i)}
+                                title="Eliminar este registro de prueba"
+                                className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
                         ))
                       ) : (
-                        <tr><td colSpan="2" className="p-4 text-center text-slate-400 italic">No hay pagos anteriores registrados.</td></tr>
+                        <tr><td colSpan="3" className="p-4 text-center text-slate-400 italic">No hay pagos anteriores registrados.</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -586,13 +657,13 @@ export default function NominaPage() {
               </div>
 
               <div className="bg-slate-900 text-white p-4 rounded-2xl flex justify-between items-center">
-                <span className="font-medium text-sm">Balance Actual Pendiente ({mesSeleccionado}):</span>
+                <span className="font-medium text-sm">Comisión Total Filtrada ({fechaInicio} al {fechaFin}):</span>
                 <span className="text-xl font-black text-amber-400">RD$ {(reciboSeleccionado.comisionAcumulada || 0).toLocaleString()}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-8 pt-8 text-center text-xs text-slate-600">
                 <div className="space-y-6"><div className="border-b border-slate-400 pb-1"></div><p className="font-bold">Firma de la Empresa</p></div>
-                <div className="space-y-6"><div className="border-b border-slate-400 pb-1"></div><p className="font-bold">Recibido Conforme (Empleado)</p></div>
+                <div className="space-y-6"><div className="border-b border-slate-400 pb-1"></div><p className="p-4 text-center font-bold">Recibido Conforme (Empleado)</p></div>
               </div>
             </div>
 
