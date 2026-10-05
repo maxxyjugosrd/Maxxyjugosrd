@@ -70,39 +70,33 @@ export default function NominaPage() {
 
     setEquipo((equipoActual) => 
       equipoActual.map((colaborador) => {
-        // SI ESTE RANGO YA FUE PAGADO, MANTENEMOS EL 0 Y NO CALCULAMOS DE NUEVO
-        const rangoActualStr = `${fechaInicio}_${fechaFin}`;
-        if (colaborador.rangoPagadoKey === rangoActualStr) {
-          return {
-            ...colaborador,
-            comisionAcumulada: 0
-          };
-        }
-
         const nombreColaborador = (colaborador.nombre || "").trim().toLowerCase();
-        // ... (el resto de tu código de cálculo sigue exactamente igual aquí abajo)
-        if (colaborador.rol === "Vendedor" && Number(colaborador.valorConfigurado) > 0) {
-          const ventasDelVendedor = pedidos.filter((v) => {
+
+        // 1. Si es Vendedor
+        if (colaborador.rol?.trim().toLowerCase() === "vendedor" && Number(colaborador.valorConfigurado) > 0) {
+          const ventasDelVendedor = pedidosFirebase.filter((v) => {
             const vendedorPedido = (v.vendedor || v.vendedorAsignado || v.usuario || "").toString().trim().toLowerCase();
             const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
             const fechaPedido = v.fecha || v.creadoEn || v.createdAt;
 
-            return vendedorPedido.includes(nombreColaborador) && 
-                   estadoPedido === "completado" && 
+            return vendedorPedido.includes(nombreColaborador) &&
+                   estadoPedido === "completado" &&
                    coincideRangoFechas(fechaPedido, fechaInicio, fechaFin);
           });
-          
+
           const ventasPorCliente = {};
           ventasDelVendedor.forEach((pedido) => {
             let clienteBruto = pedido.cliente || pedido.nombreCliente || pedido.telefonoCliente || "cliente_general";
             if (typeof clienteBruto === "object" && clienteBruto !== null) {
-              clienteBruto = clienteBruto.nombre || clienteBruto.nombreCliente || clienteBruto.telefono || "cliente_general";
+              clienteBruto = clienteBruto.nombre || clienteBruto.telefono || "cliente_general";
             }
-            const clienteKey = clienteBruto.toString().trim().toLowerCase();
-            const montoPedido = Number(pedido.subtotal) || 0;
+            const nombreCliente = clienteBruto.toString().trim();
+            const subtotalPedido = Number(pedido.subtotal || pedido.total || 0);
 
-            if (!ventasPorCliente[clienteKey]) ventasPorCliente[clienteKey] = 0;
-            ventasPorCliente[clienteKey] += montoPedido;
+            if (!ventasPorCliente[nombreCliente]) {
+              ventasPorCliente[nombreCliente] = 0;
+            }
+            ventasPorCliente[nombreCliente] += subtotalPedido;
           });
 
           const totalVendido = Object.values(ventasPorCliente).reduce((acc, curr) => acc + curr, 0);
@@ -116,40 +110,11 @@ export default function NominaPage() {
           };
         }
 
-        if (colaborador.rol === "Delivery") {
-          const entregasDelDelivery = pedidos.filter((v) => {
-            let deliveryBruto = v.deliveryAsignado || v.delivery || "";
-            if (typeof deliveryBruto === "object" && deliveryBruto !== null) {
-              deliveryBruto = deliveryBruto.nombre || "";
-            }
-            const deliveryPedido = deliveryBruto.toString().trim().toLowerCase();
-            const estadoPedido = (v.estado || "").toString().trim().toLowerCase();
-            const fechaPedido = v.fecha || v.creadoEn || v.createdAt;
-
-            return deliveryPedido.includes(nombreColaborador) && 
-                   estadoPedido === "completado" &&
-                   coincideRangoFechas(fechaPedido, fechaInicio, fechaFin);
-          });
-
-          const totalEntregas = entregasDelDelivery.length;
-          const totalComisionEnvios = entregasDelDelivery.reduce((acc, ped) => {
-            const costoEnvioReal = Number(ped.costoEnvio) || (ped.zonaEnvio && Number(ped.zonaEnvio.costo)) || 100;
-            return acc + costoEnvioReal;
-          }, 0);
-
-          return {
-            ...colaborador,
-            entregasRealizadas: totalEntregas,
-            comisionAcumulada: totalComisionEnvios || 0,
-            registrosAsociados: entregasDelDelivery
-          };
-        }
-
         return colaborador;
       })
     );
-  }, [pedidos, fechaInicio, fechaFin]);
-
+  }, [pedidosFirebase, fechaInicio, fechaFin, equipo.length]);
+  
   // Función para actualizar y guardar cambios directamente en Firestore
  const actualizarYGuardarEquipo = async (colaboradorActualizado) => {
     try {
