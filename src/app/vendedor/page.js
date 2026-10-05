@@ -153,20 +153,23 @@ export default function PanelVendedorSeguro() {
     return () => unsubscribe();
   }, []);
 
-  // Leer directamente la comisión acumulada y el porcentaje del documento en Firebase del vendedor
+  // Lectura robusta de la comisión con conversión a número asegurada
   const obtenerComisionVendedor = () => {
     const info = personalFirebase.find(
-      (p) => p.nombre?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() && p.rol === "Vendedor"
+      (p) => p.nombre?.trim().toUpperCase() === vendedorActual?.trim().toUpperCase() && p.rol?.trim().toLowerCase() === "vendedor"
     );
 
+    const porcentajeCrudo = info?.comisionPorcentaje ?? info?.valorConfigurado ?? 0;
+    const acumuladoCrudo = info?.comisionAcumulada ?? 0;
+
     return {
-      porcentaje: Number(info?.comisionPorcentaje || info?.valorConfigurado || 0),
-      comisionAcumulada: Number(info?.comisionAcumulada || 0),
+      porcentaje: Number(porcentajeCrudo) || 0,
+      comisionAcumulada: Number(acumuladoCrudo) || 0,
     };
   };
 
   const { porcentaje, comisionAcumulada } = obtenerComisionVendedor();
-
+  
   // Calcular comisiones pendientes basadas en los pedidos creados por este vendedor que están "Pendientes"
   const calcularComisionPendiente = () => {
     if (!vendedorActual) return 0;
