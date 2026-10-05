@@ -223,7 +223,7 @@ export default function CatalogoPage() {
           <div className="flex justify-between items-center">
             {/* Pestañas de Categoría */}
             <div className="flex gap-2 border-b pb-2 overflow-x-auto">
-              {["Botella 12 oz", "Galones", "Saludables & Shots"].map((cat) => (
+              {["Botella 12 oz", "Galones", "Saludables & Shots", "Picaderas & Bakery"].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setCategoriaActiva(cat)}
