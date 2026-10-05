@@ -126,10 +126,20 @@ export default function NominaPage() {
     );
   }, [pedidos, mesSeleccionado]);
 
-  const actualizarYGuardarEquipo = (nuevoEquipo) => {
-    setEquipo(nuevoEquipo);
-    localStorage.setItem("maxi_personal", JSON.stringify(nuevoEquipo));
-  };
+    // Función para actualizar y guardar cambios directamente en Firestore
+const actualizarYGuardarEquipo = async (colaboradorActualizado) => {
+  try {
+    if (!colaboradorActualizado.idDoc) return;
+    const docRef = doc(db, "personal", colaboradorActualizado.idDoc);
+    await updateDoc(docRef, {
+      comisionAcumulada: colaboradorActualizado.comisionAcumulada,
+      historialDetalle: colaboradorActualizado.historialDetalle || [],
+      totalVentasPeriodo: colaboradorActualizado.totalVentasPeriodo || 0,
+    });
+  } catch (error) {
+    console.error("Error al actualizar en Firebase:", error);
+  }
+};
 
   const obtenerInfoNomina = () => {
     const hoy = new Date();
