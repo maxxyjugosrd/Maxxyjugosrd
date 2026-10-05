@@ -97,7 +97,7 @@ export default function PanelVendedorSeguro() {
   const [passwordSupervisorInput, setPasswordSupervisorInput] = useState("");
   const [pedidoPendienteGuardar, setPedidoPendienteGuardar] = useState(null);
 
-  // 1. Cargar datos en vivo de Productos, Clientes e Ingredientes desde Firestore
+  // Cargar datos de catálogo, clientes e ingredientes en vivo desde Firestore
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -122,16 +122,16 @@ export default function PanelVendedorSeguro() {
     };
   }, []);
 
-  // 2. Cargar la nómina/personal en vivo desde Firestore para halar comisiones y vendedores
+  // Cargar personal y vendedores en vivo desde la colección "personal" de Firestore[cite: 6]
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "personal"), (snapshot) => {
       const lista = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
       setPersonalFirebase(lista);
 
-      // Filtrar deliveries para el formulario de pedidos
+      // Filtrar deliveries para el formulario
       setListaDeliveries(lista.filter((p) => p.rol === "Delivery"));
 
-      // Extraer nombres de vendedores para el login por PIN
+      // Extraer nombres reales de los vendedores para el login por PIN
       const soloVendedores = lista.filter((p) => p.rol === "Vendedor").map((p) => p.nombre);
       if (soloVendedores.length > 0) {
         setVendedoresDisponibles(soloVendedores);
@@ -140,7 +140,7 @@ export default function PanelVendedorSeguro() {
     return () => unsubscribe();
   }, []);
 
-  // Función para calcular las comisiones del vendedor logueado directo de Firebase
+  // Obtener comisiones del vendedor logueado directamente desde Firebase
   const obtenerComisionVendedor = () => {
     const info = personalFirebase.find((p) => p.nombre === vendedorActual && p.rol === "Vendedor");
     return info
@@ -389,7 +389,6 @@ export default function PanelVendedorSeguro() {
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6">
           <div className="text-center">
-            {/* Logo corporativo desde public/logo.JPG */}
             <div className="w-20 h-20 rounded-2xl overflow-hidden mx-auto shadow-md mb-3 border border-slate-100">
               <img src="/logo.JPG" alt="Maxxy Jugos" className="w-full h-full object-cover" />
             </div>
@@ -487,7 +486,7 @@ export default function PanelVendedorSeguro() {
           </div>
         )}
 
-        {/* Resumen Comisiones Vendedor (Hala de Firebase) */}
+        {/* Resumen Comisiones Vendedor */}
         <div className="bg-gradient-to-br from-amber-500 to-orange-500 text-white p-6 rounded-3xl shadow-md flex justify-between items-center">
           <div>
             <span className="text-xs uppercase tracking-wider opacity-90 font-semibold">Tus Comisiones Acumuladas</span>
