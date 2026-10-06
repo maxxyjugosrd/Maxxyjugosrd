@@ -1011,51 +1011,55 @@ export default function PanelVendedorSeguro() {
                   />
                 </div>
 
-                {/* Zona de Envío */}
-                <div className="space-y-3 border-t pt-3">
-                  <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
-                    <Truck className="w-3.5 h-3.5 text-teal-600" /> Zona de Envío
-                  </label>
-                  <select
-                    value={zonaSeleccionadaId}
-                    onChange={(e) => setZonaSeleccionadaId(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-                  >
-                    <option value="">-- Seleccionar Zona --</option>
-                    <optgroup label="Provincias (Camión)">
-                      {ZONAS_ENVIO.filter(z => z.tipo === "camion").map((zona) => (
-                        <option key={zona.id} value={zona.id}>{zona.nombre}</option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Santo Domingo (Local)">
-                      {ZONAS_ENVIO.filter(z => z.tipo === "local").map((zona) => (
-                        <option key={zona.id} value={zona.id}>{zona.nombre} (RD$ {zona.costo})</option>
-                      ))}
-                    </optgroup>
-                  </select>
+             {/* Zona de Envío */}
+<div className="space-y-3 border-t pt-3">
+  <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
+    <Truck className="w-3.5 h-3.5 text-teal-600" /> Zona de Envío
+  </label>
+  <select
+    value={zonaSeleccionadaId}
+    onChange={(e) => setZonaSeleccionadaId(e.target.value)}
+    className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+  >
+    <option value="">-- Seleccionar Zona --</option>
+    {/* Opción destacada de Envío Gratis */}
+    {ZONAS_ENVIO.filter(z => z.id === "envio-gratis").map((zona) => (
+      <option key={zona.id} value={zona.id}>🎉 {zona.nombre} (RD$ 0)</option>
+    ))}
+    <optgroup label="Provincias (Camión)">
+      {ZONAS_ENVIO.filter(z => z.tipo === "camion").map((zona) => (
+        <option key={zona.id} value={zona.id}>{zona.nombre}</option>
+      ))}
+    </optgroup>
+    <optgroup label="Santo Domingo (Local)">
+      {ZONAS_ENVIO.filter(z => z.tipo === "local" && z.id !== "envio-gratis").map((zona) => (
+        <option key={zona.id} value={zona.id}>{zona.nombre} (RD$ {zona.costo})</option>
+      ))}
+    </optgroup>
+  </select>
 
-                  {zonaActual && zonaActual.tipo === "camion" && (
-                    <div className="bg-slate-50 p-3 rounded-xl border space-y-2">
-                      <label className="text-xs font-semibold text-slate-600 block">Tarifa Camión:</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setTipoCostoCamion("costoNormal")}
-                          className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition ${tipoCostoCamion === "costoNormal" ? "bg-teal-600 text-white" : "bg-white text-slate-700"}`}
-                        >
-                          Normal (RD$ {zonaActual.costoNormal})
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTipoCostoCamion("costoFrio")}
-                          className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition ${tipoCostoCamion === "costoFrio" ? "bg-teal-600 text-white" : "bg-white text-slate-700"}`}
-                        >
-                          Frío (RD$ {zonaActual.costoFrio})
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+  {zonaActual && zonaActual.tipo === "camion" && (
+    <div className="bg-slate-50 p-3 rounded-xl border space-y-2">
+      <label className="text-xs font-semibold text-slate-600 block">Tarifa Camión:</label>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => setTipoCostoCamion("costoNormal")}
+          className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition ${tipoCostoCamion === "costoNormal" ? "bg-teal-600 text-white" : "bg-white text-slate-700"}`}
+        >
+          Normal (RD$ {zonaActual.costoNormal})
+        </button>
+        <button
+          type="button"
+          onClick={() => setTipoCostoCamion("costoFrio")}
+          className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition ${tipoCostoCamion === "costoFrio" ? "bg-teal-600 text-white" : "bg-white text-slate-700"}`}
+        >
+          Frío (RD$ {zonaActual.costoFrio})
+        </button>
+      </div>
+    </div>
+  )}
+</div>
 
                 {/* Carrito Resumen */}
                 <div className="space-y-2 border-t pt-3 max-h-48 overflow-y-auto">
