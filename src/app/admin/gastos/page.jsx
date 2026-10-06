@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Calendar, AlertTriangle, CheckCircle2, DollarSign, Bell, Clock } from "lucide-react";
+import { Plus, Trash2, Calendar, AlertTriangle, CheckCircle2, Bell, Clock, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 
-export default function GastosFijos() {
+export default function AdminGastosFijos() {
   const [gastos, setGastos] = useState([]);
   const [nombre, setNombre] = useState("");
   const [monto, setMonto] = useState("");
@@ -31,7 +32,6 @@ export default function GastosFijos() {
     }
   }, []);
 
-  // Guardar en localStorage cada vez que cambien los gastos
   const guardarEnStorage = (nuevosGastos) => {
     setGastos(nuevosGastos);
     localStorage.setItem("maxxy_gastos_fijos", JSON.stringify(nuevosGastos));
@@ -77,10 +77,8 @@ export default function GastosFijos() {
     const anioActual = hoy.getFullYear();
     const mesActual = hoy.getMonth();
 
-    // Fecha de pago para este mes
     let fechaPago = new Date(anioActual, mesActual, diaPagoObjetivo);
 
-    // Si ya pasó el día de pago este mes, calculamos para el próximo mes
     if (hoy > fechaPago) {
       fechaPago = new Date(anioActual, mesActual + 1, diaPagoObjetivo);
     }
@@ -90,17 +88,20 @@ export default function GastosFijos() {
     return diasRestantes;
   };
 
-  // Total mensual de gastos fijos
   const totalGastosFijos = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0);
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      {/* Cabecera con navegación */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
         <div>
+          <Link href="/admin" className="text-xs text-amber-600 hover:underline flex items-center gap-1 font-semibold mb-1">
+            <ArrowLeft className="w-3.5 h-3.5" /> Volver al Panel Admin
+          </Link>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Bell className="w-6 h-6 text-amber-500" /> Control de Gastos Fijos y Servicios
+            <Bell className="w-6 h-6 text-amber-500" /> Control de Gastos Fijos
           </h1>
-          <p className="text-slate-500 text-sm">Gestiona tus pagos recurrentes y recibe alertas antes de las fechas de corte.</p>
+          <p className="text-slate-500 text-sm">Administra los servicios recurrentes y mantén el control de tus fechas de corte.</p>
         </div>
 
         <div className="bg-amber-50 border border-amber-200 px-4 py-2.5 rounded-2xl shadow-sm text-right">
@@ -110,7 +111,7 @@ export default function GastosFijos() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Formulario para agregar nuevo gasto */}
+        {/* Formulario */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-fit space-y-4">
           <h2 className="text-base font-bold text-slate-800 border-b pb-3 flex items-center gap-2">
             <Plus className="w-4 h-4 text-amber-500" /> Registrar Nuevo Gasto
@@ -183,9 +184,9 @@ export default function GastosFijos() {
           </form>
         </div>
 
-        {/* Listado de Gastos y Alertas */}
+        {/* Listado con alertas */}
         <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-base font-semibold text-slate-700">Tus Gastos Registrados y Alertas</h2>
+          <h2 className="text-base font-semibold text-slate-700">Tus Gastos Registrados y Alertas de Pago</h2>
 
           {gastos.length === 0 ? (
             <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-400">
@@ -236,16 +237,16 @@ export default function GastosFijos() {
                       </div>
                     </div>
 
-                    {/* Insignia de Estado / Alerta */}
+                    {/* Alerta de días restantes */}
                     <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
                       {esUrgente ? (
                         <div className="flex items-center gap-1.5 text-rose-600 text-xs font-bold bg-rose-100/80 px-2.5 py-1 rounded-xl w-full">
                           <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse" />
                           <span>
                             {diasRestantes === 0
-                              > ? "¡Vence HOY!"
+                              ? "¡Vence HOY!"
                               : diasRestantes === 1
-                              > "¡Vence mañana!"
+                              ? "¡Vence mañana!"
                               : `⚠️ Vence en ${diasRestantes} días`}
                           </span>
                         </div>
