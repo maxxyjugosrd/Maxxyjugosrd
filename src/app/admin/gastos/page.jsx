@@ -18,7 +18,7 @@ export default function AdminGastosFijos() {
       try {
         const parsed = JSON.parse(guardados).map(g => ({
           ...g,
-          pagado: g.pagado ?? false,
+          pagado: false, // Siempre arranca pendiente por seguridad de ciclo
           ultimoPagoAnioMes: g.ultimoPagoAnioMes || null
         }));
         setGastos(parsed);
@@ -83,9 +83,14 @@ export default function AdminGastosFijos() {
     }
   };
 
-  const calcularMesesAtrasados = (gasto) => {
-    if (gasto.pagado) return 0;
+  const eliminarItemHistorial = (idHistorial) => {
+    if (confirm("¿Deseas eliminar este registro del historial?")) {
+      const historialFiltrado = historialPagos.filter((h) => h.id !== idHistorial);
+      guardarHistorialStorage(historialFiltrado);
+    }
+  };
 
+  const calcularMesesAtrasados = (gasto) => {
     const hoy = new Date();
     const anioActual = hoy.getFullYear();
     const mesActual = hoy.getMonth();
@@ -131,7 +136,7 @@ export default function AdminGastosFijos() {
     return Math.max(0, contador);
   };
 
-  const togglePagado = (id) => {
+  const registrarPago = (id) => {
     const hoy = new Date();
     const anioMesActual = `${hoy.getFullYear()}-${hoy.getMonth()}`;
     const fechaLegible = hoy.toLocaleDateString("es-DO", { year: 'numeric', month: 'long', day: 'numeric' });
@@ -140,20 +145,18 @@ export default function AdminGastosFijos() {
 
     const actualizados = gastos.map(g => {
       if (g.id === id) {
-        const nuevoPagado = !g.pagado;
-        if (nuevoPagado) {
-          itemPagadoInfo = {
-            id: "hist-" + Date.now(),
-            nombre: g.nombre,
-            monto: g.monto,
-            categoria: g.categoria,
-            fechaPago: fechaLegible
-          };
-        }
+        itemPagadoInfo = {
+          id: "hist-" + Date.now(),
+          nombre: g.nombre,
+          monto: g.monto,
+          categoria: g.categoria,
+          fechaPago: fechaLegible
+        };
+        // Al registrar pago, guardamos el periodo y mantenemos pagado en false para que siga activo en pendiente con su nueva fecha
         return {
           ...g,
-          pagado: nuevoPagado,
-          ultimoPagoAnioMes: nuevoPagado ? anioMesActual : g.ultimoPagoAnioMes
+          pagado: false, 
+          ultimoPagoAnioMes: anioMesActual
         };
       }
       return g;
@@ -186,12 +189,11 @@ export default function AdminGastosFijos() {
   const totalCompromisoMensual = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0);
   
   const totalDeudaPendiente = gastos.reduce((sum, g) => {
-    if (g.pagado) return sum;
     const mesesAtrasados = calcularMesesAtrasados(g);
     return sum + (Number(g.monto || 0) * mesesAtrasados);
   }, 0);
 
-  const cantidadConDeudaVencida = gastos.filter(g => !g.pagado && calcularMesesAtrasados(g) > 0).length;
+  const cantidadConDeudaVencida = gastos.filter(g => calcularMesesAtrasados(g) > 0).length;
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -311,7 +313,7 @@ export default function AdminGastosFijos() {
                 {gastos.map((gasto) => {
                   const diasRestantes = calcularDiasRestantes(gasto.diaPago);
                   const mesesAtrasados = calcularMesesAtrasados(gasto);
-                  const esUrgente = diasRestantes <= 3 && !gasto.pagado;
+                  const esUrgente = diasRestantes <= 3;
                   
                   const montoMostrar = mesesAtrasados > 0 
                     ? Number(gasto.monto) * mesesAtrasados 
@@ -321,9 +323,7 @@ export default function AdminGastosFijos() {
                     <div
                       key={gasto.id}
                       className={`p-4 rounded-2xl border transition shadow-sm flex flex-col justify-between relative overflow-hidden ${
-                        gasto.pagado
-                          ? "bg-slate-50 border-slate-200 opacity-80"
-                          : mesesAtrasados > 0
+                        mesesAtrasados > 0
                           ? "border-rose-400 bg-rose-50/20"
                           : "border-slate-200 bg-white"
                       }`}
@@ -332,23 +332,11 @@ export default function AdminGastosFijos() {
                         <div className="flex justify-between items-start gap-2">
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => togglePagado(gasto.id)}
-                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition shadow-sm ${
-                                gasto.pagado
-                                  ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
-                                  : "bg-slate-200 text-slate-700 hover:bg-slate-300"
-                              }`}
-                              title="Marcar como pagado o pendiente"
+                              onClick={() => registrarPago(gasto.id)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-sm bg-amber-500 text-white hover:bg-amber-600"
+                              title="Marcar como pagado y enviar al historial"
                             >
-                              {gasto.pagado ? (
-                                <>
-                                  <CheckSquare className="w-4 h-4 text-emerald-600" /> Pagado
-                                </>
-                              ) : (
-                                <>
-                                  <Square className="w-4 h-4 text-slate-500" /> Pendiente
-                                </>
-                              )}
+                              <CheckSquare className="w-4 h-4" /> Marcar Pagado
                             </button>
                             <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
                               {gasto.categoria}
@@ -365,21 +353,21 @@ export default function AdminGastosFijos() {
                         </div>
 
                         <div className="mt-3">
-                          <h3 className={`font-bold text-base ${gasto.pagado ? "line-through text-slate-400" : "text-slate-800"}`}>
+                          <h3 className="font-bold text-base text-slate-800">
                             {gasto.nombre}
                           </h3>
                           
                           <div className="mt-2 flex items-baseline justify-between">
                             <div>
-                              <span className={`text-xl font-extrabold ${gasto.pagado ? "text-slate-400 line-through" : "text-slate-900"}`}>
+                              <span className="text-xl font-extrabold text-slate-900">
                                 RD$ {montoMostrar.toLocaleString()}
                               </span>
-                              {mesesAtrasados > 1 && !gasto.pagado && (
+                              {mesesAtrasados > 1 && (
                                 <span className="text-[11px] text-rose-600 font-semibold block">
                                   (RD$ {Number(gasto.monto).toLocaleString()} × {mesesAtrasados} meses vencidos)
                                 </span>
                               )}
-                              {mesesAtrasados === 0 && !gasto.pagado && (
+                              {mesesAtrasados === 0 && (
                                 <span className="text-[11px] text-slate-400 block">
                                   Compromiso mes actual
                                 </span>
@@ -394,12 +382,7 @@ export default function AdminGastosFijos() {
                       </div>
 
                       <div className="mt-4 pt-3 border-t border-slate-100">
-                        {gasto.pagado ? (
-                          <div className="flex items-center gap-1.5 text-emerald-700 text-xs font-semibold bg-emerald-50 px-2.5 py-1 rounded-xl w-full">
-                            <CheckCircle2 className="w-4 h-4 shrink-0" />
-                            <span>Factura al día (Pagado)</span>
-                          </div>
-                        ) : mesesAtrasados > 0 ? (
+                        {mesesAtrasados > 0 ? (
                           <div className="flex items-center gap-1.5 text-rose-600 text-xs font-bold bg-rose-100/80 px-2.5 py-1 rounded-xl w-full">
                             <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse" />
                             <span>⚠️ Vencido: {mesesAtrasados} {mesesAtrasados === 1 ? 'mes acumulado' : 'meses acumulados'}</span>
@@ -436,18 +419,28 @@ export default function AdminGastosFijos() {
             </h3>
 
             {historialPagos.length === 0 ? (
-              <p className="text-xs text-slate-400 italic">No hay pagos registrados en el historial todavía. Cuando marques un gasto como pagado aparecerá aquí.</p>
+              <p className="text-xs text-slate-400 italic">No hay pagos registrados en el historial todavía. Cuando hagas clic en "Marcar Pagado" aparecerá aquí.</p>
             ) : (
-              <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+              <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto pr-2">
                 {historialPagos.map((pago) => (
-                  <div key={pago.id} className="py-3 flex justify-between items-center text-sm">
+                  <div key={pago.id} className="py-3 flex justify-between items-center text-sm gap-2">
                     <div>
                       <p className="font-bold text-slate-700">{pago.nombre}</p>
                       <p className="text-xs text-slate-400">Pagado el {pago.fechaPago}</p>
                     </div>
-                    <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full">
-                      RD$ {Number(pago.monto).toLocaleString()} - Completado
-                    </span>
+                    
+                    <div className="flex items-center gap-3">
+                      <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full">
+                        RD$ {Number(pago.monto).toLocaleString()}
+                      </span>
+                      <button
+                        onClick={() => eliminarItemHistorial(pago.id)}
+                        className="text-slate-400 hover:text-rose-500 transition p-1.5 rounded-lg hover:bg-rose-50"
+                        title="Eliminar este registro del historial"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
