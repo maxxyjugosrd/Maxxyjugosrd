@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Calendar, AlertTriangle, CheckCircle2, Bell, Clock, ArrowLeft, CheckSquare, Square, History, FileText } from "lucide-react";
+import { Plus, Trash2, Calendar, AlertTriangle, CheckCircle2, Bell, Clock, ArrowLeft, CheckSquare, History, FileText } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminGastosFijos() {
@@ -18,7 +18,6 @@ export default function AdminGastosFijos() {
       try {
         const parsed = JSON.parse(guardados).map(g => ({
           ...g,
-          pagado: false, // Siempre arranca pendiente por seguridad de ciclo
           ultimoPagoAnioMes: g.ultimoPagoAnioMes || null
         }));
         setGastos(parsed);
@@ -66,7 +65,6 @@ export default function AdminGastosFijos() {
       monto: parseFloat(monto),
       diaPago: diaNum,
       categoria,
-      pagado: false,
       ultimoPagoAnioMes: null
     };
 
@@ -90,54 +88,65 @@ export default function AdminGastosFijos() {
     }
   };
 
+  // Cálculo corregido de meses atrasados basado en la fecha actual (Octubre 2026)
   const calcularMesesAtrasados = (gasto) => {
     const hoy = new Date();
     const anioActual = hoy.getFullYear();
-    const mesActual = hoy.getMonth();
+    const mesActual = hoy.getMonth(); // 9 para Octubre
     const diaActual = hoy.getDate();
 
-    let anioLimite = 2026;
-    let mesLimite = 0;
-
-    if (gasto.ultimoPagoAnioMes) {
-      const [pAnio, pMes] = gasto.ultimoPagoAnioMes.split("-").map(Number);
-      anioLimite = pAnio;
-      mesLimite = pMes;
-    } else {
-      anioLimite = anioActual;
-      mesLimite = mesActual;
-    }
-
-    let contador = 0;
+    // Si tiene registrado un último pago, evaluamos a partir del mes siguiente al pago
     let evalAnio = anioActual;
     let evalMes = mesActual;
 
-    if (diaActual < gasto.diaPago) {
-      evalMes--;
-      if (evalMes < 0) {
-        evalMes = 11;
-        evalAnio--;
+    if (gasto.ultimoPagoAnioMes) {
+      const [pAnio, pMes] = gasto.ultimoPagoAnioMes.split("-").map(Number);
+      // Avanzamos un mes después del último pago registrado
+      evalMes = pMes + 1;
+      evalAnio = pAnio;
+      if (evalMes > 11) {
+        evalMes = 0;
+        evalAnio++;
       }
+    } else {
+      // Si nunca se ha pagado, tomamos el mes en que se creó o el mes actual pero respetando el día de corte
+      // Por simplicidad, si no hay pago, evaluamos desde el mes actual si ya pasó su día
     }
 
-    while (evalAnio > anioLimite || (evalAnio === anioLimite && evalMes >= mesLimite)) {
-      const fechaRevision = new Date(evalAnio, evalMes, gasto.diaPago);
-      if (hoy >= fechaRevision) {
-        contador++;
+    let mesesVencidos = 0;
+
+    // Contamos hacia adelante o revisamos si los meses anteriores a hoy ya pasaron su fecha de pago sin pagarse
+    // Comprobamos mes a mes desde el último pago hasta el mes actual
+    while (
+      evalAnio < anioActual || 
+      (evalAnio === anioActual && evalMes <= mesActual)
+    ) {
+      // Verificamos si la fecha de corte de ese mes ya pasó
+      const fechaCorte = new Date(evalAnio, evalMes, gasto.diaPago);
+      
+      // Si hoy es igual o mayor a la fecha de corte de ese mes, se cuenta como vencido/pendiente
+      if (hoy >= fechaCorte) {
+        // Excepción: si el mes evaluado es el mes actual y hoy es menor al día de pago, no cuenta aún
+        if (!(evalAnio === anioActual && evalMes === mesActual && diaActual < gasto.diaPago)) {
+          mesesVencidos++;
+        }
       }
-      evalMes--;
-      if (evalMes < 0) {
-        evalMes = 11;
-        evalAnio--;
+
+      evalMes++;
+      if (evalMes > 11) {
+        evalMes = 0;
+        evalAnio++;
       }
-      if (contador > 24) break; 
+
+      if (mesesVencidos > 24) break; // seguridad
     }
 
-    return Math.max(0, contador);
+    return Math.max(0, mesesVencidos);
   };
 
   const registrarPago = (id) => {
     const hoy = new Date();
+    // Guardamos el año y mes exacto actual (Ej: "2026-9" para octubre)
     const anioMesActual = `${hoy.getFullYear()}-${hoy.getMonth()}`;
     const fechaLegible = hoy.toLocaleDateString("es-DO", { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -154,8 +163,7 @@ export default function AdminGastosFijos() {
         };
         return {
           ...g,
-          pagado: false, 
-          ultimoPagoAnioMes: anioMesActual
+          ultimoPagoAnioMes: anioMesActual // Actualiza el ciclo al mes actual para que reinicie la cuenta
         };
       }
       return g;
@@ -208,7 +216,6 @@ export default function AdminGastosFijos() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Botón rápido hacia la nueva sección de Facturas */}
           <Link
             href="/admin/gastos/facturas"
             className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-sm transition"
