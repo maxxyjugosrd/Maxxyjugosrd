@@ -454,30 +454,38 @@ export default function PedidosManuales() {
             </div>
           </div>
 
-          {/* Configuración de Zona de Envío */}
-          <div className="space-y-3 border-t pt-3">
-            <div>
-              <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
-                <Truck className="w-3.5 h-3.5 text-teal-600" /> Zona de Envío / Destino
-              </label>
-              <select
-                value={zonaSeleccionadaId}
-                onChange={(e) => setZonaSeleccionadaId(e.target.value)}
-                className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-              >
-                <option value="">-- Seleccionar Zona de Envío --</option>
-                <optgroup label="Provincias (Camión)">
-                  {ZONAS_ENVIO.filter(z => z.tipo === "camion").map((zona) => (
-                    <option key={zona.id} value={zona.id}>{zona.nombre}</option>
-                  ))}
-                </optgroup>
-                <optgroup label="Santo Domingo (Local)">
-                  {ZONAS_ENVIO.filter(z => z.tipo === "local").map((zona) => (
-                    <option key={zona.id} value={zona.id}>{zona.nombre} (RD$ {zona.costo})</option>
-                  ))}
-                </optgroup>
-              </select>
-            </div>
+         {/* Configuración de Zona de Envío */}
+<div className="space-y-3 border-t pt-3">
+  <div>
+    <label className="text-xs font-semibold text-slate-600 flex items-center gap-1 mb-1">
+      <Truck className="w-3.5 h-3.5 text-teal-600" /> Zona de Envío / Destino
+    </label>
+    <select
+      value={zonaSeleccionadaId}
+      onChange={(e) => setZonaSeleccionadaId(e.target.value)}
+      className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+    >
+      <option value="">-- Seleccionar Zona de Envío --</option>
+      
+      {/* Opción destacada de Envío Gratis */}
+      {ZONAS_ENVIO.filter(z => z.id === "envio-gratis").map((zona) => (
+        <option key={zona.id} value={zona.id}>🎉 {zona.nombre} (RD$ 0)</option>
+      ))}
+
+      <optgroup label="Provincias (Camión)">
+        {ZONAS_ENVIO.filter(z => z.tipo === "camion").map((zona) => (
+          <option key={zona.id} value={zona.id}>{zona.nombre}</option>
+        ))}
+      </optgroup>
+      
+      <optgroup label="Santo Domingo (Local)">
+        {ZONAS_ENVIO.filter(z => z.tipo === "local" && z.id !== "envio-gratis").map((zona) => (
+          <option key={zona.id} value={zona.id}>{zona.nombre} (RD$ {zona.costo})</option>
+        ))}
+      </optgroup>
+    </select>
+  </div>
+</div>
 
             {/* Si es camión, mostrar selector de Costo Normal vs Frío */}
             {zonaActual && zonaActual.tipo === "camion" && (
