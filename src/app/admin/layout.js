@@ -12,7 +12,9 @@ import {
   UserCheck,
   Package,
   Calculator,
+  Bell,
   LogOut 
+  
 } from "lucide-react";
 import { getAuth, signOut } from "firebase/auth";
 import { app } from "../../lib/firebase";
@@ -35,6 +37,7 @@ export default function AdminLayout({ children }) {
     { nombre: "Métricas & Analítica", ruta: "/admin/metricas", icono: BarChart3 },
     { nombre: "Inventario & Envases", ruta: "/admin/productos", icono: Package },
     { nombre: "Finanzas & Compras", ruta: "/admin/finanzas", icono: Calculator },
+    { nombre: "Gastos Fijos", ruta: "/admin/gastos", icono: Bell },
     { nombre: "Clientes (CRM)", ruta: "/admin/clientes", icono: UserCheck },
     { nombre: "Recursos Humanos / Gestión de Personal", ruta: "/admin/personal", icono: Users },
   ];
