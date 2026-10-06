@@ -19,6 +19,7 @@ import {
   Package,
   Printer,
   Filter,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -44,6 +45,9 @@ export default function AdminDashboard() {
   const [pedidoAEditar, setPedidoAEditar] = useState(null);
   const [pedidoVerDetalles, setPedidoVerDetalles] = useState(null);
 
+  // Estados para la alerta de gastos fijos
+  const [gastosPendientesAlerta, setGastosPendientesAlerta] = useState([]);
+
   // Estados para filtros de fecha (por defecto vacíos para mostrar todo o el mes actual)
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
@@ -64,6 +68,17 @@ export default function AdminDashboard() {
     const desuscribirRecibos = obtenerRecibosEnVivo((datos) => {
       setRecibosLista(datos);
     });
+
+    // Cargar gastos fijos desde localStorage para la alerta del Dashboard
+    const guardados = localStorage.getItem("maxxy_gastos_fijos");
+    if (guardados) {
+      try {
+        const parsed = JSON.parse(guardados);
+        setGastosPendientesAlerta(parsed);
+      } catch (e) {
+        console.error("Error al cargar gastos fijos para alerta:", e);
+      }
+    }
 
     return () => {
       desuscribirPedidos && desuscribirPedidos();
@@ -252,7 +267,7 @@ export default function AdminDashboard() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">
-            Panel de Control - Maxxy Jugos 🥤
+            Panel de Control - Maxxy Jugos 
           </h1>
           <p className="text-slate-500 text-sm">
             Resumen financiero y operativo en tiempo real.
@@ -275,6 +290,27 @@ export default function AdminDashboard() {
           </Link>
         </div>
       </div>
+
+      {/* ALERTA DE GASTOS FIJOS EN EL DASHBOARD */}
+      {gastosPendientesAlerta.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center justify-between shadow-sm print:hidden">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0" />
+            <div>
+              <h4 className="font-bold text-amber-900 text-sm">
+                Tienes {gastosPendientesAlerta.length} {gastosPendientesAlerta.length === 1 ? 'gasto fijo registrado' : 'gastos fijos registrados'}
+              </h4>
+              <p className="text-xs text-amber-700">Revisa tus compromisos y fechas de corte para mantener las finanzas al día.</p>
+            </div>
+          </div>
+          <Link 
+            href="/admin/gastos" 
+            className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-sm whitespace-nowrap"
+          >
+            Ver Gastos
+          </Link>
+        </div>
+      )}
 
       {/* CABECERA EXCLUSIVA PARA IMPRESIÓN (Logo y Título formal) */}
       <div className="hidden print:flex flex-col items-center justify-center space-y-2 mb-6 border-b pb-4">
