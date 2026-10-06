@@ -18,7 +18,8 @@ export default function AdminGastosFijos() {
         const parsed = JSON.parse(guardados).map(g => ({
           ...g,
           pagado: g.pagado ?? false,
-          fechaInicioPendiente: g.fechaInicioPendiente || new Date().toISOString()
+          // Guardamos el año y mes del último pago o la fecha de creación
+          ultimoPagoAnioMes: g.ultimoPagoAnioMes || null
         }));
         setGastos(parsed);
       } catch (e) {
@@ -52,7 +53,7 @@ export default function AdminGastosFijos() {
       diaPago: diaNum,
       categoria,
       pagado: false,
-      fechaInicioPendiente: new Date().toISOString()
+      ultimoPagoAnioMes: null
     };
 
     guardarEnStorage([...gastos, nuevoGasto]);
@@ -68,38 +69,96 @@ export default function AdminGastosFijos() {
     }
   };
 
-  // Función automática para calcular meses atrasados según la fecha actual y el día de pago
+  // Calcula cuántos meses se deben realmente (solo si la fecha ya pasó del día de pago y no se ha pagado)
   const calcularMesesAtrasados = (gasto) => {
     if (gasto.pagado) return 0;
 
     const hoy = new Date();
-    const inicio = new Date(gasto.fechaInicioPendiente);
-    const diaPago = gasto.diaPago;
+    const anioActual = hoy.getFullYear();
+    const mesActual = hoy.getMonth(); // 0 = Enero, 9 = Octubre, etc.
+    const diaActual = hoy.getDate();
 
+    // Fecha límite de pago de este mes
+    const fechaCorteEsteMes = new Date(anioActual, mesActual, gasto.diaPago);
+
+    // Si ya pasó el día de pago de este mes y no está pagado, contamos al menos 1 mes vencido
+    let mesesVencidos = 0;
+    
+    // Evaluamos mes a mes hacia atrás desde el mes actual o el último mes pendiente
+    let cursorAnio = anioActual;
+    let cursorMes = mesActual;
+
+    // Si hoy es menor al día de pago, el mes actual todavía NO está vencido
+    if (diaActual < gasto.diaPago) {
+      // Retrocedemos un mes para empezar a evaluar los verdaderamente atrasados
+      cursorMes -= 1;
+      if (cursorMes < 0) {
+        cursorMes = 11;
+        cursorAnio -= 1;
+      }
+    }
+
+    // Comprobamos hacia atrás cuántos ciclos de pago se han cumplido sin pagar
+    // Tomamos como referencia la fecha en que se creó o el último mes pagado
+    let anioLimite = 2026;
+    let mesLimite = 0; // Por defecto evaluamos este año
+
+    if (gasto.ultimoPagoAnioMes) {
+      const [pAnio, pMes] = gasto.ultimoPagoAnioMes.split("-").map(Number);
+      anioLimite = pAnio;
+      mesLimite = pMes;
+    } else {
+      // Si nunca se ha pagado, tomamos el mes actual como inicio del compromiso
+      anioLimite = anioActual;
+      mesLimite = mesActual;
+    }
+
+    // Contar cuántos meses han pasado desde el último pago hasta hoy donde ya cruzó el día de pago
     let contador = 0;
-    let cursor = new Date(inicio.getFullYear(), inicio.getMonth(), diaPago);
+    let evalAnio = anioActual;
+    let evalMes = mesActual;
 
-    if (cursor < inicio) {
-      cursor.setMonth(cursor.getMonth() + 1);
+    // Si el día actual es menor al día de pago, el mes corriente no cuenta como vencido aún
+    if (diaActual < gasto.diaPago) {
+      evalMes--;
+      if (evalMes < 0) {
+        evalMes = 11;
+        evalAnio--;
+      }
     }
 
-    while (cursor <= hoy) {
-      contador++;
-      cursor.setMonth(cursor.getMonth() + 1);
+    // Ciclo para contar meses hacia atrás que ya pasaron de su fecha
+    while (evalAnio > anioLimite || (evalAnio === anioLimite && evalMes >= mesLimite)) {
+      // Verificamos si este mes específico ya pasó su fecha de pago
+      const fechaRevision = new Date(evalAnio, evalMes, gasto.diaPago);
+      if (hoy >= fechaRevision) {
+        contador++;
+      }
+      evalMes--;
+      if (evalMes < 0) {
+        evalMes = 11;
+        evalAnio--;
+      }
+      // Evitar bucles infinitos por seguridad
+      if (contador > 24) break; 
     }
 
-    return Math.max(1, contador);
+    return Math.max(0, contador);
   };
 
-  // Marcar como pagado o pendiente (reinicia la fecha base al pagar)
+  // Marcar como pagado o pendiente
   const togglePagado = (id) => {
+    const hoy = new Date();
+    const anioMesActual = `${hoy.getFullYear()}-${hoy.getMonth()}`;
+
     const actualizados = gastos.map(g => {
       if (g.id === id) {
         const nuevoPagado = !g.pagado;
         return {
           ...g,
           pagado: nuevoPagado,
-          fechaInicioPendiente: nuevoPagado ? new Date().toISOString() : g.fechaInicioPendiente
+          // Si lo marca como pagado, guardamos el año-mes actual para que el próximo mes se reactive solo
+          ultimoPagoAnioMes: nuevoPagado ? anioMesActual : g.ultimoPagoAnioMes
         };
       }
       return g;
@@ -107,7 +166,7 @@ export default function AdminGastosFijos() {
     guardarEnStorage(actualizados);
   };
 
-  // Días restantes para el próximo corte
+  // Días restantes para el próximo corte (para alertas visuales)
   const calcularDiasRestantes = (diaPagoObjetivo) => {
     const hoy = new Date();
     const anioActual = hoy.getFullYear();
@@ -126,13 +185,14 @@ export default function AdminGastosFijos() {
 
   const totalCompromisoMensual = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0);
   
-  const gastosPendientes = gastos.filter(g => !g.pagado);
-  const cantidadPendientes = gastosPendientes.length;
-  
-  const totalDeudaPendiente = gastosPendientes.reduce((sum, g) => {
-    const meses = calcularMesesAtrasados(g);
-    return sum + (Number(g.monto || 0) * meses);
+  // Total de deuda acumulada real (solo suma los meses que YA están vencidos / pasados de fecha)
+  const totalDeudaPendiente = gastos.reduce((sum, g) => {
+    if (g.pagado) return sum;
+    const mesesAtrasados = calcularMesesAtrasados(g);
+    return sum + (Number(g.monto || 0) * mesesAtrasados);
   }, 0);
+
+  const cantidadConDeudaVencida = gastos.filter(g => !g.pagado && calcularMesesAtrasados(g) > 0).length;
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -144,7 +204,7 @@ export default function AdminGastosFijos() {
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Bell className="w-6 h-6 text-amber-500" /> Control de Gastos Fijos y Alertas
           </h1>
-          <p className="text-slate-500 text-sm">El sistema calcula de forma automática los meses acumulados si pasa tu fecha de corte.</p>
+          <p className="text-slate-500 text-sm">Gestiona tus compromisos mensuales. La deuda solo se acumula si pasa la fecha de corte.</p>
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -153,11 +213,13 @@ export default function AdminGastosFijos() {
             <span className="text-base font-bold text-slate-700">RD$ {totalCompromisoMensual.toLocaleString()}</span>
           </div>
 
-          <div className="bg-rose-50 border border-rose-200 px-4 py-2 rounded-2xl shadow-sm text-right">
-            <span className="text-[11px] font-semibold text-rose-800 block">
-              Deuda Acumulada ({cantidadPendientes} {cantidadPendientes === 1 ? 'servicio' : 'servicios'})
+          <div className={`border px-4 py-2 rounded-2xl shadow-sm text-right ${totalDeudaPendiente > 0 ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-200'}`}>
+            <span className={`text-[11px] font-semibold block ${totalDeudaPendiente > 0 ? 'text-rose-800' : 'text-slate-400'}`}>
+              Deuda Vencida ({cantidadConDeudaVencida} {cantidadConDeudaVencida === 1 ? 'servicio' : 'servicios'})
             </span>
-            <span className="text-lg font-extrabold text-rose-700">RD$ {totalDeudaPendiente.toLocaleString()}</span>
+            <span className={`text-lg font-extrabold ${totalDeudaPendiente > 0 ? 'text-rose-700' : 'text-slate-700'}`}>
+              RD$ {totalDeudaPendiente.toLocaleString()}
+            </span>
           </div>
         </div>
       </div>
@@ -236,7 +298,7 @@ export default function AdminGastosFijos() {
         </div>
 
         <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-base font-semibold text-slate-700">Tus Gastos Registrados y Cálculo Automático</h2>
+          <h2 className="text-base font-semibold text-slate-700">Tus Gastos Registrados y Estado Actual</h2>
 
           {gastos.length === 0 ? (
             <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-300 text-center text-slate-400 space-y-2">
@@ -250,7 +312,11 @@ export default function AdminGastosFijos() {
                 const diasRestantes = calcularDiasRestantes(gasto.diaPago);
                 const mesesAtrasados = calcularMesesAtrasados(gasto);
                 const esUrgente = diasRestantes <= 3 && !gasto.pagado;
-                const montoTotalItem = Number(gasto.monto) * mesesAtrasados;
+                
+                // Si hay meses atrasados reales se multiplica, si no, muestra el monto base mensual de este período
+                const montoMostrar = mesesAtrasados > 0 
+                  ? Number(gasto.monto) * mesesAtrasados 
+                  : Number(gasto.monto);
 
                 return (
                   <div
@@ -258,7 +324,7 @@ export default function AdminGastosFijos() {
                     className={`p-4 rounded-2xl border transition shadow-sm flex flex-col justify-between relative overflow-hidden ${
                       gasto.pagado
                         ? "bg-slate-50 border-slate-200 opacity-80"
-                        : esUrgente
+                        : mesesAtrasados > 0
                         ? "border-rose-400 bg-rose-50/20"
                         : "border-slate-200 bg-white"
                     }`}
@@ -307,11 +373,16 @@ export default function AdminGastosFijos() {
                         <div className="mt-2 flex items-baseline justify-between">
                           <div>
                             <span className={`text-xl font-extrabold ${gasto.pagado ? "text-slate-400 line-through" : "text-slate-900"}`}>
-                              RD$ {montoTotalItem.toLocaleString()}
+                              RD$ {montoMostrar.toLocaleString()}
                             </span>
                             {mesesAtrasados > 1 && !gasto.pagado && (
                               <span className="text-[11px] text-rose-600 font-semibold block">
-                                (RD$ {Number(gasto.monto).toLocaleString()} × {mesesAtrasados} meses acumulados)
+                                (RD$ {Number(gasto.monto).toLocaleString()} × {mesesAtrasados} meses vencidos)
+                              </span>
+                            )}
+                            {mesesAtrasados === 0 && !gasto.pagado && (
+                              <span className="text-[11px] text-slate-400 block">
+                                Compromiso mes actual
                               </span>
                             )}
                           </div>
@@ -329,10 +400,10 @@ export default function AdminGastosFijos() {
                           <CheckCircle2 className="w-4 h-4 shrink-0" />
                           <span>Factura al día (Pagado)</span>
                         </div>
-                      ) : mesesAtrasados > 1 ? (
+                      ) : mesesAtrasados > 0 ? (
                         <div className="flex items-center gap-1.5 text-rose-600 text-xs font-bold bg-rose-100/80 px-2.5 py-1 rounded-xl w-full">
                           <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse" />
-                          <span>⚠️ Tienes {mesesAtrasados} meses acumulados sin pagar</span>
+                          <span>⚠️ Vencido: {mesesAtrasados} {mesesAtrasados === 1 ? 'mes acumulado' : 'meses acumulados'}</span>
                         </div>
                       ) : esUrgente ? (
                         <div className="flex items-center gap-1.5 text-rose-600 text-xs font-bold bg-rose-100/80 px-2.5 py-1 rounded-xl w-full">
