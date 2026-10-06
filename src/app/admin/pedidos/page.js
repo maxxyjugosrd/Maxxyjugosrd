@@ -8,6 +8,7 @@ import { obtenerClientesEnVivo } from "@/services/clientesService";
 
 // Listas de Zonas de Envío configuradas
 const ZONAS_ENVIO = [
+  { id: "envio-gratis", nombre: "Envío Gratis (Promoción / Retiro)", tipo: "local", costo: 0 },
   // Camiones / Provincias
   { id: "santiago", nombre: "Santiago de los Caballeros", tipo: "camion", costoNormal: 4000, costoFrio: 5000 },
   { id: "lavega", nombre: "La Vega", tipo: "camion", costoNormal: 3500, costoFrio: 4500 },
