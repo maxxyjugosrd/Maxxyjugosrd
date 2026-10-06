@@ -210,7 +210,7 @@ export default function AdminGastosFijos() {
         <div className="flex flex-wrap items-center gap-3">
           {/* Botón rápido hacia la nueva sección de Facturas */}
           <Link
-            href="/admin/facturas"
+            href="/admin/gastos/facturas"
             className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-sm transition"
           >
             <FileText className="w-4 h-4 text-amber-400" /> Ver Facturas y Comprobantes
