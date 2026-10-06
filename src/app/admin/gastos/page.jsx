@@ -11,7 +11,7 @@ export default function AdminGastosFijos() {
   const [diaPago, setDiaPago] = useState("");
   const [categoria, setCategoria] = useState("Servicios");
 
-  // Cargar gastos guardados en localStorage al iniciar
+  // Cargar gastos guardados en localStorage al iniciar (vacío por defecto)
   useEffect(() => {
     const guardados = localStorage.getItem("maxxy_gastos_fijos");
     if (guardados) {
@@ -20,15 +20,6 @@ export default function AdminGastosFijos() {
       } catch (e) {
         console.error("Error al cargar gastos:", e);
       }
-    } else {
-      // Gastos de ejemplo iniciales
-      const iniciales = [
-        { id: "1", nombre: "Alquiler del Local", monto: 15000, diaPago: 5, categoria: "Local" },
-        { id: "2", nombre: "Energía Eléctrica (EDESUR)", monto: 4500, diaPago: 18, categoria: "Servicios" },
-        { id: "3", nombre: "Internet / Conectividad", monto: 1500, diaPago: 25, categoria: "Servicios" }
-      ];
-      setGastos(iniciales);
-      localStorage.setItem("maxxy_gastos_fijos", JSON.stringify(iniciales));
     }
   }, []);
 
@@ -92,16 +83,16 @@ export default function AdminGastosFijos() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
-      {/* Cabecera con navegación */}
+      {/* Cabecera con navegación hacia Finanzas o Admin */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
         <div>
-          <Link href="/admin" className="text-xs text-amber-600 hover:underline flex items-center gap-1 font-semibold mb-1">
-            <ArrowLeft className="w-3.5 h-3.5" /> Volver al Panel Admin
+          <Link href="/admin/finanzas" className="text-xs text-amber-600 hover:underline flex items-center gap-1 font-semibold mb-1">
+            <ArrowLeft className="w-3.5 h-3.5" /> Volver a Finanzas
           </Link>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Bell className="w-6 h-6 text-amber-500" /> Control de Gastos Fijos
           </h1>
-          <p className="text-slate-500 text-sm">Administra los servicios recurrentes y mantén el control de tus fechas de corte.</p>
+          <p className="text-slate-500 text-sm">Administra tus servicios recurrentes y mantén el control de tus fechas de corte.</p>
         </div>
 
         <div className="bg-amber-50 border border-amber-200 px-4 py-2.5 rounded-2xl shadow-sm text-right">
@@ -189,8 +180,10 @@ export default function AdminGastosFijos() {
           <h2 className="text-base font-semibold text-slate-700">Tus Gastos Registrados y Alertas de Pago</h2>
 
           {gastos.length === 0 ? (
-            <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-400">
-              No tienes gastos fijos registrados. Agrega uno usando el formulario.
+            <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-300 text-center text-slate-400 space-y-2">
+              <Bell className="w-8 h-8 mx-auto text-slate-300" />
+              <p className="font-medium text-slate-600">No tienes gastos fijos registrados todavía.</p>
+              <p className="text-xs">Usa el formulario de la izquierda para agregar la luz, el local o cualquier servicio.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
