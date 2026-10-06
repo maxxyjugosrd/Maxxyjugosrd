@@ -1,446 +1,298 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Calendar, AlertTriangle, CheckCircle2, Bell, Clock, ArrowLeft, CheckSquare, Square, History } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Trash2, Calendar, Filter, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import Link from "next/link";
 
-export default function AdminGastosFijos() {
-  const [gastos, setGastos] = useState([]);
-  const [historialPagos, setHistorialPagos] = useState([]);
-  const [nombre, setNombre] = useState("");
-  const [monto, setMonto] = useState("");
-  const [diaPago, setDiaPago] = useState("");
-  const [categoria, setCategoria] = useState("Servicios");
+export default function AdminFacturasPagadas() {
+  const [historialFacturas, setHistorialFacturas] = useState([]);
+  const [gastosFijosConfig, setGastosFijosConfig] = useState([]);
+  
+  // Estados para el formulario de subida
+  const [nombreServicio, setNombreServicio] = useState("");
+  const [montoPagado, setMontoPagado] = useState("");
+  const [fechaPago, setFechaPago] = useState(new Date().toISOString().split("T")[0]);
+  const [imagenFactura, setImagenFactura] = useState("");
+  
+  // Filtros
+  const [mesSeleccionado, setMesSeleccionado] = useState("todos");
+  const [servicioSeleccionado, setServicioSeleccionado] = useState("todos");
 
   useEffect(() => {
-    const guardados = localStorage.getItem("maxxy_gastos_fijos");
-    if (guardados) {
+    // Cargar historial de facturas
+    const facturasGuardadas = localStorage.getItem("maxxy_facturas_comprobantes");
+    if (facturasGuardadas) {
       try {
-        const parsed = JSON.parse(guardados).map(g => ({
-          ...g,
-          pagado: false, // Siempre arranca pendiente por seguridad de ciclo
-          ultimoPagoAnioMes: g.ultimoPagoAnioMes || null
-        }));
-        setGastos(parsed);
+        setHistorialFacturas(JSON.parse(facturasGuardadas));
       } catch (e) {
-        console.error("Error al cargar gastos:", e);
+        console.error("Error al cargar facturas:", e);
       }
     }
 
-    const historialGuardado = localStorage.getItem("maxxy_historial_pagos");
-    if (historialGuardado) {
+    // Cargar configuración de gastos fijos para sugerir nombres en el select
+    const gastosGuardados = localStorage.getItem("maxxy_gastos_fijos");
+    if (gastosGuardados) {
       try {
-        setHistorialPagos(JSON.parse(historialGuardado));
+        setGastosFijosConfig(JSON.parse(gastosGuardados));
       } catch (e) {
-        console.error("Error al cargar historial:", e);
+        console.error("Error al cargar configuración de gastos:", e);
       }
     }
   }, []);
 
-  const guardarEnStorage = (nuevosGastos) => {
-    setGastos(nuevosGastos);
-    localStorage.setItem("maxxy_gastos_fijos", JSON.stringify(nuevosGastos));
+  const guardarFacturasStorage = (nuevasFacturas) => {
+    setHistorialFacturas(nuevasFacturas);
+    localStorage.setItem("maxxy_facturas_comprobantes", JSON.stringify(nuevasFacturas));
   };
 
-  const guardarHistorialStorage = (nuevoHistorial) => {
-    setHistorialPagos(nuevoHistorial);
-    localStorage.setItem("maxxy_historial_pagos", JSON.stringify(nuevoHistorial));
+  // Convertir imagen subida a Base64 para almacenamiento local seguro
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert("La imagen es muy pesada. Por favor selecciona una menor a 2MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagenFactura(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  const agregarGasto = (e) => {
+  const registrarFactura = (e) => {
     e.preventDefault();
-    if (!nombre.trim() || !monto || !diaPago) {
-      alert("Por favor completa todos los campos.");
+    if (!nombreServicio.trim() || !montoPagado || !fechaPago) {
+      alert("Por favor completa los campos obligatorios.");
       return;
     }
 
-    const diaNum = parseInt(diaPago);
-    if (diaNum < 1 || diaNum > 31) {
-      alert("El día de pago debe estar entre 1 y 31.");
-      return;
-    }
-
-    const nuevoGasto = {
-      id: "gasto-" + Date.now(),
-      nombre: nombre.trim(),
-      monto: parseFloat(monto),
-      diaPago: diaNum,
-      categoria,
-      pagado: false,
-      ultimoPagoAnioMes: null
+    const nuevaFactura = {
+      id: "factura-" + Date.now(),
+      nombre: nombreServicio.trim(),
+      monto: parseFloat(montoPagado),
+      fecha: fechaPago, // Formato YYYY-MM-DD para fácil filtrado
+      mesAnio: fechaPago.substring(0, 7), // "YYYY-MM"
+      imagen: imagenFactura || null
     };
 
-    guardarEnStorage([...gastos, nuevoGasto]);
-    setNombre("");
-    setMonto("");
-    setDiaPago("");
+    const actualizado = [nuevaFactura, ...historialFacturas];
+    guardarFacturasStorage(actualizado);
+
+    // Limpiar formulario
+    setNombreServicio("");
+    setMontoPagado("");
+    setImagenFactura("");
   };
 
-  const eliminarGasto = (id) => {
-    if (confirm("¿Estás seguro de eliminar este gasto fijo?")) {
-      const filtrados = gastos.filter((g) => g.id !== id);
-      guardarEnStorage(filtrados);
-    }
-  };
-
-  const eliminarItemHistorial = (idHistorial) => {
-    if (confirm("¿Deseas eliminar este registro del historial?")) {
-      const historialFiltrado = historialPagos.filter((h) => h.id !== idHistorial);
-      guardarHistorialStorage(historialFiltrado);
+  const eliminarFactura = (id) => {
+    if (confirm("¿Estás seguro de eliminar este comprobante de factura?")) {
+      const filtrados = historialFacturas.filter(f => f.id !== id);
+      guardarFacturasStorage(filtrados);
     }
   };
 
-  const calcularMesesAtrasados = (gasto) => {
-    const hoy = new Date();
-    const anioActual = hoy.getFullYear();
-    const mesActual = hoy.getMonth();
-    const diaActual = hoy.getDate();
+  // Filtrar facturas según los selectores de fecha y servicio
+  const facturasFiltradas = historialFacturas.filter(f => {
+    const coincideMes = mesSeleccionado === "todos" || f.mesAnio === mesSeleccionado;
+    const coincideServicio = servicioSeleccionado === "todos" || f.nombre === servicioSeleccionado;
+    return coincideMes && coincideServicio;
+  });
 
-    let anioLimite = 2026;
-    let mesLimite = 0;
+  // Totalidad mensual de los gastos filtrados actualmente
+  const totalGastosFiltrados = facturasFiltradas.reduce((acc, f) => acc + Number(f.monto || 0), 0);
 
-    if (gasto.ultimoPagoAnioMes) {
-      const [pAnio, pMes] = gasto.ultimoPagoAnioMes.split("-").map(Number);
-      anioLimite = pAnio;
-      mesLimite = pMes;
-    } else {
-      anioLimite = anioActual;
-      mesLimite = mesActual;
-    }
-
-    let contador = 0;
-    let evalAnio = anioActual;
-    let evalMes = mesActual;
-
-    if (diaActual < gasto.diaPago) {
-      evalMes--;
-      if (evalMes < 0) {
-        evalMes = 11;
-        evalAnio--;
-      }
-    }
-
-    while (evalAnio > anioLimite || (evalAnio === anioLimite && evalMes >= mesLimite)) {
-      const fechaRevision = new Date(evalAnio, evalMes, gasto.diaPago);
-      if (hoy >= fechaRevision) {
-        contador++;
-      }
-      evalMes--;
-      if (evalMes < 0) {
-        evalMes = 11;
-        evalAnio--;
-      }
-      if (contador > 24) break; 
-    }
-
-    return Math.max(0, contador);
-  };
-
-  const registrarPago = (id) => {
-    const hoy = new Date();
-    const anioMesActual = `${hoy.getFullYear()}-${hoy.getMonth()}`;
-    const fechaLegible = hoy.toLocaleDateString("es-DO", { year: 'numeric', month: 'long', day: 'numeric' });
-
-    let itemPagadoInfo = null;
-
-    const actualizados = gastos.map(g => {
-      if (g.id === id) {
-        itemPagadoInfo = {
-          id: "hist-" + Date.now(),
-          nombre: g.nombre,
-          monto: g.monto,
-          categoria: g.categoria,
-          fechaPago: fechaLegible
-        };
-        // Al registrar pago, guardamos el periodo y mantenemos pagado en false para que siga activo en pendiente con su nueva fecha
-        return {
-          ...g,
-          pagado: false, 
-          ultimoPagoAnioMes: anioMesActual
-        };
-      }
-      return g;
-    });
-
-    guardarEnStorage(actualizados);
-
-    if (itemPagadoInfo) {
-      const nuevoHistorial = [itemPagadoInfo, ...historialPagos];
-      guardarHistorialStorage(nuevoHistorial);
-    }
-  };
-
-  const calcularDiasRestantes = (diaPagoObjetivo) => {
-    const hoy = new Date();
-    const anioActual = hoy.getFullYear();
-    const mesActual = hoy.getMonth();
-
-    let fechaPago = new Date(anioActual, mesActual, diaPagoObjetivo);
-
-    if (hoy > fechaPago) {
-      fechaPago = new Date(anioActual, mesActual + 1, diaPagoObjetivo);
-    }
-
-    const diferenciaTiempo = fechaPago.getTime() - hoy.getTime();
-    const diasRestantes = Math.ceil(diferenciaTiempo / (1000 * 60 * 60 * 24));
-    return diasRestantes;
-  };
-
-  const totalCompromisoMensual = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0);
+  // Obtener lista única de meses disponibles en el historial para el filtro
+  const mesesDisponibles = [...new Set(historialFacturas.map(f => f.mesAnio))].sort().reverse();
   
-  const totalDeudaPendiente = gastos.reduce((sum, g) => {
-    const mesesAtrasados = calcularMesesAtrasados(g);
-    return sum + (Number(g.monto || 0) * mesesAtrasados);
-  }, 0);
-
-  const cantidadConDeudaVencida = gastos.filter(g => calcularMesesAtrasados(g) > 0).length;
+  // Obtener lista única de nombres de servicios registrados
+  const nombresServiciosUnicos = [...new Set(historialFacturas.map(f => f.nombre))];
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b pb-4">
+      {/* Cabecera */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
         <div>
-          <Link href="/admin/finanzas" className="text-xs text-amber-600 hover:underline flex items-center gap-1 font-semibold mb-1">
-            <ArrowLeft className="w-3.5 h-3.5" /> Volver a Finanzas
+          <Link href="/admin/gastos-fijos" className="text-xs text-amber-600 hover:underline flex items-center gap-1 font-semibold mb-1">
+            <ArrowLeft className="w-3.5 h-3.5" /> Volver a Gastos Fijos
           </Link>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Bell className="w-6 h-6 text-amber-500" /> Control de Gastos Fijos y Alertas
+            <FileText className="w-6 h-6 text-amber-500" /> Historial y Comprobantes de Facturas Pagadas
           </h1>
-          <p className="text-slate-500 text-sm">Gestiona tus compromisos mensuales y consulta el historial de pagos.</p>
+          <p className="text-slate-500 text-sm">Sube tus recibos, revisa la totalidad mensual y compara variaciones (luz, agua, alquiler, etc.).</p>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          <div className="bg-white border border-slate-200 px-4 py-2 rounded-2xl shadow-sm text-right">
-            <span className="text-[11px] font-semibold text-slate-400 block">Compromiso Mensual Base</span>
-            <span className="text-base font-bold text-slate-700">RD$ {totalCompromisoMensual.toLocaleString()}</span>
-          </div>
-
-          <div className={`border px-4 py-2 rounded-2xl shadow-sm text-right ${totalDeudaPendiente > 0 ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-200'}`}>
-            <span className={`text-[11px] font-semibold block ${totalDeudaPendiente > 0 ? 'text-rose-800' : 'text-slate-400'}`}>
-              Deuda Vencida ({cantidadConDeudaVencida} {cantidadConDeudaVencida === 1 ? 'servicio' : 'servicios'})
-            </span>
-            <span className={`text-lg font-extrabold ${totalDeudaPendiente > 0 ? 'text-rose-700' : 'text-slate-700'}`}>
-              RD$ {totalDeudaPendiente.toLocaleString()}
-            </span>
-          </div>
+        <div className="bg-white border border-slate-200 px-5 py-3 rounded-2xl shadow-sm text-right">
+          <span className="text-[11px] font-semibold text-slate-400 block">Total Filtrado / Mensual</span>
+          <span className="text-xl font-extrabold text-slate-800">RD$ {totalGastosFiltrados.toLocaleString()}</span>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Formulario para subir factura */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-fit space-y-4">
           <h2 className="text-base font-bold text-slate-800 border-b pb-3 flex items-center gap-2">
-            <Plus className="w-4 h-4 text-amber-500" /> Registrar Nuevo Gasto
+            <Upload className="w-4 h-4 text-amber-500" /> Subir Factura Pagada
           </h2>
 
-          <form onSubmit={agregarGasto} className="space-y-4">
+          <form onSubmit={registrarFactura} className="space-y-4">
             <div>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Nombre del Servicio / Gasto *</label>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Nombre del Servicio *</label>
               <input
                 type="text"
                 required
-                placeholder="Ej. Alquiler Casa, Luz Edesur"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
+                list="lista-servicios"
+                placeholder="Ej. Edesur (Luz), Alquiler"
+                value={nombreServicio}
+                onChange={(e) => setNombreServicio(e.target.value)}
                 className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
+              <datalist id="lista-servicios">
+                {gastosFijosConfig.map(g => (
+                  <option key={g.id} value={g.nombre} />
+                ))}
+              </datalist>
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Monto Mensual (RD$) *</label>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Monto Pagado (RD$) *</label>
               <input
                 type="number"
                 required
                 min="0"
                 step="0.01"
-                placeholder="Ej. 15000"
-                value={monto}
-                onChange={(e) => setMonto(e.target.value)}
+                placeholder="Ej. 4250.00"
+                value={montoPagado}
+                onChange={(e) => setMontoPagado(e.target.value)}
                 className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1">Día de Pago (1-31) *</label>
-                <input
-                  type="number"
-                  required
-                  min="1"
-                  max="31"
-                  placeholder="Ej. 30"
-                  value={diaPago}
-                  onChange={(e) => setDiaPago(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
-              </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Fecha del Pago *</label>
+              <input
+                type="date"
+                required
+                value={fechaPago}
+                onChange={(e) => setFechaPago(e.target.value)}
+                className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+              />
+            </div>
 
-              <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1">Categoría</label>
-                <select
-                  value={categoria}
-                  onChange={(e) => setCategoria(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-                >
-                  <option value="Local">Local</option>
-                  <option value="Servicios">Servicios</option>
-                  <option value="Impuestos">Impuestos</option>
-                  <option value="Suscripciones">Suscripciones</option>
-                  <option value="Otros">Otros</option>
-                </select>
-              </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Foto o Comprobante (Opcional)</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"
+              />
+              {imagenFactura && (
+                <div className="mt-2 relative w-full h-24 border rounded-xl overflow-hidden bg-slate-50">
+                  <img src={imagenFactura} alt="Vista previa" className="w-full h-full object-cover" />
+                </div>
+              )}
             </div>
 
             <button
               type="submit"
               className="w-full bg-amber-500 hover:bg-amber-600 text-white py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-sm mt-2 text-sm"
             >
-              <Plus className="w-4 h-4" /> Guardar Gasto Fijo
+              <Upload className="w-4 h-4" /> Guardar Factura en Historial
             </button>
           </form>
         </div>
 
+        {/* Sección de Filtros e Historial */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="space-y-4">
-            <h2 className="text-base font-semibold text-slate-700">Tus Gastos Registrados y Estado Actual</h2>
+          {/* Panel de Filtros */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center justify-between">
+            <div className="flex items-center gap-2 text-slate-700 font-bold text-sm">
+              <Filter className="w-4 h-4 text-amber-500" /> Filtrar Registros:
+            </div>
 
-            {gastos.length === 0 ? (
-              <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-300 text-center text-slate-400 space-y-2">
-                <Bell className="w-8 h-8 mx-auto text-slate-300" />
-                <p className="font-medium text-slate-600">No tienes gastos fijos registrados todavía.</p>
-                <p className="text-xs">Usa el formulario de la izquierda para agregar la casa o servicios.</p>
+            <div className="flex flex-wrap gap-3">
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block mb-0.5">Mes</span>
+                <select
+                  value={mesSeleccionado}
+                  onChange={(e) => setMesSeleccionado(e.target.value)}
+                  className="px-3 py-1.5 border rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="todos">Todos los meses</option>
+                  {mesesDisponibles.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {gastos.map((gasto) => {
-                  const diasRestantes = calcularDiasRestantes(gasto.diaPago);
-                  const mesesAtrasados = calcularMesesAtrasados(gasto);
-                  const esUrgente = diasRestantes <= 3;
-                  
-                  const montoMostrar = mesesAtrasados > 0 
-                    ? Number(gasto.monto) * mesesAtrasados 
-                    : Number(gasto.monto);
 
-                  return (
-                    <div
-                      key={gasto.id}
-                      className={`p-4 rounded-2xl border transition shadow-sm flex flex-col justify-between relative overflow-hidden ${
-                        mesesAtrasados > 0
-                          ? "border-rose-400 bg-rose-50/20"
-                          : "border-slate-200 bg-white"
-                      }`}
-                    >
-                      <div>
-                        <div className="flex justify-between items-start gap-2">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => registrarPago(gasto.id)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-sm bg-amber-500 text-white hover:bg-amber-600"
-                              title="Marcar como pagado y enviar al historial"
-                            >
-                              <CheckSquare className="w-4 h-4" /> Marcar Pagado
-                            </button>
-                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                              {gasto.categoria}
-                            </span>
-                          </div>
-
-                          <button
-                            onClick={() => eliminarGasto(gasto.id)}
-                            className="text-slate-300 hover:text-rose-500 transition p-1"
-                            title="Eliminar gasto"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        <div className="mt-3">
-                          <h3 className="font-bold text-base text-slate-800">
-                            {gasto.nombre}
-                          </h3>
-                          
-                          <div className="mt-2 flex items-baseline justify-between">
-                            <div>
-                              <span className="text-xl font-extrabold text-slate-900">
-                                RD$ {montoMostrar.toLocaleString()}
-                              </span>
-                              {mesesAtrasados > 1 && (
-                                <span className="text-[11px] text-rose-600 font-semibold block">
-                                  (RD$ {Number(gasto.monto).toLocaleString()} × {mesesAtrasados} meses vencidos)
-                                </span>
-                              )}
-                              {mesesAtrasados === 0 && (
-                                <span className="text-[11px] text-slate-400 block">
-                                  Compromiso mes actual
-                                </span>
-                              )}
-                            </div>
-                            
-                            <span className="text-xs text-slate-500 flex items-center gap-1 font-medium">
-                              <Calendar className="w-3.5 h-3.5 text-amber-500" /> Día {gasto.diaPago}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 pt-3 border-t border-slate-100">
-                        {mesesAtrasados > 0 ? (
-                          <div className="flex items-center gap-1.5 text-rose-600 text-xs font-bold bg-rose-100/80 px-2.5 py-1 rounded-xl w-full">
-                            <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse" />
-                            <span>⚠️ Vencido: {mesesAtrasados} {mesesAtrasados === 1 ? 'mes acumulado' : 'meses acumulados'}</span>
-                          </div>
-                        ) : esUrgente ? (
-                          <div className="flex items-center gap-1.5 text-rose-600 text-xs font-bold bg-rose-100/80 px-2.5 py-1 rounded-xl w-full">
-                            <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse" />
-                            <span>
-                              {diasRestantes === 0
-                                ? "¡Vence HOY!"
-                                : diasRestantes === 1
-                                ? "¡Vence mañana!"
-                                : `⚠️ Vence en ${diasRestantes} días`}
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5 text-slate-600 text-xs font-medium bg-slate-100 px-2.5 py-1 rounded-xl w-full">
-                            <Clock className="w-4 h-4 shrink-0 text-amber-500" />
-                            <span>Faltan {diasRestantes} días para el corte</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block mb-0.5">Servicio</span>
+                <select
+                  value={servicioSeleccionado}
+                  onChange={(e) => setServicioSeleccionado(e.target.value)}
+                  className="px-3 py-1.5 border rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="todos">Todos los servicios</option>
+                  {nombresServiciosUnicos.map(n => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
               </div>
-            )}
+            </div>
           </div>
 
-          {/* Sección de Historial de Pagos Realizados */}
+          {/* Listado de Facturas */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 border-b pb-3">
-              <History className="w-5 h-5 text-emerald-500" /> Historial de Pagos Realizados
+            <h3 className="text-base font-bold text-slate-800 border-b pb-3 flex items-center justify-between">
+              <span>Historial de Comprobantes ({facturasFiltradas.length})</span>
             </h3>
 
-            {historialPagos.length === 0 ? (
-              <p className="text-xs text-slate-400 italic">No hay pagos registrados en el historial todavía. Cuando hagas clic en "Marcar Pagado" aparecerá aquí.</p>
+            {facturasFiltradas.length === 0 ? (
+              <div className="p-12 text-center text-slate-400 space-y-2 border border-dashed rounded-2xl">
+                <FileText className="w-8 h-8 mx-auto text-slate-300" />
+                <p className="font-medium text-slate-600">No hay facturas que coincidan con los filtros.</p>
+                <p className="text-xs">Sube tu primer comprobante usando el formulario lateral.</p>
+              </div>
             ) : (
-              <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto pr-2">
-                {historialPagos.map((pago) => (
-                  <div key={pago.id} className="py-3 flex justify-between items-center text-sm gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-1">
+                {facturasFiltradas.map((factura) => (
+                  <div key={factura.id} className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm flex flex-col justify-between space-y-3">
                     <div>
-                      <p className="font-bold text-slate-700">{pago.nombre}</p>
-                      <p className="text-xs text-slate-400">Pagado el {pago.fechaPago}</p>
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                            {factura.mesAnio}
+                          </span>
+                          <h4 className="font-bold text-slate-800 text-base mt-1">{factura.nombre}</h4>
+                        </div>
+                        <button
+                          onClick={() => eliminarFactura(factura.id)}
+                          className="text-slate-300 hover:text-rose-500 transition p-1"
+                          title="Eliminar factura"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="mt-2 flex items-baseline justify-between">
+                        <span className="text-lg font-extrabold text-slate-900">
+                          RD$ {Number(factura.monto).toLocaleString()}
+                        </span>
+                        <span className="text-xs text-slate-400 flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5 text-amber-500" /> {factura.fecha}
+                        </span>
+                      </div>
                     </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full">
-                        RD$ {Number(pago.monto).toLocaleString()}
-                      </span>
-                      <button
-                        onClick={() => eliminarItemHistorial(pago.id)}
-                        className="text-slate-400 hover:text-rose-500 transition p-1.5 rounded-lg hover:bg-rose-50"
-                        title="Eliminar este registro del historial"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+
+                    {factura.imagen && (
+                      <div className="mt-2 border rounded-xl overflow-hidden bg-slate-50 h-32">
+                        <a href={factura.imagen} target="_blank" rel="noopener noreferrer" title="Ver imagen completa">
+                          <img src={factura.imagen} alt="Comprobante" className="w-full h-full object-cover hover:scale-105 transition duration-300" />
+                        </a>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
