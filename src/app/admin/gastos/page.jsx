@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Calendar, AlertTriangle, CheckCircle2, Bell, Clock, ArrowLeft } from "lucide-react";
+import { Plus, Trash2, Calendar, AlertTriangle, CheckCircle2, Bell, Clock, ArrowLeft, CheckSquare, Square, AlertCircle } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminGastosFijos() {
@@ -11,12 +11,18 @@ export default function AdminGastosFijos() {
   const [diaPago, setDiaPago] = useState("");
   const [categoria, setCategoria] = useState("Servicios");
 
-  // Cargar gastos guardados en localStorage al iniciar (vacío por defecto)
+  // Cargar gastos guardados en localStorage al iniciar
   useEffect(() => {
     const guardados = localStorage.getItem("maxxy_gastos_fijos");
     if (guardados) {
       try {
-        setGastos(JSON.parse(guardados));
+        // Aseguramos que los datos viejos tengan las propiedades nuevas de estado y meses
+        const parsed = JSON.parse(guardados).map(g => ({
+          ...g,
+          pagado: g.pagado ?? false,
+          mesesPendientes: g.mesesPendientes ?? 1
+        }));
+        setGastos(parsed);
       } catch (e) {
         console.error("Error al cargar gastos:", e);
       }
@@ -46,7 +52,9 @@ export default function AdminGastosFijos() {
       nombre: nombre.trim(),
       monto: parseFloat(monto),
       diaPago: diaNum,
-      categoria
+      categoria,
+      pagado: false,         // Por defecto inicia pendiente
+      mesesPendientes: 1     // 1 mes por defecto
     };
 
     guardarEnStorage([...gastos, nuevoGasto]);
@@ -60,6 +68,29 @@ export default function AdminGastosFijos() {
       const filtrados = gastos.filter((g) => g.id !== id);
       guardarEnStorage(filtrados);
     }
+  };
+
+  // Cambiar estado de pagado / pendiente
+  const togglePagado = (id) => {
+    const actualizados = gastos.map(g => {
+      if (g.id === id) {
+        return { ...g, pagado: !g.pagado };
+      }
+      return g;
+    });
+    guardarEnStorage(actualizados);
+  };
+
+  // Modificar cantidad de meses atrasados
+  const cambiarMeses = (id, delta) => {
+    const actualizados = gastos.map(g => {
+      if (g.id === id) {
+        const nuevoTotalMeses = Math.max(1, g.mesesPendientes + delta);
+        return { ...g, mesesPendientes: nuevoTotalMeses };
+      }
+      return g;
+    });
+    guardarEnStorage(actualizados);
   };
 
   // Función para calcular los días faltantes para el próximo pago
@@ -79,30 +110,49 @@ export default function AdminGastosFijos() {
     return diasRestantes;
   };
 
-  const totalGastosFijos = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0);
+  // Cálculos totales
+  const totalCompromisoMensual = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0);
+  
+  // Facturas pendientes (las que NO están pagadas)
+  const gastosPendientes = gastos.filter(g => !g.pagado);
+  const cantidadPendientes = gastosPendientes.length;
+  
+  // Total de deuda acumulada (monto x meses atrasados de los pendientes)
+  const totalDeudaPendiente = gastosPendientes.reduce((sum, g) => {
+    return sum + (Number(g.monto || 0) * Number(g.mesesPendientes || 1));
+  }, 0);
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
-      {/* Cabecera con navegación hacia Finanzas o Admin */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
+      {/* Cabecera con navegación y Resumen Financiero */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b pb-4">
         <div>
           <Link href="/admin/finanzas" className="text-xs text-amber-600 hover:underline flex items-center gap-1 font-semibold mb-1">
             <ArrowLeft className="w-3.5 h-3.5" /> Volver a Finanzas
           </Link>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Bell className="w-6 h-6 text-amber-500" /> Control de Gastos Fijos
+            <Bell className="w-6 h-6 text-amber-500" /> Control de Gastos Fijos y Alertas
           </h1>
-          <p className="text-slate-500 text-sm">Administra tus servicios recurrentes y mantén el control de tus fechas de corte.</p>
+          <p className="text-slate-500 text-sm">Marca tus pagos realizados, controla meses atrasados y evita cortes de servicios.</p>
         </div>
 
-        <div className="bg-amber-50 border border-amber-200 px-4 py-2.5 rounded-2xl shadow-sm text-right">
-          <span className="text-xs font-semibold text-amber-800 block">Total Compromiso Mensual</span>
-          <span className="text-lg font-extrabold text-amber-700">RD$ {totalGastosFijos.toLocaleString()}</span>
+        <div className="flex flex-wrap gap-3">
+          <div className="bg-white border border-slate-200 px-4 py-2 rounded-2xl shadow-sm text-right">
+            <span className="text-[11px] font-semibold text-slate-400 block">Compromiso Mensual Base</span>
+            <span className="text-base font-bold text-slate-700">RD$ {totalCompromisoMensual.toLocaleString()}</span>
+          </div>
+
+          <div className="bg-rose-50 border border-rose-200 px-4 py-2 rounded-2xl shadow-sm text-right">
+            <span className="text-[11px] font-semibold text-rose-800 block">
+              Deuda Pendiente ({cantidadPendientes} {cantidadPendientes === 1 ? 'factura' : 'facturas'})
+            </span>
+            <span className="text-lg font-extrabold text-rose-700">RD$ {totalDeudaPendiente.toLocaleString()}</span>
+          </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Formulario */}
+        {/* Formulario para registrar */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-fit space-y-4">
           <h2 className="text-base font-bold text-slate-800 border-b pb-3 flex items-center gap-2">
             <Plus className="w-4 h-4 text-amber-500" /> Registrar Nuevo Gasto
@@ -114,7 +164,7 @@ export default function AdminGastosFijos() {
               <input
                 type="text"
                 required
-                placeholder="Ej. Luz Edesur, Alquiler, Internet"
+                placeholder="Ej. Casa/Alquiler, Luz Edesur, Internet"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -122,13 +172,13 @@ export default function AdminGastosFijos() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Monto Estimado (RD$) *</label>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Monto Mensual (RD$) *</label>
               <input
                 type="number"
                 required
                 min="0"
                 step="0.01"
-                placeholder="Ej. 4500"
+                placeholder="Ej. 15000"
                 value={monto}
                 onChange={(e) => setMonto(e.target.value)}
                 className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -143,7 +193,7 @@ export default function AdminGastosFijos() {
                   required
                   min="1"
                   max="31"
-                  placeholder="Ej. 15"
+                  placeholder="Ej. 5"
                   value={diaPago}
                   onChange={(e) => setDiaPago(e.target.value)}
                   className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -157,8 +207,8 @@ export default function AdminGastosFijos() {
                   onChange={(e) => setCategoria(e.target.value)}
                   className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
                 >
-                  <option value="Servicios">Servicios</option>
                   <option value="Local">Local</option>
+                  <option value="Servicios">Servicios</option>
                   <option value="Impuestos">Impuestos</option>
                   <option value="Suscripciones">Suscripciones</option>
                   <option value="Otros">Otros</option>
@@ -175,42 +225,63 @@ export default function AdminGastosFijos() {
           </form>
         </div>
 
-        {/* Listado con alertas */}
+        {/* Listado con tarjetas interactivas */}
         <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-base font-semibold text-slate-700">Tus Gastos Registrados y Alertas de Pago</h2>
+          <h2 className="text-base font-semibold text-slate-700">Tus Gastos Registrados y Estado de Cuenta</h2>
 
           {gastos.length === 0 ? (
             <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-300 text-center text-slate-400 space-y-2">
               <Bell className="w-8 h-8 mx-auto text-slate-300" />
               <p className="font-medium text-slate-600">No tienes gastos fijos registrados todavía.</p>
-              <p className="text-xs">Usa el formulario de la izquierda para agregar la luz, el local o cualquier servicio.</p>
+              <p className="text-xs">Usa el formulario de la izquierda para agregar la casa, luz o servicios.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {gastos.map((gasto) => {
                 const diasRestantes = calcularDiasRestantes(gasto.diaPago);
-                const esUrgente = diasRestantes <= 3;
-                const esAlertaCercana = diasRestantes > 3 && diasRestantes <= 7;
+                const esUrgente = diasRestantes <= 3 && !gasto.pagado;
+                const meses = gasto.mesesPendientes || 1;
+                const montoTotalItem = Number(gasto.monto) * meses;
 
                 return (
                   <div
                     key={gasto.id}
-                    className={`bg-white p-4 rounded-2xl border transition shadow-sm flex flex-col justify-between relative overflow-hidden ${
-                      esUrgente
+                    className={`p-4 rounded-2xl border transition shadow-sm flex flex-col justify-between relative overflow-hidden ${
+                      gasto.pagado
+                        ? "bg-slate-50 border-slate-200 opacity-80"
+                        : esUrgente
                         ? "border-rose-400 bg-rose-50/20"
-                        : esAlertaCercana
-                        ? "border-amber-400 bg-amber-50/10"
-                        : "border-slate-200"
+                        : "border-slate-200 bg-white"
                     }`}
                   >
                     <div>
+                      {/* Cabecera de tarjeta con botón tachar/marcar y eliminar */}
                       <div className="flex justify-between items-start gap-2">
-                        <div>
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => togglePagado(gasto.id)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition shadow-sm ${
+                              gasto.pagado
+                                ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                                : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                            }`}
+                            title="Marcar como pagado o pendiente"
+                          >
+                            {gasto.pagado ? (
+                              <>
+                                <CheckSquare className="w-4 h-4 text-emerald-600" /> Pagado
+                              </>
+                            ) : (
+                              <>
+                                <Square className="w-4 h-4 text-slate-500" /> Pendiente
+                              </>
+                            )}
+                          </button>
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
                             {gasto.categoria}
                           </span>
-                          <h3 className="font-bold text-slate-800 text-base">{gasto.nombre}</h3>
                         </div>
+
                         <button
                           onClick={() => eliminarGasto(gasto.id)}
                           className="text-slate-300 hover:text-rose-500 transition p-1"
@@ -220,19 +291,61 @@ export default function AdminGastosFijos() {
                         </button>
                       </div>
 
-                      <div className="mt-3 flex items-baseline justify-between">
-                        <span className="text-xl font-extrabold text-slate-900">
-                          RD$ {Number(gasto.monto).toLocaleString()}
-                        </span>
-                        <span className="text-xs text-slate-500 flex items-center gap-1 font-medium">
-                          <Calendar className="w-3.5 h-3.5 text-amber-500" /> Paga el día {gasto.diaPago}
-                        </span>
+                      {/* Nombre y Monto */}
+                      <div className="mt-3">
+                        <h3 className={`font-bold text-base ${gasto.pagado ? "line-through text-slate-400" : "text-slate-800"}`}>
+                          {gasto.nombre}
+                        </h3>
+                        
+                        <div className="mt-2 flex items-baseline justify-between">
+                          <div>
+                            <span className={`text-xl font-extrabold ${gasto.pagado ? "text-slate-400 line-through" : "text-slate-900"}`}>
+                              RD$ {montoTotalItem.toLocaleString()}
+                            </span>
+                            {meses > 1 && !gasto.pagado && (
+                              <span className="text-[11px] text-rose-600 font-semibold block">
+                                (RD$ {Number(gasto.monto).toLocaleString()} × {meses} meses atrasados)
+                              </span>
+                            )}
+                          </div>
+                          
+                          <span className="text-xs text-slate-500 flex items-center gap-1 font-medium">
+                            <Calendar className="w-3.5 h-3.5 text-amber-500" /> Días {gasto.diaPago}
+                          </span>
+                        </div>
                       </div>
+
+                      {/* Selector de meses atrasados (si está pendiente) */}
+                      {!gasto.pagado && (
+                        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between bg-amber-50/50 p-2 rounded-xl">
+                          <span className="text-xs font-semibold text-slate-600">Meses acumulados / a pagar:</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => cambiarMeses(gasto.id, -1)}
+                              className="w-6 h-6 rounded-lg bg-white border border-slate-300 text-slate-700 font-bold flex items-center justify-center hover:bg-slate-100 text-xs shadow-sm"
+                            >
+                              -
+                            </button>
+                            <span className="text-xs font-bold text-amber-700 w-4 text-center">{meses}</span>
+                            <button
+                              onClick={() => cambiarMeses(gasto.id, 1)}
+                              className="w-6 h-6 rounded-lg bg-white border border-slate-300 text-slate-700 font-bold flex items-center justify-center hover:bg-slate-100 text-xs shadow-sm"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Alerta de días restantes */}
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                      {esUrgente ? (
+                    {/* Alerta de días restantes o estatus pagado */}
+                    <div className="mt-4 pt-3 border-t border-slate-100">
+                      {gasto.pagado ? (
+                        <div className="flex items-center gap-1.5 text-emerald-700 text-xs font-semibold bg-emerald-50 px-2.5 py-1 rounded-xl w-full">
+                          <CheckCircle2 className="w-4 h-4 shrink-0" />
+                          <span>Factura saldada este período</span>
+                        </div>
+                      ) : esUrgente ? (
                         <div className="flex items-center gap-1.5 text-rose-600 text-xs font-bold bg-rose-100/80 px-2.5 py-1 rounded-xl w-full">
                           <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse" />
                           <span>
@@ -243,15 +356,10 @@ export default function AdminGastosFijos() {
                               : `⚠️ Vence en ${diasRestantes} días`}
                           </span>
                         </div>
-                      ) : esAlertaCercana ? (
-                        <div className="flex items-center gap-1.5 text-amber-700 text-xs font-semibold bg-amber-100/70 px-2.5 py-1 rounded-xl w-full">
-                          <Clock className="w-4 h-4 shrink-0" />
-                          <span>Faltan {diasRestantes} días para pagar</span>
-                        </div>
                       ) : (
-                        <div className="flex items-center gap-1.5 text-emerald-700 text-xs font-medium bg-emerald-50 px-2.5 py-1 rounded-xl w-full">
-                          <CheckCircle2 className="w-4 h-4 shrink-0" />
-                          <span>Faltan {diasRestantes} días (Al día)</span>
+                        <div className="flex items-center gap-1.5 text-slate-600 text-xs font-medium bg-slate-100 px-2.5 py-1 rounded-xl w-full">
+                          <Clock className="w-4 h-4 shrink-0 text-amber-500" />
+                          <span>Faltan {diasRestantes} días para el corte</span>
                         </div>
                       )}
                     </div>
