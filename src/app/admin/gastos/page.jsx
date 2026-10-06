@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Calendar, AlertTriangle, CheckCircle2, Bell, Clock, ArrowLeft, CheckSquare, Square } from "lucide-react";
+import { Plus, Trash2, Calendar, AlertTriangle, CheckCircle2, Bell, Clock, ArrowLeft, CheckSquare, Square, History } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminGastosFijos() {
   const [gastos, setGastos] = useState([]);
+  const [historialPagos, setHistorialPagos] = useState([]);
   const [nombre, setNombre] = useState("");
   const [monto, setMonto] = useState("");
   const [diaPago, setDiaPago] = useState("");
@@ -18,7 +19,6 @@ export default function AdminGastosFijos() {
         const parsed = JSON.parse(guardados).map(g => ({
           ...g,
           pagado: g.pagado ?? false,
-          // Guardamos el año y mes del último pago o la fecha de creación
           ultimoPagoAnioMes: g.ultimoPagoAnioMes || null
         }));
         setGastos(parsed);
@@ -26,11 +26,25 @@ export default function AdminGastosFijos() {
         console.error("Error al cargar gastos:", e);
       }
     }
+
+    const historialGuardado = localStorage.getItem("maxxy_historial_pagos");
+    if (historialGuardado) {
+      try {
+        setHistorialPagos(JSON.parse(historialGuardado));
+      } catch (e) {
+        console.error("Error al cargar historial:", e);
+      }
+    }
   }, []);
 
   const guardarEnStorage = (nuevosGastos) => {
     setGastos(nuevosGastos);
     localStorage.setItem("maxxy_gastos_fijos", JSON.stringify(nuevosGastos));
+  };
+
+  const guardarHistorialStorage = (nuevoHistorial) => {
+    setHistorialPagos(nuevoHistorial);
+    localStorage.setItem("maxxy_historial_pagos", JSON.stringify(nuevoHistorial));
   };
 
   const agregarGasto = (e) => {
@@ -69,56 +83,30 @@ export default function AdminGastosFijos() {
     }
   };
 
-  // Calcula cuántos meses se deben realmente (solo si la fecha ya pasó del día de pago y no se ha pagado)
   const calcularMesesAtrasados = (gasto) => {
     if (gasto.pagado) return 0;
 
     const hoy = new Date();
     const anioActual = hoy.getFullYear();
-    const mesActual = hoy.getMonth(); // 0 = Enero, 9 = Octubre, etc.
+    const mesActual = hoy.getMonth();
     const diaActual = hoy.getDate();
 
-    // Fecha límite de pago de este mes
-    const fechaCorteEsteMes = new Date(anioActual, mesActual, gasto.diaPago);
-
-    // Si ya pasó el día de pago de este mes y no está pagado, contamos al menos 1 mes vencido
-    let mesesVencidos = 0;
-    
-    // Evaluamos mes a mes hacia atrás desde el mes actual o el último mes pendiente
-    let cursorAnio = anioActual;
-    let cursorMes = mesActual;
-
-    // Si hoy es menor al día de pago, el mes actual todavía NO está vencido
-    if (diaActual < gasto.diaPago) {
-      // Retrocedemos un mes para empezar a evaluar los verdaderamente atrasados
-      cursorMes -= 1;
-      if (cursorMes < 0) {
-        cursorMes = 11;
-        cursorAnio -= 1;
-      }
-    }
-
-    // Comprobamos hacia atrás cuántos ciclos de pago se han cumplido sin pagar
-    // Tomamos como referencia la fecha en que se creó o el último mes pagado
     let anioLimite = 2026;
-    let mesLimite = 0; // Por defecto evaluamos este año
+    let mesLimite = 0;
 
     if (gasto.ultimoPagoAnioMes) {
       const [pAnio, pMes] = gasto.ultimoPagoAnioMes.split("-").map(Number);
       anioLimite = pAnio;
       mesLimite = pMes;
     } else {
-      // Si nunca se ha pagado, tomamos el mes actual como inicio del compromiso
       anioLimite = anioActual;
       mesLimite = mesActual;
     }
 
-    // Contar cuántos meses han pasado desde el último pago hasta hoy donde ya cruzó el día de pago
     let contador = 0;
     let evalAnio = anioActual;
     let evalMes = mesActual;
 
-    // Si el día actual es menor al día de pago, el mes corriente no cuenta como vencido aún
     if (diaActual < gasto.diaPago) {
       evalMes--;
       if (evalMes < 0) {
@@ -127,9 +115,7 @@ export default function AdminGastosFijos() {
       }
     }
 
-    // Ciclo para contar meses hacia atrás que ya pasaron de su fecha
     while (evalAnio > anioLimite || (evalAnio === anioLimite && evalMes >= mesLimite)) {
-      // Verificamos si este mes específico ya pasó su fecha de pago
       const fechaRevision = new Date(evalAnio, evalMes, gasto.diaPago);
       if (hoy >= fechaRevision) {
         contador++;
@@ -139,34 +125,48 @@ export default function AdminGastosFijos() {
         evalMes = 11;
         evalAnio--;
       }
-      // Evitar bucles infinitos por seguridad
       if (contador > 24) break; 
     }
 
     return Math.max(0, contador);
   };
 
-  // Marcar como pagado o pendiente
   const togglePagado = (id) => {
     const hoy = new Date();
     const anioMesActual = `${hoy.getFullYear()}-${hoy.getMonth()}`;
+    const fechaLegible = hoy.toLocaleDateString("es-DO", { year: 'numeric', month: 'long', day: 'numeric' });
+
+    let itemPagadoInfo = null;
 
     const actualizados = gastos.map(g => {
       if (g.id === id) {
         const nuevoPagado = !g.pagado;
+        if (nuevoPagado) {
+          itemPagadoInfo = {
+            id: "hist-" + Date.now(),
+            nombre: g.nombre,
+            monto: g.monto,
+            categoria: g.categoria,
+            fechaPago: fechaLegible
+          };
+        }
         return {
           ...g,
           pagado: nuevoPagado,
-          // Si lo marca como pagado, guardamos el año-mes actual para que el próximo mes se reactive solo
           ultimoPagoAnioMes: nuevoPagado ? anioMesActual : g.ultimoPagoAnioMes
         };
       }
       return g;
     });
+
     guardarEnStorage(actualizados);
+
+    if (itemPagadoInfo) {
+      const nuevoHistorial = [itemPagadoInfo, ...historialPagos];
+      guardarHistorialStorage(nuevoHistorial);
+    }
   };
 
-  // Días restantes para el próximo corte (para alertas visuales)
   const calcularDiasRestantes = (diaPagoObjetivo) => {
     const hoy = new Date();
     const anioActual = hoy.getFullYear();
@@ -185,7 +185,6 @@ export default function AdminGastosFijos() {
 
   const totalCompromisoMensual = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0);
   
-  // Total de deuda acumulada real (solo suma los meses que YA están vencidos / pasados de fecha)
   const totalDeudaPendiente = gastos.reduce((sum, g) => {
     if (g.pagado) return sum;
     const mesesAtrasados = calcularMesesAtrasados(g);
@@ -204,7 +203,7 @@ export default function AdminGastosFijos() {
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Bell className="w-6 h-6 text-amber-500" /> Control de Gastos Fijos y Alertas
           </h1>
-          <p className="text-slate-500 text-sm">Gestiona tus compromisos mensuales. La deuda solo se acumula si pasa la fecha de corte.</p>
+          <p className="text-slate-500 text-sm">Gestiona tus compromisos mensuales y consulta el historial de pagos.</p>
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -297,137 +296,163 @@ export default function AdminGastosFijos() {
           </form>
         </div>
 
-        <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-base font-semibold text-slate-700">Tus Gastos Registrados y Estado Actual</h2>
+        <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-4">
+            <h2 className="text-base font-semibold text-slate-700">Tus Gastos Registrados y Estado Actual</h2>
 
-          {gastos.length === 0 ? (
-            <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-300 text-center text-slate-400 space-y-2">
-              <Bell className="w-8 h-8 mx-auto text-slate-300" />
-              <p className="font-medium text-slate-600">No tienes gastos fijos registrados todavía.</p>
-              <p className="text-xs">Usa el formulario de la izquierda para agregar la casa o servicios.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {gastos.map((gasto) => {
-                const diasRestantes = calcularDiasRestantes(gasto.diaPago);
-                const mesesAtrasados = calcularMesesAtrasados(gasto);
-                const esUrgente = diasRestantes <= 3 && !gasto.pagado;
-                
-                // Si hay meses atrasados reales se multiplica, si no, muestra el monto base mensual de este período
-                const montoMostrar = mesesAtrasados > 0 
-                  ? Number(gasto.monto) * mesesAtrasados 
-                  : Number(gasto.monto);
+            {gastos.length === 0 ? (
+              <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-300 text-center text-slate-400 space-y-2">
+                <Bell className="w-8 h-8 mx-auto text-slate-300" />
+                <p className="font-medium text-slate-600">No tienes gastos fijos registrados todavía.</p>
+                <p className="text-xs">Usa el formulario de la izquierda para agregar la casa o servicios.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {gastos.map((gasto) => {
+                  const diasRestantes = calcularDiasRestantes(gasto.diaPago);
+                  const mesesAtrasados = calcularMesesAtrasados(gasto);
+                  const esUrgente = diasRestantes <= 3 && !gasto.pagado;
+                  
+                  const montoMostrar = mesesAtrasados > 0 
+                    ? Number(gasto.monto) * mesesAtrasados 
+                    : Number(gasto.monto);
 
-                return (
-                  <div
-                    key={gasto.id}
-                    className={`p-4 rounded-2xl border transition shadow-sm flex flex-col justify-between relative overflow-hidden ${
-                      gasto.pagado
-                        ? "bg-slate-50 border-slate-200 opacity-80"
-                        : mesesAtrasados > 0
-                        ? "border-rose-400 bg-rose-50/20"
-                        : "border-slate-200 bg-white"
-                    }`}
-                  >
-                    <div>
-                      <div className="flex justify-between items-start gap-2">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => togglePagado(gasto.id)}
-                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition shadow-sm ${
-                              gasto.pagado
-                                ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
-                                : "bg-slate-200 text-slate-700 hover:bg-slate-300"
-                            }`}
-                            title="Marcar como pagado o pendiente"
-                          >
-                            {gasto.pagado ? (
-                              <>
-                                <CheckSquare className="w-4 h-4 text-emerald-600" /> Pagado
-                              </>
-                            ) : (
-                              <>
-                                <Square className="w-4 h-4 text-slate-500" /> Pendiente
-                              </>
-                            )}
-                          </button>
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                            {gasto.categoria}
-                          </span>
-                        </div>
-
-                        <button
-                          onClick={() => eliminarGasto(gasto.id)}
-                          className="text-slate-300 hover:text-rose-500 transition p-1"
-                          title="Eliminar gasto"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      <div className="mt-3">
-                        <h3 className={`font-bold text-base ${gasto.pagado ? "line-through text-slate-400" : "text-slate-800"}`}>
-                          {gasto.nombre}
-                        </h3>
-                        
-                        <div className="mt-2 flex items-baseline justify-between">
-                          <div>
-                            <span className={`text-xl font-extrabold ${gasto.pagado ? "text-slate-400 line-through" : "text-slate-900"}`}>
-                              RD$ {montoMostrar.toLocaleString()}
+                  return (
+                    <div
+                      key={gasto.id}
+                      className={`p-4 rounded-2xl border transition shadow-sm flex flex-col justify-between relative overflow-hidden ${
+                        gasto.pagado
+                          ? "bg-slate-50 border-slate-200 opacity-80"
+                          : mesesAtrasados > 0
+                          ? "border-rose-400 bg-rose-50/20"
+                          : "border-slate-200 bg-white"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => togglePagado(gasto.id)}
+                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition shadow-sm ${
+                                gasto.pagado
+                                  ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                                  : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                              }`}
+                              title="Marcar como pagado o pendiente"
+                            >
+                              {gasto.pagado ? (
+                                <>
+                                  <CheckSquare className="w-4 h-4 text-emerald-600" /> Pagado
+                                </>
+                              ) : (
+                                <>
+                                  <Square className="w-4 h-4 text-slate-500" /> Pendiente
+                                </>
+                              )}
+                            </button>
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                              {gasto.categoria}
                             </span>
-                            {mesesAtrasados > 1 && !gasto.pagado && (
-                              <span className="text-[11px] text-rose-600 font-semibold block">
-                                (RD$ {Number(gasto.monto).toLocaleString()} × {mesesAtrasados} meses vencidos)
-                              </span>
-                            )}
-                            {mesesAtrasados === 0 && !gasto.pagado && (
-                              <span className="text-[11px] text-slate-400 block">
-                                Compromiso mes actual
-                              </span>
-                            )}
                           </div>
+
+                          <button
+                            onClick={() => eliminarGasto(gasto.id)}
+                            className="text-slate-300 hover:text-rose-500 transition p-1"
+                            title="Eliminar gasto"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="mt-3">
+                          <h3 className={`font-bold text-base ${gasto.pagado ? "line-through text-slate-400" : "text-slate-800"}`}>
+                            {gasto.nombre}
+                          </h3>
                           
-                          <span className="text-xs text-slate-500 flex items-center gap-1 font-medium">
-                            <Calendar className="w-3.5 h-3.5 text-amber-500" /> Día {gasto.diaPago}
-                          </span>
+                          <div className="mt-2 flex items-baseline justify-between">
+                            <div>
+                              <span className={`text-xl font-extrabold ${gasto.pagado ? "text-slate-400 line-through" : "text-slate-900"}`}>
+                                RD$ {montoMostrar.toLocaleString()}
+                              </span>
+                              {mesesAtrasados > 1 && !gasto.pagado && (
+                                <span className="text-[11px] text-rose-600 font-semibold block">
+                                  (RD$ {Number(gasto.monto).toLocaleString()} × {mesesAtrasados} meses vencidos)
+                                </span>
+                              )}
+                              {mesesAtrasados === 0 && !gasto.pagado && (
+                                <span className="text-[11px] text-slate-400 block">
+                                  Compromiso mes actual
+                                </span>
+                              )}
+                            </div>
+                            
+                            <span className="text-xs text-slate-500 flex items-center gap-1 font-medium">
+                              <Calendar className="w-3.5 h-3.5 text-amber-500" /> Día {gasto.diaPago}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-100">
-                      {gasto.pagado ? (
-                        <div className="flex items-center gap-1.5 text-emerald-700 text-xs font-semibold bg-emerald-50 px-2.5 py-1 rounded-xl w-full">
-                          <CheckCircle2 className="w-4 h-4 shrink-0" />
-                          <span>Factura al día (Pagado)</span>
-                        </div>
-                      ) : mesesAtrasados > 0 ? (
-                        <div className="flex items-center gap-1.5 text-rose-600 text-xs font-bold bg-rose-100/80 px-2.5 py-1 rounded-xl w-full">
-                          <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse" />
-                          <span>⚠️ Vencido: {mesesAtrasados} {mesesAtrasados === 1 ? 'mes acumulado' : 'meses acumulados'}</span>
-                        </div>
-                      ) : esUrgente ? (
-                        <div className="flex items-center gap-1.5 text-rose-600 text-xs font-bold bg-rose-100/80 px-2.5 py-1 rounded-xl w-full">
-                          <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse" />
-                          <span>
-                            {diasRestantes === 0
-                              ? "¡Vence HOY!"
-                              : diasRestantes === 1
-                              ? "¡Vence mañana!"
-                              : `⚠️ Vence en ${diasRestantes} días`}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 text-slate-600 text-xs font-medium bg-slate-100 px-2.5 py-1 rounded-xl w-full">
-                          <Clock className="w-4 h-4 shrink-0 text-amber-500" />
-                          <span>Faltan {diasRestantes} días para el corte</span>
-                        </div>
-                      )}
+                      <div className="mt-4 pt-3 border-t border-slate-100">
+                        {gasto.pagado ? (
+                          <div className="flex items-center gap-1.5 text-emerald-700 text-xs font-semibold bg-emerald-50 px-2.5 py-1 rounded-xl w-full">
+                            <CheckCircle2 className="w-4 h-4 shrink-0" />
+                            <span>Factura al día (Pagado)</span>
+                          </div>
+                        ) : mesesAtrasados > 0 ? (
+                          <div className="flex items-center gap-1.5 text-rose-600 text-xs font-bold bg-rose-100/80 px-2.5 py-1 rounded-xl w-full">
+                            <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse" />
+                            <span>⚠️ Vencido: {mesesAtrasados} {mesesAtrasados === 1 ? 'mes acumulado' : 'meses acumulados'}</span>
+                          </div>
+                        ) : esUrgente ? (
+                          <div className="flex items-center gap-1.5 text-rose-600 text-xs font-bold bg-rose-100/80 px-2.5 py-1 rounded-xl w-full">
+                            <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse" />
+                            <span>
+                              {diasRestantes === 0
+                                ? "¡Vence HOY!"
+                                : diasRestantes === 1
+                                ? "¡Vence mañana!"
+                                : `⚠️ Vence en ${diasRestantes} días`}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 text-slate-600 text-xs font-medium bg-slate-100 px-2.5 py-1 rounded-xl w-full">
+                            <Clock className="w-4 h-4 shrink-0 text-amber-500" />
+                            <span>Faltan {diasRestantes} días para el corte</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Sección de Historial de Pagos Realizados */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 border-b pb-3">
+              <History className="w-5 h-5 text-emerald-500" /> Historial de Pagos Realizados
+            </h3>
+
+            {historialPagos.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">No hay pagos registrados en el historial todavía. Cuando marques un gasto como pagado aparecerá aquí.</p>
+            ) : (
+              <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                {historialPagos.map((pago) => (
+                  <div key={pago.id} className="py-3 flex justify-between items-center text-sm">
+                    <div>
+                      <p className="font-bold text-slate-700">{pago.nombre}</p>
+                      <p className="text-xs text-slate-400">Pagado el {pago.fechaPago}</p>
+                    </div>
+                    <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full">
+                      RD$ {Number(pago.monto).toLocaleString()} - Completado
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
