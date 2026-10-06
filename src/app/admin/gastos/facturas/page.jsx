@@ -114,7 +114,7 @@ export default function AdminFacturasPagadas() {
       {/* Cabecera */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
         <div>
-          <Link href="/admin/gastos-fijos" className="text-xs text-amber-600 hover:underline flex items-center gap-1 font-semibold mb-1">
+          <Link href="/admin/gastos" className="text-xs text-amber-600 hover:underline flex items-center gap-1 font-semibold mb-1">
             <ArrowLeft className="w-3.5 h-3.5" /> Volver a Gastos Fijos
           </Link>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
