@@ -207,7 +207,11 @@ export default function FinanzasYComprasPage() {
   };
 
   // Cálculos y totales
-  const totalPresupuestado = listaCompras.reduce((acc, i) => acc + Number(i.total || 0), 0);
+  // MODIFICADO: Solo suma los ítems cuyo estado 'comprado' sea falso (no tachados)
+  const totalPresupuestado = listaCompras
+    .filter(i => !i.comprado)
+    .reduce((acc, i) => acc + Number(i.total || 0), 0);
+
   const totalGastadoFacturas = listaFacturas.reduce((acc, f) => acc + Number(f.monto || 0), 0);
 
   // Historial de gastos por proveedor con filtro mensual
@@ -244,7 +248,7 @@ export default function FinanzasYComprasPage() {
 
           <div className="flex gap-3">
             <div className="bg-slate-50 border p-3 rounded-2xl text-right">
-              <p className="text-[10px] text-slate-400 font-bold uppercase">Presupuesto Total</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase">Presupuesto Pendiente</p>
               <p className="text-sm font-black text-slate-900">RD$ {totalPresupuestado.toLocaleString()}</p>
             </div>
             <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-2xl text-right">
@@ -438,9 +442,9 @@ export default function FinanzasYComprasPage() {
                               <div>
                                 <p className="font-bold text-slate-800 text-sm">{item.concepto}</p>
                                 <p className="text-slate-500 text-[11px] mt-0.5">
-                                  {item.tipo === "libra" ? "⚖️ Libras: " : "📦 Cant: "} <strong className="text-slate-700">{item.cantidad}</strong> 
+                                  {item.tipo === "libra" ? " Libras: " : " Cant: "} <strong className="text-slate-700">{item.cantidad}</strong> 
                                   {" "}× RD$ {item.precioUnitario} {item.tipo === "libra" ? "c/u (libra)" : "c/u"}
-                                  {proveedorObj && <span className="text-amber-700 font-bold ml-2">🏢 {proveedorObj.empresa}</span>}
+                                  {proveedorObj && <span className="text-amber-700 font-bold ml-2"> {proveedorObj.empresa}</span>}
                                 </p>
                               </div>
                             </div>
@@ -649,7 +653,7 @@ export default function FinanzasYComprasPage() {
                         onChange={(e) => setMesFiltroHistorial(e.target.value)}
                         className="p-2 border rounded-xl text-xs outline-none bg-slate-50 font-bold"
                       >
-                        <option value="todos">📅 Todo el tiempo (Histórico)</option>
+                        <option value="todos">Todo el tiempo (Histórico)</option>
                         <option value="2026-10">Octubre 2026</option>
                         <option value="2026-09">Septiembre 2026</option>
                         <option value="2026-08">Agosto 2026</option>
